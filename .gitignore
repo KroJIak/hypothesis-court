@@ -1,11 +1,12 @@
 .agents/
 .codex
+**/.obsidian/
 /.env
 /.env.*
 !/.env.example
 
 # Documentation and local research scratchpads
-doc/internal/
+docs/internal/
 testing/
 
 # OS and editor noise

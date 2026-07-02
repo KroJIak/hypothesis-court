@@ -102,7 +102,7 @@ flowchart LR
 backend/   - API-каркас
 frontend/  - UI-прототип рабочего пространства
 nginx/     - reverse proxy
-doc/       - документация
+docs/      - документация
 testing/   - локальные исходные материалы для анализа
 ```
 

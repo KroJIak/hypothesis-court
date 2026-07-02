@@ -22,7 +22,7 @@ tags:
 ## Карта документации
 
 ```text
-doc/
+docs/
 ├── 00-INDEX.md
 ├── 01-Project-Scope.md
 ├── 02-MVP-and-Target-Product.md
