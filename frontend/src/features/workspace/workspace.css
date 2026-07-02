@@ -175,17 +175,61 @@
 }
 
 .debate-stage {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-template-rows: auto auto;
-  align-items: start;
-  justify-items: center;
-  gap: 12px 24px;
-  padding: 8px 34px 10px;
+  position: relative;
+  width: min(460px, 100%);
+  min-height: 398px;
+  margin: 0 auto 18px;
+}
+
+.debate-stage__triangle {
+  position: absolute;
+  z-index: 1;
+}
+
+.debate-stage__links {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.debate-stage__links path {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.42);
+  stroke-linecap: round;
+  stroke-width: 1.4;
+  transition:
+    stroke 160ms ease,
+    stroke-width 160ms ease;
+}
+
+.debate-stage:has(.play-button:hover) .debate-stage__links path,
+.debate-stage:has(.play-button:focus-visible) .debate-stage__links path {
+  stroke: rgba(255, 255, 255, 0.72);
+  stroke-width: 3.2;
+}
+
+.debate-stage__triangle--left {
+  left: 18px;
+  top: 0;
+}
+
+.debate-stage__triangle--center {
+  left: 50%;
+  top: 108px;
+  transform: translateX(-50%);
+}
+
+.debate-stage__triangle--right {
+  right: 18px;
+  top: 0;
 }
 
 .debate-stage__triangle--bottom {
-  grid-column: 2;
+  left: 50%;
+  top: 228px;
+  transform: translateX(-50%);
 }
 
 .play-button {
@@ -198,6 +242,8 @@
   color: #f2f2f2;
   font: inherit;
   cursor: pointer;
+  position: relative;
+  z-index: 2;
 }
 
 .play-button__icon {
@@ -214,10 +260,6 @@
 .play-button__icon svg {
   width: 34px;
   height: 34px;
-}
-
-.play-button__label {
-  font-size: 1rem;
 }
 
 .scene-agent {
@@ -568,8 +610,16 @@
   }
 
   .debate-stage {
+    display: grid;
     grid-template-columns: 1fr;
     justify-items: center;
+    width: 100%;
+    min-height: auto;
+  }
+
+  .debate-stage__triangle {
+    position: static;
+    transform: none;
   }
 
   .debate-stage__triangle--bottom {

@@ -90,13 +90,17 @@ function DebateStage({ debate }) {
 
   return (
     <section className="debate-stage" aria-label="Дискуссия агентов">
+      <svg className="debate-stage__links" viewBox="0 0 460 398" preserveAspectRatio="none" aria-hidden="true">
+        <path d="M74 87L386 87" />
+        <path d="M74 87L230 315" />
+        <path d="M386 87L230 315" />
+      </svg>
       <div className="debate-stage__triangle debate-stage__triangle--left">
         <AgentCard {...rolesByPlacement["top-left"]} />
       </div>
       <div className="debate-stage__triangle debate-stage__triangle--center">
         <button type="button" className="play-button" aria-label={debate.playLabel}>
           <span className="play-button__icon"><Play aria-hidden="true" strokeWidth={2.1} /></span>
-          <span className="play-button__label">{debate.playLabel}</span>
         </button>
       </div>
       <div className="debate-stage__triangle debate-stage__triangle--right">
