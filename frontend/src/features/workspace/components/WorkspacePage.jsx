@@ -323,7 +323,11 @@ export function WorkspacePage() {
     return <WorkspaceError />;
   }
 
-  const selectedSession = sessions.find((session) => session.id === selectedChatId) ?? sessions[0];
+  const selectedSession = sessions.find((session) => session.id === selectedChatId) ?? sessions[0] ?? null;
+
+  if (!selectedSession) {
+    return <WorkspaceSkeleton />;
+  }
 
   function handleSelectChat(chatId) {
     setSelectedChatId(chatId);
