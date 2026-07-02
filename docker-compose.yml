@@ -3,6 +3,8 @@ services:
     build:
       context: ./backend
     container_name: hypothesis-court-backend
+    environment:
+      BACKEND_CORS_ALLOW_ORIGINS: ${BACKEND_CORS_ALLOW_ORIGINS}
     healthcheck:
       test:
         [
@@ -22,6 +24,7 @@ services:
     container_name: hypothesis-court-frontend
     environment:
       VITE_API_BASE_URL: /api
+      FRONTEND_ALLOWED_HOSTS: ${FRONTEND_ALLOWED_HOSTS}
     healthcheck:
       test:
         [
