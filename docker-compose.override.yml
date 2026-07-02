@@ -1,0 +1,8 @@
+services:
+  backend:
+    ports:
+      - "${BACKEND_EXTERNAL_PORT}:8000"
+
+  nginx:
+    ports:
+      - "${NGINX_EXTERNAL_PORT}:80"

@@ -1,2 +1,38 @@
 .agents/
 .codex
+/.env
+/.env.*
+!/.env.example
+
+# Documentation and local research scratchpads
+doc/internal/
+testing/
+
+# OS and editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node
+node_modules/
+dist/
+.vite/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Docker and runtime output
+*.log
+tmp/
+temp/
