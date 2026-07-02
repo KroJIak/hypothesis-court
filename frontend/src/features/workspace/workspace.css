@@ -233,23 +233,61 @@
 }
 
 .scene-agent__name {
-  font-size: 0.98rem;
-  line-height: 1.2;
+  margin-bottom: 7px;
+  font-size: 1.04rem;
+  font-weight: 700;
+  line-height: 1.1;
 }
 
 .scene-agent__status {
+  white-space: nowrap;
   font-size: 0.92rem;
   color: #ebebeb;
 }
 
-.status-dots {
-  font-size: 0.95rem;
-  letter-spacing: 0.18em;
+.scene-agent__status-tail {
+  font-size: 0.92em;
+  letter-spacing: 0;
   color: #d8d8d8;
 }
 
 .agent-avatar {
   color: #f1f1f1;
+}
+
+.agent-avatar__plate {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 22px;
+  background: #2c2c2c;
+}
+
+.agent-avatar__base-icon {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 92%;
+  height: 92%;
+  color: #bdbdbd;
+  transform: translate(-50%, -50%);
+}
+
+.agent-avatar__accessory {
+  position: absolute;
+  left: 50%;
+  top: calc(67% + 12px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  color: #efefef;
+  transform: translate(-50%, -50%);
+}
+
+.agent-avatar__accessory-icon {
+  width: 22px;
+  height: 22px;
 }
 
 .agent-avatar--regular {
