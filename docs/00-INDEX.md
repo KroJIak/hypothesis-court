@@ -31,7 +31,8 @@ docs/
 │   ├── 02-User-Flow.md
 │   ├── 03-Hypothesis-Pipeline.md
 │   ├── 04-Agents-and-Judge.md
-│   └── 05-Interface-and-Scene.md
+│   ├── 05-Interface-and-Scene.md
+│   └── 06-Session-Walkthrough.md
 ├── architecture/
 │   ├── 00-INDEX.md
 │   ├── 01-System-Overview.md
@@ -42,10 +43,10 @@ docs/
 │   └── 06-Infrastructure.md
 └── sources/
     ├── 00-INDEX.md
-    └── hypothesis-factory/
+    └── Organizer-Materials/
         ├── 00-INDEX.md
-        ├── 01-Full-Spec.md
-        └── sections/
+        ├── Hypothesis-Factory/
+        └── Task-01/
 ```
 
 ## Документационные слои

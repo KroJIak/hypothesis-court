@@ -8,7 +8,7 @@ tags:
 # Agents and Judge
 
 > [!important]
-> Внутри debate loop все роли обсуждают одну и ту же гипотезу. В системе нет параллельных “альтернативных миров”, где каждая роль генерирует отдельную идею.
+> Сначала hypothesis engine выпускает стартовый набор из `3-5` гипотез. Внутри одного debate loop роли обсуждают одну активную гипотезу. Debate layer не расширяет hypothesis set, а уточняет уже созданные варианты.
 
 ## Ролевой состав
 
@@ -59,19 +59,22 @@ tags:
 
 ```mermaid
 flowchart TD
-    A[Hypothesis v1] --> B[Defender]
-    B --> C[Attacker]
-    C --> D[Manufacturer]
-    D --> E[Hypothesis v2]
-    E --> F{Refinement complete}
-    F -- No --> B
-    F -- Yes --> G[Final debated hypothesis]
+    A[Initial hypothesis set] --> B[Active hypothesis]
+    B --> C[Defender]
+    C --> D[Attacker]
+    D --> E[Manufacturer]
+    E --> F[Refined version]
+    F --> G{Refinement complete or round limit}
+    G -- No --> C
+    G -- Yes --> H{More hypotheses left}
+    H -- Yes --> B
+    H -- No --> I[Refined hypothesis set]
 ```
 
 ## Evaluation layer
 
 Evaluators работают независимо друг от друга.
-Каждая роль смотрит на уже refined hypothesis и возвращает собственную structured assessment.
+Каждая роль смотрит на refined hypothesis set и возвращает собственную structured assessment по каждой гипотезе.
 
 Примеры дополнительных evaluators:
 
@@ -85,7 +88,7 @@ Evaluators работают независимо друг от друга.
 
 Judge собирает:
 
-- итог debate loop;
+- refined hypothesis set;
 - все evaluator outputs;
 - ключевые evidence items;
 - remaining risks.
@@ -93,6 +96,7 @@ Judge собирает:
 Judge выпускает:
 
 - verdict;
+- ranking hypotheses;
 - приоритет;
 - краткое executive summary;
 - список сильных сторон;
@@ -105,12 +109,14 @@ Judge выпускает:
 > Эти правила определяют поведение агентной системы:
 
 - custom evaluators живут в evaluation layer;
-- debate layer отвечает за refinement гипотезы;
-- evaluation layer отвечает за независимую оценку;
+- hypothesis engine формирует count стартовых гипотез из pipeline settings;
+- debate layer отвечает за refinement активной гипотезы и не создаёт новые ветки идей;
+- evaluation layer отвечает за независимую оценку и ranking;
+- round limit debate loop задаётся в pipeline settings;
 - judge синтезирует выводы и закрывает сессию verdict.
 
 ## Связанные документы
 
 - [[03-Hypothesis-Pipeline]]
 - [[05-Interface-and-Scene]]
-- [[sources/hypothesis-factory/01-Full-Spec]]
+- [[sources/Organizer-Materials/Hypothesis-Factory/01-Full-Spec]]

@@ -11,12 +11,11 @@ tags:
 
 ## Содержание
 
-1. [[hypothesis-factory/00-INDEX]]
+1. [[Organizer-Materials/00-INDEX]]
 
 ## Назначение
 
-- `hypothesis-factory/01-Full-Spec` хранит ТЗ одним большим markdown-файлом без Tilda-мусора.
-- `hypothesis-factory/sections/` хранит это же ТЗ, разложенное по главам.
+- `Organizer-Materials/` хранит все материалы организаторов в едином формате именования.
 
 ## Роль в документации
 

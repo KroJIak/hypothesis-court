@@ -40,7 +40,7 @@ flowchart TD
 
 ## Архитектурный принцип
 
-Основная логика живёт в явном Python-оркестраторе. Агентные роли выполняются как управляемые шаги пайплайна с заданными prompt- и schema-контрактами.
+Основная логика живёт в явном Python-оркестраторе. Агентные роли выполняются как управляемые шаги пайплайна с заданными prompt- и schema-контрактами. Количество стартовых гипотез и round limit debate loop задаются через pipeline settings, а не через разрозненные prompt-хаки.
 
 ## Системные модули
 
@@ -60,24 +60,26 @@ flowchart TD
 
 ### Hypothesis engine
 
-- hypothesis generation;
+- generation of `3-5` initial hypotheses;
 - mechanism framing;
 - KPI alignment.
 
 ### Debate layer
 
-- role sequencing;
+- role sequencing per active hypothesis;
+- round-limit enforcement;
 - version release;
 - transcript and argument map.
 
 ### Evaluation layer
 
-- independent criteria scoring;
+- independent criteria scoring per refined hypothesis;
+- ranking sheet assembly;
 - structured evaluator outputs.
 
 ### Judge
 
-- final synthesis;
+- final synthesis across refined hypothesis set;
 - prioritization;
 - recommendation artifact.
 
@@ -87,9 +89,10 @@ flowchart TD
 flowchart LR
     A[Source documents] --> B[Chunks and metadata]
     B --> C[Evidence items]
-    C --> D[Hypothesis versions]
-    D --> E[Evaluator outputs]
-    E --> F[Judge verdict]
+    C --> D[Initial hypothesis set]
+    D --> E[Refined hypothesis versions]
+    E --> F[Evaluator outputs and ranking]
+    F --> G[Judge verdict]
 ```
 
 ## Связанные документы

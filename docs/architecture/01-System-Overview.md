@@ -43,12 +43,12 @@ flowchart LR
 ### Backend
 
 - хранит и обслуживает исследовательские сессии;
-- управляет пайплайном гипотез;
+- управляет пайплайном hypothesis set, debate loop и ranking;
 - агрегирует evidence и verdict.
 
 ### Frontend
 
-- показывает debate scene;
+- показывает hypothesis set, debate scene и ranking;
 - отображает evidence, evaluators и verdict;
 - организует пользовательский путь внутри research session.
 

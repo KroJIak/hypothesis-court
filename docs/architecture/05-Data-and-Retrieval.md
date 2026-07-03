@@ -9,7 +9,7 @@ tags:
 # Data and Retrieval
 
 > [!abstract]
-> Платформа работает вокруг evidence-centric data model: каждая гипотеза, реплика и verdict привязаны к материалам, сигналам и версии исследовательской сессии.
+> Платформа работает вокруг evidence-centric data model: каждая стартовая гипотеза, её версия после debate, реплика и verdict привязаны к материалам, сигналам и версии исследовательской сессии.
 
 ## Входные данные
 
@@ -48,6 +48,7 @@ tags:
 
 ### Hypothesis support map
 
+- initial candidate reference;
 - supporting evidence;
 - contradictory evidence;
 - unresolved gaps;
@@ -61,9 +62,10 @@ flowchart TD
     B --> C[Embeddings]
     C --> D[Retrieved fragments]
     D --> E[Evidence items]
-    E --> F[Hypothesis versions]
-    F --> G[Debate and evaluation outputs]
-    G --> H[Judge verdict]
+    E --> F[Initial hypothesis set]
+    F --> G[Refined hypothesis versions]
+    G --> H[Debate and evaluation outputs]
+    H --> I[Judge verdict]
 ```
 
 ## Retrieval layer
@@ -91,6 +93,7 @@ Retrieval layer объединяет:
 - документа;
 - фрагмента;
 - evidence item;
+- стартовой гипотезы;
 - версии гипотезы;
 - реплики роли;
 - итогового verdict.
@@ -100,4 +103,4 @@ Retrieval layer объединяет:
 - [[02-System-Architecture]]
 - [[03-Backend]]
 - [[product/03-Hypothesis-Pipeline]]
-- [[sources/hypothesis-factory/01-Full-Spec]]
+- [[sources/Organizer-Materials/Hypothesis-Factory/01-Full-Spec]]

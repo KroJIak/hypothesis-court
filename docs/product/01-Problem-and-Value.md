@@ -63,4 +63,4 @@ Hypothesis Court воспринимается как:
 - [[02-User-Flow]]
 - [[03-Hypothesis-Pipeline]]
 - [[05-Interface-and-Scene]]
-- [[sources/hypothesis-factory/01-Full-Spec]]
+- [[sources/Organizer-Materials/Hypothesis-Factory/01-Full-Spec]]
