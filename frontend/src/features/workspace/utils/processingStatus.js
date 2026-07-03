@@ -23,3 +23,19 @@ export function getSequentialProcessingStatus(index, totalCount) {
 
   return PROCESSING_STATUS_QUEUED;
 }
+
+export function getBinaryProcessingStatus(index, totalCount) {
+  if (totalCount <= 1) {
+    return PROCESSING_STATUS_PROCESSING;
+  }
+
+  const processedCount = Math.max(1, Math.floor(totalCount * 0.35));
+
+  return index < processedCount ? PROCESSING_STATUS_PROCESSED : PROCESSING_STATUS_PROCESSING;
+}
+
+export function normalizeAttachmentProcessingStatus(status) {
+  return status === PROCESSING_STATUS_PROCESSED
+    ? PROCESSING_STATUS_PROCESSED
+    : PROCESSING_STATUS_PROCESSING;
+}

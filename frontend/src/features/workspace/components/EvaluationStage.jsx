@@ -10,6 +10,8 @@ import { getAgentViewTransitionName } from "../utils/layoutTransition";
 
 export function EvaluationStage({
   evaluation,
+  answer,
+  isAnswerVisible,
   onAgentAvatarRef,
   judgeAvatarRef,
   onAgentDragStart,
@@ -107,6 +109,12 @@ export function EvaluationStage({
       <div className="evaluation-stage__judge">
         <AgentCard {...evaluation.judge} compact avatarRef={judgeAvatarRef} />
       </div>
+
+      {isAnswerVisible && answer ? (
+        <div className="judge-verdict" aria-live="polite">
+          <p>{answer}</p>
+        </div>
+      ) : null}
     </section>
   );
 }

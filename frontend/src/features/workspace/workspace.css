@@ -636,9 +636,12 @@
 
 .workspace-scene__connection-layer path {
   fill: none;
-  stroke: rgba(255, 255, 255, 0.5);
+  stroke: rgba(255, 255, 255, 0.28);
   stroke-linecap: round;
   stroke-width: 1.35;
+  transition:
+    stroke 160ms ease,
+    stroke-width 160ms ease;
 }
 
 .debate-stage {
@@ -664,7 +667,7 @@
 
 .debate-stage__links path {
   fill: none;
-  stroke: rgba(255, 255, 255, 0.42);
+  stroke: rgba(255, 255, 255, 0.28);
   stroke-linecap: round;
   stroke-width: 1.2;
   transition:
@@ -672,10 +675,17 @@
     stroke-width 160ms ease;
 }
 
-.debate-stage:has(.play-button:hover) .debate-stage__links path,
-.debate-stage:has(.play-button:focus-visible) .debate-stage__links path {
-  stroke: rgba(255, 255, 255, 0.72);
-  stroke-width: 2.6;
+.connection-path--active {
+  stroke: rgba(255, 255, 255, 0.72) !important;
+  stroke-dasharray: 7 7;
+  stroke-width: 2.45 !important;
+  animation: connection-flow 760ms linear infinite;
+}
+
+@keyframes connection-flow {
+  to {
+    stroke-dashoffset: -28;
+  }
 }
 
 .debate-stage__triangle--left {
@@ -723,6 +733,12 @@
   border-radius: 16px;
   background: #272727;
   color: #ffffff;
+}
+
+.play-button:hover .play-button__icon,
+.play-button:focus-visible .play-button__icon,
+.play-button--active .play-button__icon {
+  background: #2f2f2f;
 }
 
 .play-button__icon svg {

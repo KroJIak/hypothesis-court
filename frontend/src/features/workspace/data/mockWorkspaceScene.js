@@ -1,5 +1,5 @@
 import { PROCESSING_STATUS_QUEUED } from "../constants";
-import { getSequentialProcessingStatus } from "../utils/processingStatus";
+import { getBinaryProcessingStatus, getSequentialProcessingStatus } from "../utils/processingStatus";
 
 function createDebateRoles() {
   return [
@@ -91,7 +91,7 @@ function createAttachmentProcessingState(attachments) {
   const processingStatusById = new Map(
     orderedAttachmentIds.map((attachmentId, index) => [
       attachmentId,
-      getSequentialProcessingStatus(index, orderedAttachmentIds.length),
+      getBinaryProcessingStatus(index, orderedAttachmentIds.length),
     ]),
   );
 
