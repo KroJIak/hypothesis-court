@@ -11,6 +11,11 @@ export function mapWorkspaceScene(dto) {
       title: session.title,
       query: session.query,
       answer: session.answer,
+      hypotheses: (session.hypotheses ?? []).map((hypothesis) => ({
+        id: hypothesis.id,
+        title: hypothesis.title,
+        description: hypothesis.description,
+      })),
       attachments: session.attachments.map((attachment) => ({
         id: attachment.id,
         kind: attachment.kind,

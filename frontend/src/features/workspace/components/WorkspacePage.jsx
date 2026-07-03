@@ -16,6 +16,7 @@ import {
   createPendingAgent,
   createComposerRequest,
   createDraftWorkspaceSession,
+  createHypothesesFromRequests,
   createWorkspaceSession,
   formatComposerRequest,
   getInitialAvailableAgents,
@@ -225,6 +226,7 @@ export function WorkspacePage() {
       title: nextTitle,
       query: nextQuery,
       launchedRequests: composerRequests,
+      hypotheses: createHypothesesFromRequests(composerRequests),
       composerRequests: [],
     }));
 

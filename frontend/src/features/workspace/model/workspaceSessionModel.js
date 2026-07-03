@@ -32,6 +32,7 @@ export function createWorkspaceSession(session, paletteAgents) {
     ...session,
     composerRequests: session.composerRequests ?? [],
     launchedRequests: session.launchedRequests ?? [],
+    hypotheses: session.hypotheses ?? [],
     availableAgents: getInitialAvailableAgents(session, paletteAgents),
   };
 }
@@ -50,6 +51,7 @@ export function createDraftWorkspaceSession(baseSession, paletteAgents, newChatI
     attachments: [],
     composerRequests: [],
     launchedRequests: [],
+    hypotheses: [],
     availableAgents: sortAvailableAgents(
       [
         ...paletteAgents.filter((agent) => !agent.isEmpty),
@@ -97,6 +99,26 @@ export function createComposerRequest(context, text) {
 
 export function formatComposerRequest(request) {
   return `${request.context.label} ${request.text}`;
+}
+
+export function createHypothesesFromRequests(requests, count = 4) {
+  const requestSummary = requests
+    .slice(0, 2)
+    .map((request) => request.text)
+    .join("; ");
+  const hypothesisSeeds = [
+    "Сузить проверку до режима, где целевой KPI достигается без расширения производственного окна.",
+    "Сравнить базовый маршрут с более дешёвой заменой критического этапа и оценить потерю качества.",
+    "Проверить, не скрывается ли основной эффект в комбинации ограничений, а не в отдельном параметре.",
+    "Выделить короткий пилот, который подтвердит реализуемость до вложений в масштабирование.",
+    "Отдельно протестировать слабое место, которое может обнулить выигрыш при переносе в производство.",
+  ];
+
+  return hypothesisSeeds.slice(0, count).map((description, index) => ({
+    id: `generated-hypothesis-${index + 1}`,
+    title: `Гипотеза ${index + 1}`,
+    description: requestSummary ? `${description} Исходный фокус: ${requestSummary}.` : description,
+  }));
 }
 
 export function hasPendingAgent(session) {
