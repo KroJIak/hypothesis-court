@@ -13,12 +13,15 @@ class ChatSessionRepository:
         *,
         user_id: uuid.UUID,
         chat_session_id: uuid.UUID,
+        for_update: bool = False,
     ) -> ChatSession | None:
         stmt = select(ChatSession).where(
             ChatSession.id == chat_session_id,
             ChatSession.user_id == user_id,
             ChatSession.deleted_at.is_(None),
         )
+        if for_update:
+            stmt = stmt.with_for_update()
         return session.execute(stmt).scalar_one_or_none()
 
     def get_unstarted_for_user(self, session: Session, *, user_id: uuid.UUID) -> ChatSession | None:

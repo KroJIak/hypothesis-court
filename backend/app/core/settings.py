@@ -70,6 +70,7 @@ class Settings:
     superadmin_first_name: str | None
     superadmin_last_name: str | None
     chat_max_pinned_sessions: int
+    session_max_files: int
     avatar_upload_max_bytes: int = 5 * 1024 * 1024
 
     @property
@@ -109,5 +110,9 @@ def get_settings() -> Settings:
         chat_max_pinned_sessions=_parse_non_negative_int(
             _get_env("CHAT_MAX_PINNED_SESSIONS", "5"),
             "CHAT_MAX_PINNED_SESSIONS",
+        ),
+        session_max_files=_parse_non_negative_int(
+            _get_env("SESSION_MAX_FILES", "100"),
+            "SESSION_MAX_FILES",
         ),
     )

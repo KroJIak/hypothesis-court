@@ -86,7 +86,10 @@ export function createWorkspaceSessionFromChatSession(chatSession, templateSessi
     : createUnstartedSessionTemplate(templateSession, paletteAgents);
 
   return createWorkspaceSession(
-    applyChatSessionMetadata(session, chatSession),
+    {
+      ...applyChatSessionMetadata(session, chatSession),
+      attachments: [],
+    },
     paletteAgents,
   );
 }

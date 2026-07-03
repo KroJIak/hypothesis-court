@@ -82,11 +82,14 @@ export function Composer({
   attachments,
   composerRequests,
   draftMessage,
+  isAttachmentUploading = false,
+  onAttachFiles,
   onDraftMessageChange,
   onRemoveComposerRequest,
   onSend,
 }) {
   const attachmentButtonRefs = useRef(new Map());
+  const attachmentInputRef = useRef(null);
   const requestStackRef = useRef(null);
   const [activeAttachmentId, setActiveAttachmentId] = useState(null);
   const [attachmentTooltipStyle, setAttachmentTooltipStyle] = useState({ left: "0px", top: "0px" });
@@ -186,6 +189,25 @@ export function Composer({
     setIsContextMenuOpen(false);
   }, []);
 
+  const handleOpenAttachmentPicker = useCallback(() => {
+    if (isAttachmentUploading) {
+      return;
+    }
+
+    attachmentInputRef.current?.click();
+  }, [isAttachmentUploading]);
+
+  const handleAttachmentInputChange = useCallback((event) => {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = "";
+
+    if (files.length === 0) {
+      return;
+    }
+
+    onAttachFiles?.(files);
+  }, [onAttachFiles]);
+
   const handleSubmit = useCallback((event) => {
     event.preventDefault();
     onSend({
@@ -217,7 +239,20 @@ export function Composer({
             />
           ))}
         </div>
-        <button type="button" className="attachment-attach-button" aria-label={composer.attachLabel}>
+        <input
+          ref={attachmentInputRef}
+          type="file"
+          className="sr-only"
+          multiple
+          onChange={handleAttachmentInputChange}
+        />
+        <button
+          type="button"
+          className="attachment-attach-button"
+          aria-label={composer.attachLabel}
+          disabled={isAttachmentUploading}
+          onClick={handleOpenAttachmentPicker}
+        >
           <Paperclip aria-hidden="true" strokeWidth={1.9} />
         </button>
       </div>

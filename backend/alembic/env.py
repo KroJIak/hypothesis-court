@@ -5,7 +5,7 @@ from sqlalchemy import engine_from_config, pool
 
 from app.core.settings import get_settings
 from app.db.base import Base
-from app.models import app_seed_run, audit_event, auth_refresh_session, user  # noqa: F401
+import app.models  # noqa: F401
 
 config = context.config
 

@@ -16,6 +16,10 @@ import {
   unpinChatSession,
 } from "../api/chatSessions";
 import {
+  listSessionFiles,
+  uploadSessionFile,
+} from "../api/sessionFiles";
+import {
   AGENT_DRAG_MIME_TYPE,
   EVALUATION_SIDE_RIGHT,
 } from "../constants";
@@ -57,6 +61,7 @@ export function WorkspacePage({
   const [chatSearchQuery, setChatSearchQuery] = useState("");
   const [chatHistoryError, setChatHistoryError] = useState("");
   const [isCreatingChat, setIsCreatingChat] = useState(false);
+  const [isUploadingSessionFile, setIsUploadingSessionFile] = useState(false);
   const deferredChatSearchQuery = useDeferredValue(chatSearchQuery);
 
   useEffect(() => {
@@ -94,6 +99,43 @@ export function WorkspacePage({
 
     return () => controller.abort();
   }, [accessToken, data, deferredChatSearchQuery, status]);
+
+  useEffect(() => {
+    if (status !== "success" || !selectedChatId) {
+      return undefined;
+    }
+
+    const controller = new AbortController();
+
+    listSessionFiles({
+      accessToken,
+      chatSessionId: selectedChatId,
+      signal: controller.signal,
+    })
+      .then((payload) => {
+        setSessions((currentSessions) =>
+          currentSessions.map((session) =>
+            session.id === selectedChatId
+              ? {
+                  ...session,
+                  attachments: payload.items,
+                  maxFiles: payload.maxFiles,
+                }
+              : session,
+          ),
+        );
+        setChatHistoryError("");
+      })
+      .catch((error) => {
+        if (error?.name === "AbortError") {
+          return;
+        }
+
+        setChatHistoryError(error instanceof Error ? error.message : "Не удалось загрузить файлы чата.");
+      });
+
+    return () => controller.abort();
+  }, [accessToken, selectedChatId, status]);
 
   if (status === "loading") {
     return <WorkspaceSkeleton />;
@@ -221,6 +263,45 @@ export function WorkspacePage({
       }
     } catch (error) {
       setChatHistoryError(error instanceof Error ? error.message : "Не удалось удалить чат.");
+    }
+  }
+
+  async function handleAttachFiles(fileList) {
+    const files = Array.from(fileList ?? []).filter(Boolean);
+
+    if (!selectedSession || files.length === 0) {
+      return;
+    }
+
+    setIsUploadingSessionFile(true);
+    setChatHistoryError("");
+
+    try {
+      for (const file of files) {
+        const uploadedFile = await uploadSessionFile({
+          accessToken,
+          chatSessionId: selectedSession.id,
+          file,
+        });
+
+        setSessions((currentSessions) =>
+          currentSessions.map((session) =>
+            session.id === selectedSession.id
+              ? {
+                  ...session,
+                  attachments: [
+                    ...(session.attachments ?? []).filter((attachment) => attachment.id !== uploadedFile.id),
+                    uploadedFile,
+                  ],
+                }
+              : session,
+          ),
+        );
+      }
+    } catch (error) {
+      setChatHistoryError(error instanceof Error ? error.message : "Не удалось загрузить файл.");
+    } finally {
+      setIsUploadingSessionFile(false);
     }
   }
 
@@ -453,7 +534,9 @@ export function WorkspacePage({
           attachments={selectedSession.attachments}
           composerRequests={selectedSession.composerRequests ?? []}
           draftMessage={draftMessage}
+          isAttachmentUploading={isUploadingSessionFile}
           onDraftMessageChange={setDraftMessage}
+          onAttachFiles={handleAttachFiles}
           onRemoveComposerRequest={handleRemoveComposerRequest}
           onSend={handleSend}
         />
