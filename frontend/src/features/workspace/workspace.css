@@ -1006,8 +1006,99 @@
   align-items: center;
   border-radius: 20px;
   background: #1f1f1f;
-  padding: 6px 8px 6px 12px;
-  gap: 9px;
+  padding: 6px 8px;
+  gap: 10px;
+}
+
+.composer-request-stack {
+  --composer-request-row-height: 27px;
+  --composer-visible-request-count: 4;
+  max-height: calc(
+    var(--composer-request-row-height) * var(--composer-visible-request-count) + 8px
+  );
+  margin-bottom: 8px;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.035);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px 5px;
+  scrollbar-width: none;
+}
+
+.composer-request-stack::-webkit-scrollbar {
+  display: none;
+}
+
+.composer-request-row {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) 26px;
+  align-items: center;
+  min-height: var(--composer-request-row-height);
+  width: 100%;
+  color: rgba(242, 242, 242, 0.62);
+  column-gap: 8px;
+  font-size: 0.82rem;
+  line-height: 1;
+  padding: 0 4px;
+  animation: composer-request-rise 180ms ease-out both;
+}
+
+.composer-request-row__context {
+  min-width: 0;
+  max-width: 112px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.075);
+  color: rgba(244, 244, 244, 0.68);
+  font-size: 0.76rem;
+  line-height: 1;
+  overflow: hidden;
+  padding: 4px 7px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-request-row__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-request-row__delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: rgba(242, 242, 242, 0.56);
+  cursor: pointer;
+}
+
+.composer-request-row__delete:hover,
+.composer-request-row__delete:focus-visible {
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(242, 242, 242, 0.82);
+  outline: none;
+}
+
+.composer-request-row__delete svg {
+  width: 16px;
+  height: 16px;
+}
+
+@keyframes composer-request-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .composer-panel__input-wrap {
@@ -1039,7 +1130,7 @@
   flex-direction: row;
   justify-content: flex-end;
   align-items: center;
-  gap: 14px;
+  gap: 0;
 }
 
 .composer-context {
@@ -1053,7 +1144,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: space-between;
-  width: 138px;
+  width: auto;
   height: 28px;
   border: 0;
   border-radius: 999px;
@@ -1073,9 +1164,6 @@
 }
 
 .composer-context__label {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -1088,12 +1176,13 @@
 
 .composer-context__menu {
   position: absolute;
-  right: 0;
+  left: 0;
   bottom: calc(100% + 6px);
   z-index: 20;
   display: flex;
   flex-direction: column;
-  width: 148px;
+  width: max-content;
+  min-width: 100%;
   border-radius: 14px;
   background: #2a2a2a;
   padding: 5px;
@@ -1130,6 +1219,11 @@
   border: 0;
   border-radius: 999px;
   cursor: pointer;
+  overflow: hidden;
+  transition:
+    width 180ms ease,
+    background 180ms ease,
+    color 180ms ease;
 }
 
 .composer-action--ghost {
@@ -1140,6 +1234,19 @@
 .composer-action--primary {
   background: #d8d8d8;
   color: #1a1a1a;
+}
+
+.composer-action--start {
+  width: 82px;
+  background: #3fb950;
+  color: #061b0b;
+}
+
+.composer-action__start-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .composer-action svg {

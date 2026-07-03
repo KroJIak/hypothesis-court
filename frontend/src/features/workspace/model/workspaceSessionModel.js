@@ -30,6 +30,7 @@ export function getInitialAvailableAgents(session, paletteAgents) {
 export function createWorkspaceSession(session, paletteAgents) {
   return {
     ...session,
+    composerRequests: session.composerRequests ?? [],
     availableAgents: getInitialAvailableAgents(session, paletteAgents),
   };
 }
@@ -46,6 +47,7 @@ export function createDraftWorkspaceSession(baseSession, paletteAgents, newChatI
     answer:
       "После подключения API здесь появится вердикт судьи и итоговая рекомендация по собранной сцене.",
     attachments: [],
+    composerRequests: [],
     availableAgents: sortAvailableAgents(
       [
         ...paletteAgents.filter((agent) => !agent.isEmpty),
@@ -76,6 +78,23 @@ export function createPendingAgent() {
     isEmpty: true,
     isPendingSetup: true,
   };
+}
+
+export function createComposerRequest(context, text) {
+  const requestId =
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `composer-request-${Date.now()}`;
+
+  return {
+    id: requestId,
+    context,
+    text,
+  };
+}
+
+export function formatComposerRequest(request) {
+  return `${request.context.label} ${request.text}`;
 }
 
 export function hasPendingAgent(session) {

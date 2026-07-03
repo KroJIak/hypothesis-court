@@ -13,8 +13,10 @@ import { useWorkspaceScene } from "../hooks/useWorkspaceScene";
 import {
   createEvaluationAgent,
   createPendingAgent,
+  createComposerRequest,
   createDraftWorkspaceSession,
   createWorkspaceSession,
+  formatComposerRequest,
   getInitialAvailableAgents,
   hasPendingAgent,
   insertEvaluationAgentAtEdge,
@@ -193,23 +195,45 @@ export function WorkspacePage() {
     handleMoveAgentToPalette(payload.agentId);
   }
 
-  function handleSend(event) {
-    event.preventDefault();
+  function handleSend({ context, text }) {
+    const nextText = text.trim();
+    const composerRequests = selectedSession.composerRequests ?? [];
 
-    const nextQuery = draftMessage.trim();
-
-    if (!nextQuery) {
+    if (!nextText && composerRequests.length === 0) {
       return;
     }
+
+    if (nextText) {
+      updateSelectedSession((session) => ({
+        ...session,
+        composerRequests: [...(session.composerRequests ?? []), createComposerRequest(context, nextText)],
+      }));
+
+      setDraftMessage("");
+      return;
+    }
+
+    const nextQuery = composerRequests.map(formatComposerRequest).join("\n");
+    const nextTitle = composerRequests.length === 1
+      ? formatComposerRequest(composerRequests[0])
+      : `${formatComposerRequest(composerRequests[0])} +${composerRequests.length - 1}`;
 
     updateSelectedSession((session) => ({
       ...session,
       isPendingDraft: false,
-      title: nextQuery,
+      title: nextTitle,
       query: nextQuery,
+      composerRequests: [],
     }));
 
     setDraftMessage("");
+  }
+
+  function handleRemoveComposerRequest(requestId) {
+    updateSelectedSession((session) => ({
+      ...session,
+      composerRequests: (session.composerRequests ?? []).filter((request) => request.id !== requestId),
+    }));
   }
 
   return (
@@ -241,8 +265,10 @@ export function WorkspacePage() {
         <Composer
           composer={data.composer}
           attachments={selectedSession.attachments}
+          composerRequests={selectedSession.composerRequests ?? []}
           draftMessage={draftMessage}
           onDraftMessageChange={setDraftMessage}
+          onRemoveComposerRequest={handleRemoveComposerRequest}
           onSend={handleSend}
         />
       </section>
