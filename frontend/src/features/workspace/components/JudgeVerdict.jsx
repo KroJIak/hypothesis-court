@@ -2,21 +2,41 @@ import { useEffect, useRef, useState } from "react";
 
 const TYPEWRITER_INTERVAL_MS = 18;
 const TYPEWRITER_CHUNK_SIZE = 4;
+const verdictProgressBySession = new Map();
 
-export function JudgeVerdict({ answer }) {
+function getVerdictProgressKey(sessionId, answer) {
+  return `${sessionId}:${answer}`;
+}
+
+function getInitialVisibleAnswer(sessionId, answer) {
+  const cachedLength = verdictProgressBySession.get(getVerdictProgressKey(sessionId, answer)) ?? 0;
+
+  return answer.slice(0, cachedLength);
+}
+
+export function JudgeVerdict({ answer, sessionId }) {
   const verdictRef = useRef(null);
-  const [visibleAnswer, setVisibleAnswer] = useState("");
+  const [visibleAnswer, setVisibleAnswer] = useState(() => getInitialVisibleAnswer(sessionId, answer));
 
   useEffect(() => {
-    setVisibleAnswer("");
-
     if (!answer) {
+      setVisibleAnswer("");
       return undefined;
     }
 
-    let nextLength = 0;
+    const progressKey = getVerdictProgressKey(sessionId, answer);
+    let nextLength = verdictProgressBySession.get(progressKey) ?? 0;
+
+    if (nextLength >= answer.length) {
+      setVisibleAnswer(answer);
+      return undefined;
+    }
+
+    setVisibleAnswer(answer.slice(0, nextLength));
+
     const intervalId = window.setInterval(() => {
       nextLength = Math.min(answer.length, nextLength + TYPEWRITER_CHUNK_SIZE);
+      verdictProgressBySession.set(progressKey, nextLength);
       setVisibleAnswer(answer.slice(0, nextLength));
 
       if (nextLength >= answer.length) {
@@ -25,7 +45,7 @@ export function JudgeVerdict({ answer }) {
     }, TYPEWRITER_INTERVAL_MS);
 
     return () => window.clearInterval(intervalId);
-  }, [answer]);
+  }, [answer, sessionId]);
 
   useEffect(() => {
     verdictRef.current?.scrollIntoView({

@@ -149,6 +149,9 @@ export function WorkspacePage({
   }
 
   const selectedSession = sessions.find((session) => session.id === selectedChatId) ?? sessions[0] ?? null;
+  const isAgentEditingLocked = selectedSession
+    ? selectedSession.isStarted || (selectedSession.hypotheses ?? []).length > 0
+    : false;
 
   function updateSelectedSession(mapSelectedSession) {
     setSessions((currentSessions) =>
@@ -320,6 +323,10 @@ export function WorkspacePage({
   }
 
   function handleAddAgent() {
+    if (isAgentEditingLocked) {
+      return;
+    }
+
     if (hasPendingAgent(selectedSession)) {
       return;
     }
@@ -335,6 +342,11 @@ export function WorkspacePage({
   }
 
   function handleAgentDragStart(event, source, agentId) {
+    if (isAgentEditingLocked) {
+      event.preventDefault();
+      return;
+    }
+
     setDragSource(source);
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData(AGENT_DRAG_MIME_TYPE, JSON.stringify({ source, agentId }));
@@ -398,6 +410,10 @@ export function WorkspacePage({
     event.preventDefault();
     setDragSource(null);
 
+    if (isAgentEditingLocked) {
+      return;
+    }
+
     const payload = readAgentDragPayload(event);
 
     if (payload?.source !== "palette") {
@@ -411,6 +427,10 @@ export function WorkspacePage({
     event.preventDefault();
     setDragSource(null);
 
+    if (isAgentEditingLocked) {
+      return;
+    }
+
     const payload = readAgentDragPayload(event);
 
     if (payload?.source !== "evaluation") {
@@ -421,6 +441,10 @@ export function WorkspacePage({
   }
 
   function handleReorderPaletteAgent(agentId, targetAgentId, placement) {
+    if (isAgentEditingLocked) {
+      return;
+    }
+
     runLayoutTransition(() => {
       updateSelectedSession((session) => {
         const availableAgents = session.availableAgents ?? getInitialAvailableAgents(session, data.palette.agents);
@@ -540,6 +564,7 @@ export function WorkspacePage({
             onAgentDragEnd={handleAgentDragEnd}
             onDropAgentToEvaluation={handleDropAgentToEvaluation}
             dragSource={dragSource}
+            isAgentEditingLocked={isAgentEditingLocked}
           />
         </div>
 
@@ -565,7 +590,9 @@ export function WorkspacePage({
         onDropAgentToPalette={handleDropAgentToPalette}
         onReorderPaletteAgent={handleReorderPaletteAgent}
         isDropTargetVisible={dragSource === "evaluation"}
-        isAddAgentDisabled={hasPendingAgent(selectedSession)}
+        isAddAgentDisabled={isAgentEditingLocked || hasPendingAgent(selectedSession)}
+        isAgentEditingLocked={isAgentEditingLocked}
+        lockedReason="Агентов можно менять только до старта процесса."
         onAddAgent={handleAddAgent}
       />
     </main>
