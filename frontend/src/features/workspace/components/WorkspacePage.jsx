@@ -17,6 +17,44 @@ import { AgentAvatar } from "./AgentAvatar";
 import { useWorkspaceScene } from "../hooks/useWorkspaceScene";
 import "../workspace.css";
 
+const COLLAPSED_RECENT_CHAT_LIMIT = 5;
+const AGENT_DRAG_MIME_TYPE = "application/x-hypothesis-court-agent";
+const DEFAULT_EVALUATION_AGENT_STATUS = "оценивает";
+
+function getInitialAvailableAgents(session, paletteAgents) {
+  const selectedAgentIds = new Set(session.evaluation.agents.map((agent) => agent.id));
+
+  return paletteAgents.filter((agent) => !selectedAgentIds.has(agent.id));
+}
+
+function createWorkspaceSession(session, paletteAgents) {
+  return {
+    ...session,
+    availableAgents: getInitialAvailableAgents(session, paletteAgents),
+  };
+}
+
+function createEvaluationAgent(agent) {
+  return {
+    ...agent,
+    status: agent.status ?? DEFAULT_EVALUATION_AGENT_STATUS,
+  };
+}
+
+function readAgentDragPayload(event) {
+  const rawPayload = event.dataTransfer.getData(AGENT_DRAG_MIME_TYPE);
+
+  if (!rawPayload) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(rawPayload);
+  } catch {
+    return null;
+  }
+}
+
 function capitalizeFirst(text) {
   if (!text) {
     return text;
@@ -35,6 +73,14 @@ function Sidebar({
   onCreateChat,
   onToggleSidebar,
 }) {
+  const [isCollapsedChatListOpen, setIsCollapsedChatListOpen] = useState(false);
+  const recentCollapsedSessions = sessions.slice(0, COLLAPSED_RECENT_CHAT_LIMIT);
+
+  function handleCollapsedChatSelect(chatId) {
+    onSelectChat(chatId);
+    setIsCollapsedChatListOpen(false);
+  }
+
   return (
     <aside className={`workspace-sidebar${isCollapsed ? " workspace-sidebar--collapsed" : ""}`}>
       <div className="sidebar-topbar">
@@ -78,20 +124,49 @@ function Sidebar({
         <span className="sidebar-label">{shell.navigation.searchLabel}</span>
       </button>
 
-      <div className="chat-list" role="list" aria-label="История чатов">
-        {sessions.map((session) => (
+      {isCollapsed ? (
+        <div className="collapsed-chat-history">
           <button
-            key={session.id}
             type="button"
-            className={`chat-list__item${session.id === selectedChatId ? " chat-list__item--active" : ""}`}
-            onClick={() => onSelectChat(session.id)}
-            title={session.title}
+            className="collapsed-chat-history__trigger"
+            onClick={() => setIsCollapsedChatListOpen((currentValue) => !currentValue)}
+            aria-label="Показать недавние чаты"
+            aria-expanded={isCollapsedChatListOpen}
           >
-            <span className="chat-list__icon"><MessageSquare aria-hidden="true" strokeWidth={1.9} /></span>
-            <span className="sidebar-label">{session.title}</span>
+            <MessageSquare aria-hidden="true" strokeWidth={1.9} />
           </button>
-        ))}
-      </div>
+          {isCollapsedChatListOpen ? (
+            <div className="collapsed-chat-history__popover" role="list" aria-label="Недавние чаты">
+              {recentCollapsedSessions.map((session) => (
+                <button
+                  key={session.id}
+                  type="button"
+                  className={`collapsed-chat-history__item${session.id === selectedChatId ? " collapsed-chat-history__item--active" : ""}`}
+                  onClick={() => handleCollapsedChatSelect(session.id)}
+                  title={session.title}
+                >
+                  {session.title}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <div className="chat-list" role="list" aria-label="История чатов">
+          {sessions.map((session) => (
+            <button
+              key={session.id}
+              type="button"
+              className={`chat-list__item${session.id === selectedChatId ? " chat-list__item--active" : ""}`}
+              onClick={() => onSelectChat(session.id)}
+              title={session.title}
+            >
+              <span className="chat-list__icon"><MessageSquare aria-hidden="true" strokeWidth={1.9} /></span>
+              <span className="sidebar-label">{session.title}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       <button type="button" className="account-button" aria-label={shell.user.name}>
         <CircleUserRound aria-hidden="true" strokeWidth={1.9} />
@@ -100,11 +175,23 @@ function Sidebar({
   );
 }
 
-function AgentCard({ name, status, variant, compact = false, avatarRef = null }) {
+function AgentCard({
+  name,
+  status,
+  variant,
+  compact = false,
+  avatarRef = null,
+  draggable = false,
+  onDragStart,
+}) {
   return (
-    <div className={`scene-agent${compact ? " scene-agent--compact" : ""}`}>
-      <span className="scene-agent__name">{name}</span>
+    <div
+      className={`scene-agent${compact ? " scene-agent--compact" : ""}${draggable ? " scene-agent--draggable" : ""}`}
+      draggable={draggable}
+      onDragStart={onDragStart}
+    >
       <span className="scene-agent__avatar-anchor" ref={avatarRef}>
+        <span className="scene-agent__name">{name}</span>
         <AgentAvatar variant={variant} size={compact ? "compact" : "regular"} />
       </span>
       {status ? (
@@ -219,15 +306,43 @@ function DebateStage({ debate, manufacturerAvatarRef }) {
   );
 }
 
-function EvaluationStage({ evaluation, answer, onAgentAvatarRef, judgeAvatarRef }) {
+function EvaluationStage({
+  evaluation,
+  answer,
+  onAgentAvatarRef,
+  judgeAvatarRef,
+  onAgentDragStart,
+  onDropAgent,
+}) {
+  function handleDragOver(event) {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+  }
+
   return (
     <section className="evaluation-stage" aria-label="Оценка гипотезы">
-      <div className="evaluation-stage__agents">
-        {evaluation.agents.map((agent) => (
-          <div key={agent.id} className={`evaluation-stage__slot evaluation-stage__slot--${agent.placement}`}>
-            <AgentCard {...agent} compact avatarRef={(node) => onAgentAvatarRef(agent.id, node)} />
-          </div>
-        ))}
+      <div
+        className="evaluation-stage__agents"
+        onDragOver={handleDragOver}
+        onDrop={onDropAgent}
+        aria-label="Перетащите сюда оценочного агента"
+      >
+        <div className="evaluation-stage__rail">
+          {evaluation.agents.map((agent) => (
+            <div key={agent.id} className="evaluation-stage__slot">
+              <AgentCard
+                {...agent}
+                compact
+                draggable
+                avatarRef={(node) => onAgentAvatarRef(agent.id, node)}
+                onDragStart={(event) => onAgentDragStart(event, "evaluation", agent.id)}
+              />
+            </div>
+          ))}
+          {evaluation.agents.length === 0 ? (
+            <div className="evaluation-stage__empty">Перетащите агента для оценки</div>
+          ) : null}
+        </div>
       </div>
 
       <div className="evaluation-stage__judge">
@@ -251,7 +366,7 @@ function getElementCenter(element, rootRect) {
   };
 }
 
-function WorkspaceScene({ session }) {
+function WorkspaceScene({ session, onAgentDragStart, onDropAgentToEvaluation }) {
   const sceneRef = useRef(null);
   const manufacturerAvatarRef = useRef(null);
   const judgeAvatarRef = useRef(null);
@@ -327,11 +442,13 @@ function WorkspaceScene({ session }) {
 
     observedElements.forEach((element) => resizeObserver.observe(element));
     window.addEventListener("resize", updateConnections);
+    sceneRef.current?.addEventListener("scroll", updateConnections, true);
 
     return () => {
       window.cancelAnimationFrame(animationFrame);
       resizeObserver.disconnect();
       window.removeEventListener("resize", updateConnections);
+      sceneRef.current?.removeEventListener("scroll", updateConnections, true);
     };
   }, [session.evaluation.agents]);
 
@@ -356,26 +473,46 @@ function WorkspaceScene({ session }) {
         answer={session.answer}
         onAgentAvatarRef={setEvaluationAvatarRef}
         judgeAvatarRef={judgeAvatarRef}
+        onAgentDragStart={onAgentDragStart}
+        onDropAgent={onDropAgentToEvaluation}
       />
     </div>
   );
 }
 
-function AgentPalette({ palette }) {
+function AgentPalette({ palette, agents, onAgentDragStart, onDropAgentToPalette }) {
+  function handleDragOver(event) {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+  }
+
   return (
-    <aside className="agent-palette">
+    <aside
+      className="agent-palette"
+      onDragOver={handleDragOver}
+      onDrop={onDropAgentToPalette}
+      aria-label="Доступные агенты"
+    >
       <button type="button" className="palette-add-button" aria-label={palette.addAgentLabel}>
         <Plus aria-hidden="true" strokeWidth={2.1} />
       </button>
       <span className="palette-add-label">{palette.addAgentLabel}</span>
 
       <div className="palette-list">
-        {palette.agents.map((agent) => (
-          <div key={agent.id} className="palette-list__item">
+        {agents.map((agent) => (
+          <div
+            key={agent.id}
+            className="palette-list__item palette-list__item--draggable"
+            draggable
+            onDragStart={(event) => onAgentDragStart(event, "palette", agent.id)}
+          >
             <AgentAvatar variant={agent.variant} size="regular" />
             <span className="palette-list__label">{agent.name}</span>
           </div>
         ))}
+        {agents.length === 0 ? (
+          <span className="palette-list__empty">Все агенты на сцене</span>
+        ) : null}
       </div>
     </aside>
   );
@@ -458,7 +595,7 @@ export function WorkspacePage() {
       return;
     }
 
-    setSessions(data.sessions);
+    setSessions(data.sessions.map((session) => createWorkspaceSession(session, data.palette.agents)));
     setSelectedChatId(data.shell.currentChatId);
   }, [data, status]);
 
@@ -510,6 +647,92 @@ export function WorkspacePage() {
     setIsSidebarCollapsed((currentValue) => !currentValue);
   }
 
+  function handleAgentDragStart(event, source, agentId) {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData(AGENT_DRAG_MIME_TYPE, JSON.stringify({ source, agentId }));
+    event.dataTransfer.setData("text/plain", agentId);
+  }
+
+  function handleMoveAgentToEvaluation(agentId) {
+    setSessions((currentSessions) =>
+      currentSessions.map((session) => {
+        if (session.id !== selectedSession.id) {
+          return session;
+        }
+
+        const availableAgents = session.availableAgents ?? getInitialAvailableAgents(session, data.palette.agents);
+        const movingAgent = availableAgents.find((agent) => agent.id === agentId);
+
+        if (!movingAgent || session.evaluation.agents.some((agent) => agent.id === agentId)) {
+          return session;
+        }
+
+        return {
+          ...session,
+          availableAgents: availableAgents.filter((agent) => agent.id !== agentId),
+          evaluation: {
+            ...session.evaluation,
+            agents: [...session.evaluation.agents, createEvaluationAgent(movingAgent)],
+          },
+        };
+      }),
+    );
+  }
+
+  function handleMoveAgentToPalette(agentId) {
+    setSessions((currentSessions) =>
+      currentSessions.map((session) => {
+        if (session.id !== selectedSession.id) {
+          return session;
+        }
+
+        const movingAgent = session.evaluation.agents.find((agent) => agent.id === agentId);
+
+        if (!movingAgent) {
+          return session;
+        }
+
+        const availableAgents = session.availableAgents ?? getInitialAvailableAgents(session, data.palette.agents);
+        const nextAvailableAgents = availableAgents.some((agent) => agent.id === agentId)
+          ? availableAgents
+          : [...availableAgents, movingAgent];
+
+        return {
+          ...session,
+          availableAgents: nextAvailableAgents,
+          evaluation: {
+            ...session.evaluation,
+            agents: session.evaluation.agents.filter((agent) => agent.id !== agentId),
+          },
+        };
+      }),
+    );
+  }
+
+  function handleDropAgentToEvaluation(event) {
+    event.preventDefault();
+
+    const payload = readAgentDragPayload(event);
+
+    if (payload?.source !== "palette") {
+      return;
+    }
+
+    handleMoveAgentToEvaluation(payload.agentId);
+  }
+
+  function handleDropAgentToPalette(event) {
+    event.preventDefault();
+
+    const payload = readAgentDragPayload(event);
+
+    if (payload?.source !== "evaluation") {
+      return;
+    }
+
+    handleMoveAgentToPalette(payload.agentId);
+  }
+
   function handleSend(event) {
     event.preventDefault();
 
@@ -554,7 +777,11 @@ export function WorkspacePage() {
         <div className="workspace-main__question">{selectedSession.query}</div>
 
         <div className="workspace-main__scene">
-          <WorkspaceScene session={selectedSession} />
+          <WorkspaceScene
+            session={selectedSession}
+            onAgentDragStart={handleAgentDragStart}
+            onDropAgentToEvaluation={handleDropAgentToEvaluation}
+          />
         </div>
 
         <Composer
@@ -566,7 +793,12 @@ export function WorkspacePage() {
         />
       </section>
 
-      <AgentPalette palette={data.palette} />
+      <AgentPalette
+        palette={data.palette}
+        agents={selectedSession.availableAgents ?? getInitialAvailableAgents(selectedSession, data.palette.agents)}
+        onAgentDragStart={handleAgentDragStart}
+        onDropAgentToPalette={handleDropAgentToPalette}
+      />
     </main>
   );
 }
