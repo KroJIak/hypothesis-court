@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useState } from "react";
+import { useDeferredValue, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { AgentPalette } from "./AgentPalette";
 import { Composer } from "./Composer";
@@ -24,6 +24,8 @@ import {
   EVALUATION_SIDE_RIGHT,
 } from "../constants";
 import { useWorkspaceScene } from "../hooks/useWorkspaceScene";
+import { resetScenePlayback } from "../hooks/useScenePlayback";
+import { resetJudgeVerdict } from "./JudgeVerdict";
 import {
   createEvaluationAgent,
   createPendingAgent,
@@ -63,7 +65,15 @@ export function WorkspacePage({
   const [isCreatingChat, setIsCreatingChat] = useState(false);
   const [isUploadingSessionFile, setIsUploadingSessionFile] = useState(false);
   const [removedAttachmentIdsBySession, setRemovedAttachmentIdsBySession] = useState({});
+  const sceneScrollRef = useRef(null);
   const deferredChatSearchQuery = useDeferredValue(chatSearchQuery);
+  const selectedSession = sessions.find((session) => session.id === selectedChatId) ?? sessions[0] ?? null;
+  const isAgentEditingLocked = selectedSession
+    ? selectedSession.isStarted || (selectedSession.hypotheses ?? []).length > 0
+    : false;
+  const isProcessRunning = selectedSession
+    ? selectedSession.isStarted && (selectedSession.launchedRequests ?? []).length > 0
+    : false;
 
   useEffect(() => {
     if (status !== "success" || !data) {
@@ -140,6 +150,24 @@ export function WorkspacePage({
     return () => controller.abort();
   }, [accessToken, removedAttachmentIdsBySession, selectedChatId, status]);
 
+  useLayoutEffect(() => {
+    sceneScrollRef.current?.scrollTo({
+      top: 0,
+      left: 0,
+      behavior: "auto",
+    });
+  }, [selectedSession?.id]);
+
+  useEffect(() => {
+    document.title = selectedSession?.title
+      ? `Hypothesis Court | ${selectedSession.title}`
+      : "Hypothesis Court";
+
+    return () => {
+      document.title = "Hypothesis Court";
+    };
+  }, [selectedSession?.title]);
+
   if (status === "loading") {
     return <WorkspaceSkeleton />;
   }
@@ -147,11 +175,6 @@ export function WorkspacePage({
   if (status === "error" || !data) {
     return <WorkspaceError />;
   }
-
-  const selectedSession = sessions.find((session) => session.id === selectedChatId) ?? sessions[0] ?? null;
-  const isAgentEditingLocked = selectedSession
-    ? selectedSession.isStarted || (selectedSession.hypotheses ?? []).length > 0
-    : false;
 
   function updateSelectedSession(mapSelectedSession) {
     setSessions((currentSessions) =>
@@ -495,7 +518,9 @@ export function WorkspacePage({
       .then((chatSession) => {
         setSessions((currentSessions) =>
           currentSessions.map((session) =>
-            session.id === selectedSession.id ? applyChatSessionMetadata(session, chatSession) : session,
+            session.id === selectedSession.id && (session.launchedRequests ?? []).length > 0
+              ? applyChatSessionMetadata(session, chatSession)
+              : session,
           ),
         );
       })
@@ -504,6 +529,24 @@ export function WorkspacePage({
       });
 
     setDraftMessage("");
+  }
+
+  function handleStopProcess() {
+    const restoredRequests = selectedSession.launchedRequests ?? [];
+
+    resetScenePlayback(selectedSession.id);
+    resetJudgeVerdict(selectedSession.id);
+    setDraftMessage("");
+
+    updateSelectedSession((session) => ({
+      ...session,
+      isStarted: false,
+      isPendingDraft: true,
+      launchedRequests: [],
+      composerRequests: restoredRequests,
+      hypotheses: [],
+      answer: "",
+    }));
   }
 
   function handleRemoveComposerRequest(requestId) {
@@ -557,7 +600,7 @@ export function WorkspacePage({
       <section className="workspace-main">
         <RequestSummaryRail requests={selectedSession.launchedRequests ?? []} />
 
-        <div className="workspace-main__scene">
+        <div className="workspace-main__scene" ref={sceneScrollRef}>
           <WorkspaceScene
             session={selectedSession}
             onAgentDragStart={handleAgentDragStart}
@@ -574,10 +617,12 @@ export function WorkspacePage({
           composerRequests={selectedSession.composerRequests ?? []}
           draftMessage={draftMessage}
           isAttachmentUploading={isUploadingSessionFile}
+          isProcessRunning={isProcessRunning}
           onDraftMessageChange={setDraftMessage}
           onAttachFiles={handleAttachFiles}
           onRemoveAttachment={handleRemoveAttachment}
           onRemoveComposerRequest={handleRemoveComposerRequest}
+          onStop={handleStopProcess}
           onSend={handleSend}
         />
       </section>

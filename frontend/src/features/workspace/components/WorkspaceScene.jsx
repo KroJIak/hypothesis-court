@@ -29,6 +29,9 @@ export function WorkspaceScene({
     judgeStatus,
   } = useScenePlayback(session);
   const hasHypotheses = (session.hypotheses ?? []).length > 0;
+  const isHypothesesLoading = session.isStarted
+    && (session.launchedRequests ?? []).length > 0
+    && !hasHypotheses;
   const debate = useMemo(() => ({
     ...session.debate,
     roles: session.debate.roles.map((role) => ({
@@ -177,7 +180,7 @@ export function WorkspaceScene({
         </svg>
       ) : null}
 
-      <HypothesisCandidates hypotheses={hypotheses} />
+      <HypothesisCandidates hypotheses={hypotheses} isLoading={isHypothesesLoading} />
       <DebateStage
         debate={debate}
         manufacturerAvatarRef={manufacturerAvatarRef}

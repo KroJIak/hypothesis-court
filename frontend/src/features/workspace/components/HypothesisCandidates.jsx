@@ -9,10 +9,14 @@ const HYPOTHESIS_PREVIEW_EDGE_OFFSET = 14;
 const HYPOTHESIS_PREVIEW_HEIGHT = 126;
 const HYPOTHESIS_VISIBLE_COUNT = 3;
 const HYPOTHESIS_FALLBACK_CARD_WIDTH = 220;
+const HYPOTHESIS_SKELETON_COUNT = 3;
 
-export function HypothesisCandidates({ hypotheses }) {
+export function HypothesisCandidates({ hypotheses, isLoading = false }) {
   const visibleHypotheses = hypotheses ?? [];
-  const hypothesisCount = visibleHypotheses.length;
+  const displayedHypotheses = isLoading
+    ? Array.from({ length: HYPOTHESIS_SKELETON_COUNT }, (_, index) => ({ id: `hypothesis-skeleton-${index}` }))
+    : visibleHypotheses;
+  const hypothesisCount = displayedHypotheses.length;
   const sectionRef = useRef(null);
   const cardRefs = useRef(new Map());
   const hidePreviewTimeoutRef = useRef(null);
@@ -141,20 +145,31 @@ export function HypothesisCandidates({ hypotheses }) {
 
         {hypothesisCount > 0 ? (
           <div className="hypothesis-candidates__list">
-            {visibleHypotheses.map((hypothesis) => (
+            {displayedHypotheses.map((hypothesis) => (
               <article
                 ref={(node) => setCardRef(hypothesis.id, node)}
                 key={hypothesis.id}
-                className="hypothesis-card"
-                onMouseEnter={(event) => showPreview(hypothesis.id, event.currentTarget)}
-                onMouseLeave={hidePreviewSoon}
-                onFocus={(event) => showPreview(hypothesis.id, event.currentTarget)}
-                onBlur={hidePreview}
-                tabIndex={0}
+                className={isLoading ? "hypothesis-card hypothesis-card--skeleton" : "hypothesis-card"}
+                onMouseEnter={isLoading ? undefined : (event) => showPreview(hypothesis.id, event.currentTarget)}
+                onMouseLeave={isLoading ? undefined : hidePreviewSoon}
+                onFocus={isLoading ? undefined : (event) => showPreview(hypothesis.id, event.currentTarget)}
+                onBlur={isLoading ? undefined : hidePreview}
+                tabIndex={isLoading ? undefined : 0}
+                aria-hidden={isLoading ? true : undefined}
               >
-                <ProcessingStatusBadge status={hypothesis.processingStatus} />
-                <h2 className="hypothesis-card__title">{hypothesis.title}</h2>
-                <p className="hypothesis-card__description">{hypothesis.description}</p>
+                {isLoading ? (
+                  <>
+                    <span className="hypothesis-card__skeleton-line hypothesis-card__skeleton-line--title" />
+                    <span className="hypothesis-card__skeleton-line" />
+                    <span className="hypothesis-card__skeleton-line hypothesis-card__skeleton-line--short" />
+                  </>
+                ) : (
+                  <>
+                    <ProcessingStatusBadge status={hypothesis.processingStatus} />
+                    <h2 className="hypothesis-card__title">{hypothesis.title}</h2>
+                    <p className="hypothesis-card__description">{hypothesis.description}</p>
+                  </>
+                )}
               </article>
             ))}
           </div>

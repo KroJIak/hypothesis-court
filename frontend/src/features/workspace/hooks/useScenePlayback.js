@@ -27,6 +27,10 @@ const STATUS_VERDICT = "выносит вердикт";
 const PLAYBACK_TICK_MS = 180;
 const playbackTimelines = new Map();
 
+export function resetScenePlayback(sessionId) {
+  playbackTimelines.delete(sessionId);
+}
+
 const debateSpeakerSteps = [
   {
     senderId: "defender",

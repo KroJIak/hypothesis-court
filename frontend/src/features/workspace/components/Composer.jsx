@@ -96,10 +96,12 @@ export function Composer({
   composerRequests,
   draftMessage,
   isAttachmentUploading = false,
+  isProcessRunning = false,
   onAttachFiles,
   onDraftMessageChange,
   onRemoveAttachment,
   onRemoveComposerRequest,
+  onStop,
   onSend,
 }) {
   const attachmentButtonRefs = useRef(new Map());
@@ -299,71 +301,82 @@ export function Composer({
         </div>
       ) : null}
 
-      <form className="composer-panel" onSubmit={handleSubmit}>
-        <div className="composer-context" onBlur={handleContextBlur} onKeyDown={handleContextKeyDown}>
-          <span className="sr-only">Тип сообщения</span>
-          <button
-            type="button"
-            className="composer-context__trigger"
-            aria-haspopup="listbox"
-            aria-expanded={isContextMenuOpen}
-            onClick={() => setIsContextMenuOpen((isOpen) => !isOpen)}
-          >
-            <span className="composer-context__label">{selectedContext.label}</span>
-            <ChevronDown className="composer-context__chevron" aria-hidden="true" strokeWidth={1.8} />
-          </button>
-          {isContextMenuOpen ? (
-            <div className="composer-context__menu" role="listbox" aria-label="Тип сообщения">
-              {COMPOSER_CONTEXT_OPTIONS.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  className={
-                    option.value === composerContext
-                      ? "composer-context__option composer-context__option--active"
-                      : "composer-context__option"
-                  }
-                  role="option"
-                  aria-selected={option.value === composerContext}
-                  onClick={() => handleSelectContext(option.value)}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          ) : null}
-        </div>
+      {isProcessRunning ? (
+        <button
+          type="button"
+          className="composer-stop-button"
+          aria-label="Остановить процесс"
+          onClick={onStop}
+        >
+          Стоп
+        </button>
+      ) : (
+        <form className="composer-panel" onSubmit={handleSubmit}>
+          <div className="composer-context" onBlur={handleContextBlur} onKeyDown={handleContextKeyDown}>
+            <span className="sr-only">Тип сообщения</span>
+            <button
+              type="button"
+              className="composer-context__trigger"
+              aria-haspopup="listbox"
+              aria-expanded={isContextMenuOpen}
+              onClick={() => setIsContextMenuOpen((isOpen) => !isOpen)}
+            >
+              <span className="composer-context__label">{selectedContext.label}</span>
+              <ChevronDown className="composer-context__chevron" aria-hidden="true" strokeWidth={1.8} />
+            </button>
+            {isContextMenuOpen ? (
+              <div className="composer-context__menu" role="listbox" aria-label="Тип сообщения">
+                {COMPOSER_CONTEXT_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={
+                      option.value === composerContext
+                        ? "composer-context__option composer-context__option--active"
+                        : "composer-context__option"
+                    }
+                    role="option"
+                    aria-selected={option.value === composerContext}
+                    onClick={() => handleSelectContext(option.value)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
 
-        <label className="composer-panel__input-wrap">
-          <span className="sr-only">Сообщение</span>
-          <textarea
-            className="composer-panel__input"
-            value={draftMessage}
-            onChange={(event) => onDraftMessageChange(event.target.value)}
-            onKeyDown={handleInputKeyDown}
-            placeholder={composer.placeholder}
-            rows={1}
-          />
-        </label>
+          <label className="composer-panel__input-wrap">
+            <span className="sr-only">Сообщение</span>
+            <textarea
+              className="composer-panel__input"
+              value={draftMessage}
+              onChange={(event) => onDraftMessageChange(event.target.value)}
+              onKeyDown={handleInputKeyDown}
+              placeholder={composer.placeholder}
+              rows={1}
+            />
+          </label>
 
-        <div className="composer-panel__actions">
-          <button
-            type="submit"
-            className={
-              isStartMode
-                ? "composer-action composer-action--primary composer-action--start"
-                : "composer-action composer-action--primary"
-            }
-            aria-label={isStartMode ? "Старт" : composer.sendLabel}
-          >
-            {isStartMode ? (
-              <span className="composer-action__start-label">Старт</span>
-            ) : (
-              <SendHorizontal aria-hidden="true" strokeWidth={2} />
-            )}
-          </button>
-        </div>
-      </form>
+          <div className="composer-panel__actions">
+            <button
+              type="submit"
+              className={
+                isStartMode
+                  ? "composer-action composer-action--primary composer-action--start"
+                  : "composer-action composer-action--primary"
+              }
+              aria-label={isStartMode ? "Старт" : composer.sendLabel}
+            >
+              {isStartMode ? (
+                <span className="composer-action__start-label">Старт</span>
+              ) : (
+                <SendHorizontal aria-hidden="true" strokeWidth={2} />
+              )}
+            </button>
+          </div>
+        </form>
+      )}
     </div>
   );
 }

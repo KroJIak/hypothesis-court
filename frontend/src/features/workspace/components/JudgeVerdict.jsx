@@ -4,6 +4,14 @@ const TYPEWRITER_INTERVAL_MS = 18;
 const TYPEWRITER_CHUNK_SIZE = 4;
 const verdictProgressBySession = new Map();
 
+export function resetJudgeVerdict(sessionId) {
+  for (const progressKey of verdictProgressBySession.keys()) {
+    if (progressKey.startsWith(`${sessionId}:`)) {
+      verdictProgressBySession.delete(progressKey);
+    }
+  }
+}
+
 function getVerdictProgressKey(sessionId, answer) {
   return `${sessionId}:${answer}`;
 }
