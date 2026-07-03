@@ -144,6 +144,10 @@ export function Sidebar({
     setDeleteCandidate(null);
   }
 
+  function getChatRelativeTime(session) {
+    return formatChatRelativeTime(session.updatedAt ?? session.createdAt);
+  }
+
   return (
     <aside className={`workspace-sidebar${isCollapsed ? " workspace-sidebar--collapsed" : ""}`}>
       <div className="sidebar-topbar">
@@ -251,21 +255,29 @@ export function Sidebar({
                 >
                   <span className="chat-list__icon"><MessageSquare aria-hidden="true" strokeWidth={1.9} /></span>
                   <span className="sidebar-label">{session.title}</span>
+                  {session.isPinned ? (
+                    <span className="chat-list__pin" aria-label="Закреплённый чат" title="Закреплённый чат">
+                      <Pin aria-hidden="true" strokeWidth={2} />
+                    </span>
+                  ) : null}
                 </button>
               )}
 
-              <button
-                type="button"
-                className="chat-list__actions-trigger"
-                aria-label={`Действия с чатом ${session.title}`}
-                aria-expanded={activeChatMenuId === session.id}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setActiveChatMenuId((currentId) => (currentId === session.id ? null : session.id));
-                }}
-              >
-                <MoreHorizontal aria-hidden="true" strokeWidth={2} />
-              </button>
+              <div className="chat-list__meta">
+                <span className="chat-list__time">{getChatRelativeTime(session)}</span>
+                <button
+                  type="button"
+                  className="chat-list__actions-trigger"
+                  aria-label={`Действия с чатом ${session.title}`}
+                  aria-expanded={activeChatMenuId === session.id}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setActiveChatMenuId((currentId) => (currentId === session.id ? null : session.id));
+                  }}
+                >
+                  <MoreHorizontal aria-hidden="true" strokeWidth={2} />
+                </button>
+              </div>
 
               {activeChatMenuId === session.id ? (
                 <div ref={chatMenuRef} className="chat-list-menu" role="menu">
@@ -338,4 +350,38 @@ export function Sidebar({
       />
     </aside>
   );
+}
+
+function formatChatRelativeTime(rawDate) {
+  if (!rawDate) {
+    return "только что";
+  }
+
+  const date = new Date(rawDate);
+  const timestamp = date.getTime();
+
+  if (Number.isNaN(timestamp)) {
+    return "только что";
+  }
+
+  const diffMs = Math.max(0, Date.now() - timestamp);
+  const diffMinutes = Math.floor(diffMs / 60000);
+
+  if (diffMinutes < 1) {
+    return "только что";
+  }
+
+  if (diffMinutes < 60) {
+    return `${diffMinutes} м назад`;
+  }
+
+  const diffHours = Math.floor(diffMinutes / 60);
+
+  if (diffHours < 24) {
+    return `${diffHours} ч назад`;
+  }
+
+  const diffDays = Math.floor(diffHours / 24);
+
+  return `${diffDays} д назад`;
 }
