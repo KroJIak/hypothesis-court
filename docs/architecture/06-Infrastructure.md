@@ -5,17 +5,16 @@ tags:
   - infra
 ---
 
-# Инфраструктура
+# Infrastructure
 
-## Текущая локальная схема
+## Runtime topology
 
-- `backend` работает внутри контейнера на `8000`
-- `frontend` работает внутри контейнера на `5173`
-- `nginx` работает внутри контейнера на `80`
+- `backend` обслуживает API и orchestration flow;
+- `frontend` обслуживает workspace UI;
+- `nginx` публикует единый внешний вход и маршрутизирует трафик;
+- внешние порты задаются через `.env` и `docker-compose.override.yml`.
 
-Внешние порты задаются через `docker-compose.override.yml` и `.env`.
-
-## Текущий proxy-контур
+## Контур запуска
 
 ```mermaid
 flowchart LR
@@ -24,23 +23,17 @@ flowchart LR
     N -->|/api| A[backend]
 ```
 
-## Что уже настроено
+## Контейнерная модель
 
-- отдельные Dockerfile для `backend`, `frontend`, `nginx`;
-- compose-файл для общего контура;
-- override-файл для проброса портов;
-- env-переменные для CORS и allowed hosts;
-- proxy `/api` через nginx.
+- отдельный Dockerfile у `backend`;
+- отдельный Dockerfile у `frontend`;
+- отдельный Dockerfile у `nginx`;
+- `docker-compose.yml` собирает системный контур;
+- `docker-compose.override.yml` задаёт локальные внешние порты.
 
-## Что должно остаться правилом
+## Environment layer
 
-- Для браузерного сценария основной вход должен быть через `nginx`.
-- Для локальной разработки frontend вне docker должен уметь ходить напрямую в backend через свой env-файл.
-- Порты и домены не должны хардкодиться в приложениях.
-
-## Важные env-переменные
-
-### Корневой `.env`
+### Root env
 
 - `NGINX_EXTERNAL_PORT`
 - `BACKEND_EXTERNAL_PORT`
@@ -51,15 +44,15 @@ flowchart LR
 
 - `VITE_API_BASE_URL`
 
-## Следующий шаг по infra
+## Runtime rules
 
-- добавить persistent storage для backend-данных;
-- добавить БД в compose;
-- предусмотреть init/migration workflow;
-- продумать фоновые задачи, если пайплайн станет долгим.
+- браузерный доступ идёт через `nginx`;
+- API публикуется под `/api`;
+- конфигурация доменов и портов живёт в env;
+- frontend и backend остаются развязаны на уровне внешнего URL.
 
 ## Связанные документы
 
-- [[01-Current-State]]
+- [[01-System-Overview]]
 - [[03-Backend]]
 - [[04-Frontend]]

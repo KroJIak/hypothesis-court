@@ -6,93 +6,98 @@ tags:
   - retrieval
 ---
 
-# Данные и поиск
+# Data and Retrieval
 
 > [!abstract]
-> Этот раздел фиксирует, как проект должен работать с документами и evidence. Именно здесь лежит разница между “LLM просто придумал” и объяснимым R&D-инструментом.
+> Платформа работает вокруг evidence-centric data model: каждая гипотеза, реплика и verdict привязаны к материалам, сигналам и версии исследовательской сессии.
 
 ## Входные данные
 
 - научные статьи;
-- патентные и обзорные материалы;
 - внутренние отчёты;
-- результаты прошлых экспериментов;
+- результаты экспериментов;
 - служебные заметки;
 - KPI;
 - ограничения;
 - пользовательские критерии оценки.
 
-## Принцип работы с knowledge
-
-Проекту нужен не просто набор raw chunks, а наблюдаемая evidence layer:
-
-- какой источник был использован;
-- какой фрагмент был поднят;
-- какой факт или claim из него извлечён;
-- как этот факт повлиял на гипотезу;
-- какие источники друг другу противоречат.
-
-## MVP-подход
-
-Для первого рабочего контура достаточно:
-
-- извлечь текст;
-- нарезать на чанки;
-- индексировать;
-- поднимать релевантные чанки по KPI и контексту;
-- использовать их как input для генерации и критики гипотезы.
-
-## Целевой подход
-
-Предпочтительное развитие:
-
-- PostgreSQL + pgvector;
-- хранение документов и чанков;
-- дополнительный слой `claims / facts / signals`;
-- хранение ссылок на origin fragments;
-- явная фиксация contradictions и evidence strength.
-
-## Возможные доменные артефакты
+## Базовые сущности
 
 ### Source document
 
 - тип источника;
-- имя;
+- название;
 - происхождение;
-- дата;
-- авторство;
-- извлечённый текст;
-- технические метаданные.
+- метаданные;
+- извлечённый текст.
+
+### Document chunk
+
+- ссылка на документ;
+- позиция в документе;
+- chunk text;
+- embedding и retrieval metadata.
 
 ### Evidence item
 
-- ссылка на документ;
-- ссылка на фрагмент;
-- краткая формулировка факта;
-- тип сигнала: `support`, `risk`, `contradiction`, `constraint`, `unknown`;
+- source reference;
+- fragment reference;
+- claim summary;
+- signal type: `support`, `risk`, `contradiction`, `constraint`, `unknown`;
 - relevance score.
 
 ### Hypothesis support map
 
-- какие evidence поддерживают гипотезу;
-- какие evidence её ослабляют;
-- какие вопросы остаются открытыми.
+- supporting evidence;
+- contradictory evidence;
+- unresolved gaps;
+- relevance to KPI.
 
-## Что важно для качества
+## Data flow
 
-> [!warning]
-> Если не хранить evidence явно, проект быстро скатится в красивый, но недоказуемый AI output.
+```mermaid
+flowchart TD
+    A[Documents] --> B[Chunks]
+    B --> C[Embeddings]
+    C --> D[Retrieved fragments]
+    D --> E[Evidence items]
+    E --> F[Hypothesis versions]
+    F --> G[Debate and evaluation outputs]
+    G --> H[Judge verdict]
+```
 
-Нужны:
+## Retrieval layer
 
-- traceability;
-- повторяемость;
-- понятные ссылки на источники;
-- диагностируемость провалов retrieval.
+Retrieval layer объединяет:
+
+- semantic search;
+- metadata filters;
+- similarity and adjacency search;
+- contradiction spotting;
+- evidence ranking.
+
+## Persistence model
+
+Платформа использует:
+
+- PostgreSQL как основное хранилище;
+- pgvector для векторного поиска;
+- session-bound records для evidence, hypotheses и verdicts.
+
+## Explainability contract
+
+Каждый важный вывод в системе можно проследить до:
+
+- документа;
+- фрагмента;
+- evidence item;
+- версии гипотезы;
+- реплики роли;
+- итогового verdict.
 
 ## Связанные документы
 
+- [[02-System-Architecture]]
 - [[03-Backend]]
-- [[02-Target-System]]
 - [[product/03-Hypothesis-Pipeline]]
-- [[sources/02-Chat-Decisions]]
+- [[sources/hypothesis-factory/01-Full-Spec]]

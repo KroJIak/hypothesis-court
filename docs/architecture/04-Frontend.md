@@ -5,48 +5,26 @@ tags:
   - frontend
 ---
 
-# Фронтенд
+# Frontend
 
 ## Роль frontend
 
-Frontend должен не просто отправлять prompt и показывать ответ. Он должен визуализировать:
+Frontend организует research workspace, в котором пользователь ведёт сессию, наблюдает debate, читает evidence и получает verdict.
 
-- постановку исследовательской задачи;
-- ход поиска и отбора evidence;
-- эволюцию гипотезы;
-- сцену debate loop;
-- независимую оценку;
-- финальный verdict.
+## Основные UI-зоны
 
-## Что есть сейчас
+- session sidebar;
+- debate scene;
+- evaluation panel;
+- evidence and attachment panel;
+- session composer.
 
-Текущий frontend уже содержит удачный UI-прототип:
-
-- sidebar с сессиями;
-- debate stage;
-- evaluation stage;
-- agent palette;
-- composer;
-- вложения.
-
-Эта логика собрана в `frontend/src/features/workspace`.
-
-## Что отсутствует сейчас
-
-- реальный API client под продуктовые endpoints;
-- состояние живой исследовательской сессии;
-- загрузка файлов;
-- поток обновлений пайплайна;
-- отображение evidence и цитат;
-- история версий гипотезы;
-- экраны ошибок и пустых состояний под реальные сценарии.
-
-## Предпочтительная структура frontend-домена
+## Функциональные блоки
 
 ```text
 frontend/src/
-├── app/
-├── shared/
+├── app/        - app shell and providers
+├── shared/     - common UI, utils and primitives
 ├── features/
 │   ├── research-session/
 │   ├── document-upload/
@@ -54,43 +32,42 @@ frontend/src/
 │   ├── debate-scene/
 │   ├── evaluation-panel/
 │   └── final-verdict/
-└── pages/
+└── pages/      - route-level compositions
 ```
 
-## Основные UI-состояния
+## Пользовательские состояния
 
-- `idle` — задача ещё не поставлена;
-- `collecting-input` — пользователь задаёт KPI и прикладывает материалы;
-- `processing` — пайплайн запущен;
-- `debating` — идёт спор ролей;
-- `evaluating` — считаются независимые критерии;
-- `completed` — verdict готов;
-- `failed` — ошибка пайплайна или недостающие данные.
+- `intake`
+- `ingestion`
+- `evidence-ready`
+- `debating`
+- `evaluating`
+- `completed`
 
-## Принципы UI
+## Визуальный принцип
 
-> [!important]
-> Интерфейс должен выглядеть как продукт с характером, а не как стандартная админка или generic AI dashboard.
+Интерфейс работает как сцена обсуждения, а не как корпоративная форма ввода.
+Центральное место занимает гипотеза и её refinement through roles.
 
-- Центральная сцена должна быть главным фокусом.
-- Источники и evidence должны быть доступны рядом, а не спрятаны.
-- Пользователь должен видеть, какая версия гипотезы текущая.
-- Разница между debate и evaluation должна быть очевидна визуально.
+## Клиентский поток данных
 
-## Связь с backend
+```mermaid
+flowchart LR
+    A[Session selection] --> B[Brief and sources]
+    B --> C[Evidence view]
+    C --> D[Debate scene]
+    D --> E[Evaluation panel]
+    E --> F[Judge verdict]
+```
 
-### Через docker compose
+## Интеграция с backend
 
-- frontend ходит в API через `/api`;
-- nginx маршрутизирует запросы.
-
-### При локальном запуске frontend
-
-- frontend использует локальный env-файл;
-- `VITE_API_BASE_URL` может указывать напрямую на backend.
+- браузерный маршрут API проходит через `/api`;
+- локальный frontend использует `VITE_API_BASE_URL`;
+- session state синхронизируется через API-контракты backend.
 
 ## Связанные документы
 
-- [[01-Current-State]]
+- [[01-System-Overview]]
 - [[06-Infrastructure]]
 - [[product/05-Interface-and-Scene]]

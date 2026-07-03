@@ -8,16 +8,15 @@ tags:
 # Hypothesis Court
 
 > [!abstract]
-> Эта папка фиксирует, **что именно мы строим**, **что уже есть в репозитории** и **какие решения уже приняты** по продукту и архитектуре.
+> Эта документация описывает **Hypothesis Court** как действующую платформу для генерации, обсуждения и приоритизации исследовательских гипотез.
 
 ## Как читать
 
 1. [[01-Project-Scope]]
-2. [[02-MVP-and-Target-Product]]
-3. [[03-Roadmap]]
-4. [[product/00-INDEX]]
-5. [[architecture/00-INDEX]]
-6. [[sources/00-INDEX]]
+2. [[02-Product-Model]]
+3. [[product/00-INDEX]]
+4. [[architecture/00-INDEX]]
+5. [[sources/00-INDEX]]
 
 ## Карта документации
 
@@ -25,8 +24,7 @@ tags:
 docs/
 ├── 00-INDEX.md
 ├── 01-Project-Scope.md
-├── 02-MVP-and-Target-Product.md
-├── 03-Roadmap.md
+├── 02-Product-Model.md
 ├── product/
 │   ├── 00-INDEX.md
 │   ├── 01-Problem-and-Value.md
@@ -36,34 +34,38 @@ docs/
 │   └── 05-Interface-and-Scene.md
 ├── architecture/
 │   ├── 00-INDEX.md
-│   ├── 01-Current-State.md
-│   ├── 02-Target-System.md
+│   ├── 01-System-Overview.md
+│   ├── 02-System-Architecture.md
 │   ├── 03-Backend.md
 │   ├── 04-Frontend.md
 │   ├── 05-Data-and-Retrieval.md
 │   └── 06-Infrastructure.md
 └── sources/
     ├── 00-INDEX.md
-    ├── 01-Hypothesis-Factory-Source.md
-    └── 02-Chat-Decisions.md
+    └── hypothesis-factory/
+        ├── 00-INDEX.md
+        ├── 01-Full-Spec.md
+        └── sections/
 ```
 
-## Основные принципы
+## Документационные слои
 
 > [!important]
-> В этой документации жёстко разделены:
-> - **целевой продукт**
-> - **текущее состояние репозитория**
-> - **исходные материалы**
-
-> [!note]
-> Файл [[sources/01-Hypothesis-Factory-Source]] сохранён как буквальная копия организаторского описания. Он не очищался и не перефразировался.
+> Документация разделена на три слоя:
+> - **product**: пользовательская логика, исследовательский поток и UX
+> - **architecture**: техническое устройство платформы
+> - **sources**: исходные материалы и зафиксированные решения
 
 ## Быстрые переходы
 
-- [[product/03-Hypothesis-Pipeline|Целевой пайплайн генерации и оценки гипотез]]
-- [[product/04-Agents-and-Judge|Каноническая агентная схема]]
-- [[product/05-Interface-and-Scene|Целевой интерфейс и сцена спора]]
-- [[architecture/01-Current-State|Что реально уже реализовано]]
-- [[architecture/05-Data-and-Retrieval|Как должны работать данные, RAG и evidence layer]]
-- [[sources/02-Chat-Decisions|Решения, уже зафиксированные в истории обсуждения]]
+- [[02-Product-Model|Операционная модель продукта]]
+- [[product/03-Hypothesis-Pipeline|Пайплайн гипотез]]
+- [[product/04-Agents-and-Judge|Агентная схема и судья]]
+- [[architecture/01-System-Overview|Системный обзор]]
+- [[architecture/05-Data-and-Retrieval|Данные, retrieval и evidence layer]]
+
+## Навигационный принцип
+
+> [!note]
+> Основной слой для повседневной работы команды начинается с `product/` и `architecture/`.
+> `sources/` хранит первоисточники и decision log для сверки формулировок и контекста.
