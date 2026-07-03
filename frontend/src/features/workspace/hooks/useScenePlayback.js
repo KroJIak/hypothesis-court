@@ -88,11 +88,12 @@ function createAgentStatusMap(agentIds, status) {
 }
 
 function createDebatePlaybackSteps(hypothesisIndex) {
-  return Array.from({ length: DEBATE_CYCLE_COUNT }).flatMap(() =>
+  return Array.from({ length: DEBATE_CYCLE_COUNT }).flatMap((_, cycleIndex) =>
     debateSpeakerSteps.flatMap((step) => [
       {
         phase: "debate",
         hypothesisIndex,
+        debateCycleNumber: cycleIndex + 1,
         debateRoleStatuses: createDebateThinkingStatuses(step.senderId),
         durationMs: DEBATE_THINK_STEP_MS,
       },
@@ -100,6 +101,7 @@ function createDebatePlaybackSteps(hypothesisIndex) {
         ...step,
         phase: "debate",
         hypothesisIndex,
+        debateCycleNumber: cycleIndex + 1,
         debateRoleStatuses: createDebateSpeakingStatuses(step.senderId, step.receiverIds),
         durationMs: DEBATE_STEP_MS,
       },
@@ -311,6 +313,10 @@ function getJudgeStatus(session, currentStep) {
   return "";
 }
 
+function getDebateCycleNumber(currentStep) {
+  return currentStep?.phase === "debate" ? currentStep.debateCycleNumber ?? null : null;
+}
+
 function getHypothesesWithPlaybackStatus(hypotheses, playbackState, currentStep) {
   if (!hypotheses || hypotheses.length === 0) {
     return [];
@@ -384,6 +390,7 @@ export function useScenePlayback(session) {
   return {
     activeDebateConnectionDirections: createActiveConnectionMap(currentStep?.activeDebateConnections),
     activeEvaluationConnectionDirections: createActiveConnectionMap(currentStep?.activeEvaluationConnections),
+    debateCycleNumber: getDebateCycleNumber(currentStep),
     debateRoleStatuses: getDebateRoleStatuses(currentStep),
     evaluationAgentStatuses: getEvaluationAgentStatuses(session, currentStep),
     hypotheses: getHypothesesWithPlaybackStatus(session.hypotheses ?? [], playbackState, currentStep),

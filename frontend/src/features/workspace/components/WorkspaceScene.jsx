@@ -22,6 +22,7 @@ export function WorkspaceScene({
   const {
     activeDebateConnectionDirections,
     activeEvaluationConnectionDirections,
+    debateCycleNumber,
     debateRoleStatuses,
     evaluationAgentStatuses,
     hypotheses,
@@ -71,20 +72,6 @@ export function WorkspaceScene({
       ? "connection-path connection-path--active connection-path--reverse"
       : "connection-path connection-path--active";
   }
-
-  useLayoutEffect(() => {
-    const scrollContainer = sceneRef.current?.parentElement;
-
-    if (!scrollContainer) {
-      return;
-    }
-
-    scrollContainer.scrollTo({
-      top: 0,
-      left: 0,
-      behavior: "auto",
-    });
-  }, [session.id]);
 
   useLayoutEffect(() => {
     const updateConnections = () => {
@@ -185,6 +172,7 @@ export function WorkspaceScene({
         debate={debate}
         manufacturerAvatarRef={manufacturerAvatarRef}
         activeConnectionDirections={activeDebateConnectionDirections}
+        debateCycleNumber={debateCycleNumber}
         hideAgentStatus={!hasHypotheses}
       />
       <EvaluationStage

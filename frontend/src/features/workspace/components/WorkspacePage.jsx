@@ -151,11 +151,28 @@ export function WorkspacePage({
   }, [accessToken, removedAttachmentIdsBySession, selectedChatId, status]);
 
   useLayoutEffect(() => {
-    sceneScrollRef.current?.scrollTo({
-      top: 0,
-      left: 0,
-      behavior: "auto",
-    });
+    const sceneElement = sceneScrollRef.current;
+
+    if (!sceneElement) {
+      return undefined;
+    }
+
+    const resetSceneScroll = () => {
+      sceneElement.scrollTop = 0;
+      sceneElement.scrollLeft = 0;
+    };
+
+    resetSceneScroll();
+
+    const animationFrameId = window.requestAnimationFrame(resetSceneScroll);
+    const timeoutId = window.setTimeout(resetSceneScroll, 0);
+    const lateTimeoutId = window.setTimeout(resetSceneScroll, 80);
+
+    return () => {
+      window.cancelAnimationFrame(animationFrameId);
+      window.clearTimeout(timeoutId);
+      window.clearTimeout(lateTimeoutId);
+    };
   }, [selectedSession?.id]);
 
   useEffect(() => {
@@ -298,7 +315,7 @@ export function WorkspacePage({
   async function handleAttachFiles(fileList) {
     const files = Array.from(fileList ?? []).filter(Boolean);
 
-    if (!selectedSession || files.length === 0) {
+    if (!selectedSession || isProcessRunning || files.length === 0) {
       return;
     }
 
@@ -335,6 +352,10 @@ export function WorkspacePage({
   }
 
   function handleRemoveAttachment(attachmentId) {
+    if (isProcessRunning) {
+      return;
+    }
+
     setRemovedAttachmentIdsBySession((currentValue) => ({
       ...currentValue,
       [selectedSession.id]: [...(currentValue[selectedSession.id] ?? []), attachmentId],
@@ -613,11 +634,13 @@ export function WorkspacePage({
 
         <Composer
           composer={data.composer}
-          attachments={selectedSession.attachments}
+          sessionId={selectedSession.id}
+          attachments={selectedSession.attachments ?? []}
           composerRequests={selectedSession.composerRequests ?? []}
           draftMessage={draftMessage}
           isAttachmentUploading={isUploadingSessionFile}
           isProcessRunning={isProcessRunning}
+          canEditAttachments={!isProcessRunning}
           onDraftMessageChange={setDraftMessage}
           onAttachFiles={handleAttachFiles}
           onRemoveAttachment={handleRemoveAttachment}

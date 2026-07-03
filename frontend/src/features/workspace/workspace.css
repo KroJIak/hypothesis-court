@@ -1067,10 +1067,38 @@
 }
 
 .debate-stage__triangle--center {
-  display: none;
   left: 50%;
-  top: 45px;
+  top: 42px;
   transform: translateX(-50%);
+}
+
+.debate-cycle-indicator {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 46px;
+  min-height: 48px;
+  border-radius: 16px;
+  background: rgba(32, 32, 32, 0.9);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
+  color: rgba(244, 244, 244, 0.88);
+  pointer-events: none;
+}
+
+.debate-cycle-indicator__number {
+  color: #f8f8f8;
+  font-size: 1.28rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.debate-cycle-indicator__label {
+  margin-top: 3px;
+  color: rgba(244, 244, 244, 0.48);
+  font-size: 0.58rem;
+  line-height: 1;
+  text-transform: lowercase;
 }
 
 .debate-stage__triangle--right {
@@ -1657,12 +1685,12 @@
   max-height: calc(
     (var(--attachment-item-size) * var(--attachment-visible-count)) +
       (var(--attachment-item-gap) * (var(--attachment-visible-count) - 1)) +
-      5px
+      9px
   );
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 4px 4px 1px 0;
+  padding: 4px 4px 5px 0;
   scrollbar-width: none;
 }
 
@@ -2106,10 +2134,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 100%;
-  min-height: 44px;
+  width: min(168px, 100%);
+  min-height: 38px;
   border: 0;
-  border-radius: 20px;
+  border-radius: 16px;
   background: #9f3a3a;
   color: #fff1f1;
   cursor: pointer;
@@ -2120,6 +2148,7 @@
   transition:
     background-color 160ms ease,
     transform 160ms ease;
+  margin: 0 auto;
 }
 
 .composer-stop-button:hover,
