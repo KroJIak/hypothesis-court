@@ -526,20 +526,23 @@
   --hypothesis-agent-size: 44px;
   --hypothesis-gap: 10px;
   --hypothesis-card-gap: 8px;
+  --hypothesis-visible-count: 3;
   --hypothesis-card-width: calc(
-    (var(--workspace-answer-column-width) - (2 * var(--hypothesis-card-gap))) / 3
+    (100% - ((var(--hypothesis-visible-count) - 1) * var(--hypothesis-card-gap))) /
+      var(--hypothesis-visible-count)
   );
+  box-sizing: border-box;
   position: relative;
   z-index: 1;
-  display: grid;
-  grid-template-columns: var(--hypothesis-agent-size) var(--workspace-answer-column-width);
-  align-items: center;
-  gap: var(--hypothesis-gap);
+  display: block;
   width: var(--workspace-answer-column-width);
   margin: 4px auto 10px;
 }
 
 .hypothesis-candidates__agent {
+  position: absolute;
+  left: calc(-1 * (var(--hypothesis-agent-size) + var(--hypothesis-gap)));
+  top: 50%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -548,6 +551,7 @@
   border-radius: 13px;
   background: #202020;
   color: rgba(244, 244, 244, 0.78);
+  transform: translateY(-50%);
 }
 
 .hypothesis-candidates__agent svg {
@@ -557,8 +561,10 @@
 
 .hypothesis-candidates__list {
   display: flex;
+  align-items: stretch;
   gap: var(--hypothesis-card-gap);
   min-width: 0;
+  width: 100%;
   overflow-x: auto;
   overscroll-behavior-inline: contain;
   scrollbar-width: none;
@@ -569,6 +575,7 @@
 }
 
 .hypothesis-card {
+  box-sizing: border-box;
   flex: 0 0 var(--hypothesis-card-width);
   min-width: 0;
   border-radius: 15px;
