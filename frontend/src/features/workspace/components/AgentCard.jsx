@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { AgentAvatar } from "./AgentAvatar";
@@ -65,6 +65,20 @@ export function AgentCard({
   const hideNameTooltip = useCallback(() => {
     setIsNameVisible(false);
   }, []);
+
+  useEffect(() => {
+    if (!isNameVisible) {
+      return undefined;
+    }
+
+    window.addEventListener("scroll", hideNameTooltip, true);
+    window.addEventListener("resize", hideNameTooltip);
+
+    return () => {
+      window.removeEventListener("scroll", hideNameTooltip, true);
+      window.removeEventListener("resize", hideNameTooltip);
+    };
+  }, [hideNameTooltip, isNameVisible]);
 
   return (
     <div

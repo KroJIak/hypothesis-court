@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { DebateStage } from "./DebateStage";
 import { EvaluationStage } from "./EvaluationStage";
@@ -15,10 +15,31 @@ export function WorkspaceScene({ session, onAgentDragStart, onAgentDragEnd, onDr
   const {
     activeDebateConnectionDirections,
     activeEvaluationConnectionDirections,
+    debateRoleStatuses,
+    evaluationAgentStatuses,
     hypotheses,
     isAnswerVisible,
+    judgeStatus,
   } = useScenePlayback(session);
   const hasHypotheses = (session.hypotheses ?? []).length > 0;
+  const debate = useMemo(() => ({
+    ...session.debate,
+    roles: session.debate.roles.map((role) => ({
+      ...role,
+      status: debateRoleStatuses[role.id] ?? "",
+    })),
+  }), [debateRoleStatuses, session.debate]);
+  const evaluation = useMemo(() => ({
+    ...session.evaluation,
+    agents: session.evaluation.agents.map((agent) => ({
+      ...agent,
+      status: evaluationAgentStatuses[agent.id] ?? "",
+    })),
+    judge: {
+      ...session.evaluation.judge,
+      status: judgeStatus,
+    },
+  }), [evaluationAgentStatuses, judgeStatus, session.evaluation]);
 
   const setEvaluationAvatarRef = useCallback((agentId, node) => {
     if (node) {
@@ -151,13 +172,13 @@ export function WorkspaceScene({ session, onAgentDragStart, onAgentDragEnd, onDr
 
       <HypothesisCandidates hypotheses={hypotheses} />
       <DebateStage
-        debate={session.debate}
+        debate={debate}
         manufacturerAvatarRef={manufacturerAvatarRef}
         activeConnectionDirections={activeDebateConnectionDirections}
         hideAgentStatus={!hasHypotheses}
       />
       <EvaluationStage
-        evaluation={session.evaluation}
+        evaluation={evaluation}
         answer={session.answer}
         isAnswerVisible={isAnswerVisible}
         hideAgentStatus={!hasHypotheses}

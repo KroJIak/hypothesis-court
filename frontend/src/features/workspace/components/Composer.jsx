@@ -150,12 +150,22 @@ export function Composer({
   }, []);
 
   const handleAttachmentRailScroll = useCallback(() => {
+    hideAttachmentTooltip();
+  }, [hideAttachmentTooltip]);
+
+  useEffect(() => {
     if (!activeAttachmentId) {
-      return;
+      return undefined;
     }
 
-    updateAttachmentTooltip(activeAttachmentId);
-  }, [activeAttachmentId, updateAttachmentTooltip]);
+    window.addEventListener("scroll", hideAttachmentTooltip, true);
+    window.addEventListener("resize", hideAttachmentTooltip);
+
+    return () => {
+      window.removeEventListener("scroll", hideAttachmentTooltip, true);
+      window.removeEventListener("resize", hideAttachmentTooltip);
+    };
+  }, [activeAttachmentId, hideAttachmentTooltip]);
 
   const handleContextBlur = useCallback((event) => {
     if (event.currentTarget.contains(event.relatedTarget)) {

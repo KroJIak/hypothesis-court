@@ -114,10 +114,10 @@
 }
 
 .attachment-chip .processing-status-badge {
-  top: 3px;
-  right: 3px;
-  width: 12px;
-  height: 12px;
+  top: -3px;
+  right: -3px;
+  width: 15px;
+  height: 15px;
 }
 
 .processing-status-badge--processed {
@@ -1015,16 +1015,16 @@
   white-space: nowrap;
   background: linear-gradient(
     90deg,
-    rgba(244, 244, 244, 0.42),
-    rgba(244, 244, 244, 0.82),
-    rgba(244, 244, 244, 0.42)
+    rgba(244, 244, 244, 0.62),
+    rgba(255, 255, 255, 0.9),
+    rgba(244, 244, 244, 0.62)
   );
   background-size: 220% 100%;
   background-clip: text;
   -webkit-background-clip: text;
   color: transparent;
-  font-size: 0.74rem;
-  opacity: 0.72;
+  font-size: 0.68rem;
+  opacity: 0.82;
   animation: agent-status-shimmer 2200ms ease-in-out infinite;
 }
 

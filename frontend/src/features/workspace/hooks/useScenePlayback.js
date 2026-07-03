@@ -13,21 +13,39 @@ const EVALUATION_AGENT_STEP_MS = 850;
 const EVALUATION_AGENT_STAGGER_MS = 220;
 const HYPOTHESIS_COMPLETE_MS = 360;
 const ANSWER_REVEAL_DELAY_MS = 700;
+const DEBATE_THINK_STEP_MS = 460;
+const EVALUATION_THINK_STEP_MS = 680;
+const JUDGE_THINK_STEP_MS = 760;
+const JUDGE_VERDICT_STEP_MS = 820;
+
+const DEBATE_ROLE_IDS = ["defender", "attacker", "manufacturer"];
+const STATUS_ANSWERS = "отвечает";
+const STATUS_LISTENS = "слушает";
+const STATUS_THINKS = "размышляет";
+const STATUS_WAITS = "ожидает";
+const STATUS_EVALUATES = "оценивает";
+const STATUS_VERDICT = "выносит вердикт";
 
 const debateSpeakerSteps = [
   {
+    senderId: "defender",
+    receiverIds: ["attacker", "manufacturer"],
     activeDebateConnections: [
       { id: "top-left-top-right", direction: "forward" },
       { id: "top-left-bottom", direction: "forward" },
     ],
   },
   {
+    senderId: "attacker",
+    receiverIds: ["defender", "manufacturer"],
     activeDebateConnections: [
       { id: "top-left-top-right", direction: "reverse" },
       { id: "top-right-bottom", direction: "forward" },
     ],
   },
   {
+    senderId: "manufacturer",
+    receiverIds: ["defender", "attacker"],
     activeDebateConnections: [
       { id: "top-left-bottom", direction: "reverse" },
       { id: "top-right-bottom", direction: "reverse" },
@@ -35,45 +53,115 @@ const debateSpeakerSteps = [
   },
 ];
 
+function createDebateThinkingStatuses(senderId) {
+  return Object.fromEntries(
+    DEBATE_ROLE_IDS.map((roleId) => [
+      roleId,
+      roleId === senderId ? STATUS_THINKS : STATUS_WAITS,
+    ]),
+  );
+}
+
+function createDebateSpeakingStatuses(senderId, receiverIds) {
+  return Object.fromEntries(
+    DEBATE_ROLE_IDS.map((roleId) => {
+      if (roleId === senderId) {
+        return [roleId, STATUS_ANSWERS];
+      }
+
+      if (receiverIds.includes(roleId)) {
+        return [roleId, STATUS_LISTENS];
+      }
+
+      return [roleId, STATUS_WAITS];
+    }),
+  );
+}
+
+function createAgentStatusMap(agentIds, status) {
+  return Object.fromEntries(agentIds.map((agentId) => [agentId, status]));
+}
+
 function createDebatePlaybackSteps(hypothesisIndex) {
   return Array.from({ length: DEBATE_CYCLE_COUNT }).flatMap(() =>
-    debateSpeakerSteps.map((step) => ({
-      ...step,
-      hypothesisIndex,
-      durationMs: DEBATE_STEP_MS,
-    })),
+    debateSpeakerSteps.flatMap((step) => [
+      {
+        phase: "debate",
+        hypothesisIndex,
+        debateRoleStatuses: createDebateThinkingStatuses(step.senderId),
+        durationMs: DEBATE_THINK_STEP_MS,
+      },
+      {
+        ...step,
+        phase: "debate",
+        hypothesisIndex,
+        debateRoleStatuses: createDebateSpeakingStatuses(step.senderId, step.receiverIds),
+        durationMs: DEBATE_STEP_MS,
+      },
+    ]),
   );
 }
 
 function createEvaluationJudgeSteps(agentIds, hypothesisIndex) {
+  const agentWaveGroups = agentIds.reduce((groups, agentId, index) => {
+    const waveIndex = index % 2;
+
+    return groups.map((group, groupIndex) =>
+      groupIndex === waveIndex ? [...group, agentId] : group,
+    );
+  }, [[], []]).filter((group) => group.length > 0);
+
   return [
     {
+      phase: "evaluation",
       hypothesisIndex,
       activeEvaluationConnections: [
         "manufacturer-judge",
         ...agentIds.map((agentId) => `manufacturer-${agentId}`),
       ].map((id) => ({ id, direction: "forward" })),
+      evaluationAgentStatuses: createAgentStatusMap(agentIds, STATUS_LISTENS),
+      judgeStatus: STATUS_LISTENS,
       durationMs: EVALUATION_BROADCAST_MS,
     },
-    ...agentIds.reduce((steps, agentId, index) => {
-      const waveIndex = index % 2;
-      const existingWave = steps[waveIndex];
-      const connection = { id: `${agentId}-judge`, direction: "forward" };
+    {
+      phase: "evaluation",
+      hypothesisIndex,
+      evaluationAgentStatuses: createAgentStatusMap(agentIds, STATUS_THINKS),
+      judgeStatus: STATUS_WAITS,
+      durationMs: EVALUATION_THINK_STEP_MS,
+    },
+    ...agentWaveGroups.map((agentGroup, waveIndex) => {
+      const futureAgentIds = agentWaveGroups.slice(waveIndex + 1).flat();
+      const futureThinkingStatuses = createAgentStatusMap(futureAgentIds, STATUS_THINKS);
+      const activeEvaluationStatuses = createAgentStatusMap(agentGroup, STATUS_EVALUATES);
 
-      if (existingWave) {
-        existingWave.activeEvaluationConnections.push(connection);
-        return steps;
-      }
-
-      return [
-        ...steps,
-        {
-          hypothesisIndex,
-          activeEvaluationConnections: [connection],
-          durationMs: EVALUATION_AGENT_STEP_MS + (waveIndex * EVALUATION_AGENT_STAGGER_MS),
+      return {
+        phase: "evaluation",
+        hypothesisIndex,
+        activeEvaluationConnections: agentGroup.map((agentId) => ({
+          id: `${agentId}-judge`,
+          direction: "forward",
+        })),
+        evaluationAgentStatuses: {
+          ...futureThinkingStatuses,
+          ...activeEvaluationStatuses,
         },
-      ];
-    }, []),
+        judgeStatus: STATUS_LISTENS,
+        durationMs: EVALUATION_AGENT_STEP_MS + (waveIndex * EVALUATION_AGENT_STAGGER_MS),
+      };
+    }),
+    {
+      phase: "evaluation",
+      hypothesisIndex,
+      judgeStatus: STATUS_THINKS,
+      durationMs: JUDGE_THINK_STEP_MS,
+    },
+    {
+      phase: "evaluation",
+      hypothesisIndex,
+      judgeStatus: STATUS_VERDICT,
+      durationMs: JUDGE_VERDICT_STEP_MS,
+    },
   ];
 }
 
@@ -111,6 +199,45 @@ const initialPlaybackState = {
 
 function createActiveConnectionMap(connections = []) {
   return new Map(connections.map((connection) => [connection.id, connection.direction]));
+}
+
+function getDebateRoleStatuses(currentStep) {
+  return currentStep?.debateRoleStatuses ?? {};
+}
+
+function getEvaluationAgentStatuses(session, currentStep) {
+  if (!session.hypotheses || session.hypotheses.length === 0 || !currentStep) {
+    return {};
+  }
+
+  if (currentStep.evaluationAgentStatuses) {
+    return currentStep.evaluationAgentStatuses;
+  }
+
+  if (currentStep.phase === "debate") {
+    return createAgentStatusMap(
+      session.evaluation.agents.map((agent) => agent.id),
+      STATUS_WAITS,
+    );
+  }
+
+  return {};
+}
+
+function getJudgeStatus(session, currentStep) {
+  if (!session.hypotheses || session.hypotheses.length === 0 || !currentStep) {
+    return "";
+  }
+
+  if (currentStep.judgeStatus) {
+    return currentStep.judgeStatus;
+  }
+
+  if (currentStep.phase === "debate") {
+    return STATUS_WAITS;
+  }
+
+  return "";
 }
 
 function getHypothesesWithPlaybackStatus(hypotheses, playbackState, currentStep) {
@@ -205,9 +332,12 @@ export function useScenePlayback(session) {
   return {
     activeDebateConnectionDirections: createActiveConnectionMap(currentStep?.activeDebateConnections),
     activeEvaluationConnectionDirections: createActiveConnectionMap(currentStep?.activeEvaluationConnections),
+    debateRoleStatuses: getDebateRoleStatuses(currentStep),
+    evaluationAgentStatuses: getEvaluationAgentStatuses(session, currentStep),
     hypotheses: getHypothesesWithPlaybackStatus(session.hypotheses ?? [], playbackState, currentStep),
     isAnswerVisible: playbackState.isAnswerVisible,
     isRunning,
+    judgeStatus: getJudgeStatus(session, currentStep),
     startPlayback,
   };
 }

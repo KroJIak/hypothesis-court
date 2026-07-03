@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   Ban,
@@ -72,12 +72,22 @@ export function RequestSummaryRail({ requests }) {
   }, []);
 
   const handleRailScroll = useCallback(() => {
+    hideTooltip();
+  }, [hideTooltip]);
+
+  useEffect(() => {
     if (!activeRequestId) {
-      return;
+      return undefined;
     }
 
-    updateTooltipPosition(activeRequestId);
-  }, [activeRequestId, updateTooltipPosition]);
+    window.addEventListener("scroll", hideTooltip, true);
+    window.addEventListener("resize", hideTooltip);
+
+    return () => {
+      window.removeEventListener("scroll", hideTooltip, true);
+      window.removeEventListener("resize", hideTooltip);
+    };
+  }, [activeRequestId, hideTooltip]);
 
   if (requests.length === 0) {
     return null;

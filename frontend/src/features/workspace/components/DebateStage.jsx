@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Play } from "lucide-react";
 
@@ -79,6 +79,20 @@ export function DebateStage({
   const hidePlayTooltip = useCallback(() => {
     setIsPlayTooltipVisible(false);
   }, []);
+
+  useEffect(() => {
+    if (!isPlayTooltipVisible) {
+      return undefined;
+    }
+
+    window.addEventListener("scroll", hidePlayTooltip, true);
+    window.addEventListener("resize", hidePlayTooltip);
+
+    return () => {
+      window.removeEventListener("scroll", hidePlayTooltip, true);
+      window.removeEventListener("resize", hidePlayTooltip);
+    };
+  }, [hidePlayTooltip, isPlayTooltipVisible]);
 
   useLayoutEffect(() => {
     const updateConnections = () => {
