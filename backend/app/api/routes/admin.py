@@ -35,6 +35,7 @@ def _to_response(settings, *, has_api_token: bool | None = None) -> ModelProvide
         provider=settings.provider,
         base_url=settings.base_url,
         model=settings.model,
+        api_token=settings.api_token,
         has_api_token=bool(settings.api_token) if has_api_token is None else has_api_token,
         updated_at=settings.updated_at,
     )

@@ -7,6 +7,7 @@ class ModelProviderSettingsResponse(BaseModel):
     provider: str
     base_url: str
     model: str | None
+    api_token: str | None = None
     has_api_token: bool
     updated_at: datetime | None = None
 

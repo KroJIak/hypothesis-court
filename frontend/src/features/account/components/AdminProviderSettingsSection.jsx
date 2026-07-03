@@ -47,6 +47,7 @@ export function AdminProviderSettingsSection({
         const nextModel = settings?.model ?? "";
         setBaseUrl(settings?.base_url ?? "");
         setModel(nextModel);
+        setApiToken(settings?.api_token ?? "");
         setHasApiToken(Boolean(settings?.has_api_token));
         setAvailableModels(mergeModelOptions([nextModel]));
         setErrorMessage("");
@@ -74,16 +75,18 @@ export function AdminProviderSettingsSection({
       accessToken,
       provider,
       baseUrl,
-      apiToken: apiToken.trim() || null,
+      apiToken: apiToken?.trim() || null,
     });
 
     const nextModels = payload.models ?? [];
-    setAvailableModels(mergeModelOptions(nextModels, [model]));
+    setAvailableModels(mergeModelOptions(nextModels, [model?.trim() || ""]));
     return nextModels;
   }
 
   async function handleSubmit(event) {
     event.preventDefault();
+    const nextModel = model?.trim() || "";
+    const nextApiToken = apiToken?.trim() || null;
     setIsSaving(true);
     setErrorMessage("");
     setSuccessMessage("");
@@ -93,12 +96,12 @@ export function AdminProviderSettingsSection({
         accessToken,
         provider,
         baseUrl,
-        model,
-        apiToken: apiToken.trim() || null,
+        model: nextModel,
+        apiToken: nextApiToken,
       });
       setBaseUrl(settings.base_url);
-      setModel(settings.model);
-      setApiToken("");
+      setModel(settings.model ?? "");
+      setApiToken(settings.api_token ?? nextApiToken ?? "");
       setHasApiToken(Boolean(settings.has_api_token));
       setSuccessMessage("Сохранено.");
     } catch (error) {
@@ -109,22 +112,23 @@ export function AdminProviderSettingsSection({
   }
 
   async function handleTestConnection() {
+    const nextModel = model?.trim() || "";
     setIsTesting(true);
     setErrorMessage("");
     setSuccessMessage("");
 
     try {
-      const nextModels = model.trim()
+      const nextModels = nextModel
         ? (await testProviderConnection({
             accessToken,
             provider,
             baseUrl,
-            model,
-            apiToken: apiToken.trim() || null,
+            model: nextModel,
+            apiToken: apiToken?.trim() || null,
           })).models ?? []
         : await refreshModels();
 
-      setAvailableModels(mergeModelOptions(nextModels, [model]));
+      setAvailableModels(mergeModelOptions(nextModels, [nextModel]));
       setSuccessMessage("Подключение работает.");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Не удалось проверить подключение.");
@@ -168,7 +172,7 @@ export function AdminProviderSettingsSection({
         <label className="account-admin-field">
           <span>Модель</span>
           <select
-            value={model}
+            value={model ?? ""}
             disabled={isLoading}
             onFocus={handleModelSelectFocus}
             onChange={(event) => setModel(event.target.value)}
@@ -189,7 +193,7 @@ export function AdminProviderSettingsSection({
           <span className="account-admin-password-input">
             <input
               type={isApiTokenVisible ? "text" : "password"}
-              value={apiToken}
+              value={apiToken ?? ""}
               placeholder={hasApiToken ? "Токен уже сохранён" : "Введите API токен"}
               disabled={isLoading}
               onChange={(event) => setApiToken(event.target.value)}
