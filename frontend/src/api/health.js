@@ -1,12 +1,7 @@
-const fallbackBaseUrl = "/api";
-
-function normalizeBaseUrl(baseUrl) {
-  return baseUrl.replace(/\/+$/, "");
-}
+import { getApiBaseUrl } from "./baseUrl";
 
 export async function fetchHealth(signal) {
-  const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL;
-  const baseUrl = normalizeBaseUrl(configuredBaseUrl || fallbackBaseUrl);
+  const baseUrl = getApiBaseUrl();
   const response = await fetch(`${baseUrl}/health`, {
     headers: {
       Accept: "application/json",
