@@ -1,12 +1,12 @@
 import {
   BookOpenText,
   FileText,
-  SlidersHorizontal,
+  ShieldAlert,
   Target,
 } from "lucide-react";
 
 const requestIconByContextValue = {
-  constraints: SlidersHorizontal,
+  constraints: ShieldAlert,
   context: BookOpenText,
   kpi: Target,
 };
@@ -23,7 +23,6 @@ export function RequestSummaryRail({ requests }) {
   return (
     <div
       className="request-summary-rail"
-      style={{ "--request-summary-count": requests.length }}
       aria-label="Параметры запущенного исследования"
     >
       {requests.map((request) => {
