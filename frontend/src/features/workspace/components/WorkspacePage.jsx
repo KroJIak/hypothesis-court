@@ -12,6 +12,7 @@ import {
   listChatSessions,
   pinChatSession,
   renameChatSession,
+  startChatSession,
   unpinChatSession,
 } from "../api/chatSessions";
 import {
@@ -122,6 +123,14 @@ export function WorkspacePage({
   }
 
   async function handleCreateChat() {
+    const unstartedSession = sessions.find((session) => !session.isStarted);
+    if (unstartedSession) {
+      setChatSearchQuery("");
+      setSelectedChatId(unstartedSession.id);
+      setDraftMessage("");
+      return;
+    }
+
     setIsCreatingChat(true);
     setChatHistoryError("");
 
@@ -131,6 +140,7 @@ export function WorkspacePage({
         title: data.shell.navigation.newChatLabel,
       });
       const nextSession = createWorkspaceSessionFromChatSession(chatSession, data.sessions, data.palette.agents);
+      setChatSearchQuery("");
       setSessions((currentSessions) => [
         nextSession,
         ...currentSessions.filter((session) => session.id !== nextSession.id),
@@ -353,6 +363,7 @@ export function WorkspacePage({
 
     updateSelectedSession((session) => ({
       ...session,
+      isStarted: true,
       isPendingDraft: false,
       title: nextTitle,
       query: nextQuery,
@@ -361,6 +372,17 @@ export function WorkspacePage({
       composerRequests: [],
     }));
     void handleRenameChat(selectedSession.id, nextTitle);
+    void startChatSession({ accessToken, chatSessionId: selectedSession.id })
+      .then((chatSession) => {
+        setSessions((currentSessions) =>
+          currentSessions.map((session) =>
+            session.id === selectedSession.id ? applyChatSessionMetadata(session, chatSession) : session,
+          ),
+        );
+      })
+      .catch((error) => {
+        setChatHistoryError(error instanceof Error ? error.message : "Не удалось запустить чат.");
+      });
 
     setDraftMessage("");
   }

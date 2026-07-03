@@ -9,6 +9,7 @@ class ChatSessionResponse(BaseModel):
 
     id: uuid.UUID
     title: str
+    is_started: bool
     is_pinned: bool
     pinned_at: datetime | None
     created_at: datetime

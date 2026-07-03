@@ -21,6 +21,19 @@ class ChatSessionRepository:
         )
         return session.execute(stmt).scalar_one_or_none()
 
+    def get_unstarted_for_user(self, session: Session, *, user_id: uuid.UUID) -> ChatSession | None:
+        stmt = (
+            select(ChatSession)
+            .where(
+                ChatSession.user_id == user_id,
+                ChatSession.deleted_at.is_(None),
+                ChatSession.is_started.is_(False),
+            )
+            .order_by(ChatSession.created_at.desc())
+            .limit(1)
+        )
+        return session.execute(stmt).scalar_one_or_none()
+
     def list_active_for_user(
         self,
         session: Session,
@@ -43,6 +56,7 @@ class ChatSessionRepository:
         items = session.execute(
             stmt.order_by(
                 ChatSession.is_pinned.desc(),
+                ChatSession.is_started.asc(),
                 ChatSession.pinned_at.desc().nullslast(),
                 ChatSession.updated_at.desc(),
                 ChatSession.created_at.desc(),

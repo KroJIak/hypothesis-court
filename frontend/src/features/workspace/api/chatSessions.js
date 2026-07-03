@@ -5,6 +5,7 @@ function mapChatSession(dto) {
   return {
     id: dto.id,
     title: dto.title,
+    isStarted: Boolean(dto.is_started),
     isPinned: Boolean(dto.is_pinned),
     pinnedAt: dto.pinned_at ?? null,
     createdAt: dto.created_at,
@@ -111,6 +112,23 @@ export async function unpinChatSession({ accessToken, chatSessionId }) {
 
   if (!response.ok) {
     const detail = await readWorkspaceApiError(response, "Не удалось открепить чат.");
+    throw new Error(detail);
+  }
+
+  return mapChatSession(await response.json());
+}
+
+export async function startChatSession({ accessToken, chatSessionId }) {
+  const response = await fetch(`${getApiBaseUrl()}/chat-sessions/${chatSessionId}/start`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    const detail = await readWorkspaceApiError(response, "Не удалось запустить чат.");
     throw new Error(detail);
   }
 

@@ -35,8 +35,12 @@ class ChatSessionService:
             offset=offset,
         )
 
-    def create_session(self, *, user: User, title: str) -> ChatSession:
+    def create_session(self, *, user: User, title: str) -> tuple[ChatSession, bool]:
         try:
+            unstarted_session = self._chat_sessions.get_unstarted_for_user(self._session, user_id=user.id)
+            if unstarted_session is not None:
+                return unstarted_session, False
+
             chat_session = self._chat_sessions.create(
                 self._session,
                 ChatSession(
@@ -45,7 +49,7 @@ class ChatSessionService:
                 ),
             )
             self._session.commit()
-            return chat_session
+            return chat_session, True
         except Exception:
             self._session.rollback()
             raise
@@ -89,6 +93,16 @@ class ChatSessionService:
             chat_session = self._get_owned_session(user=user, chat_session_id=chat_session_id)
             chat_session.is_pinned = False
             chat_session.pinned_at = None
+            self._session.commit()
+            return chat_session
+        except Exception:
+            self._session.rollback()
+            raise
+
+    def start_session(self, *, user: User, chat_session_id: uuid.UUID) -> ChatSession:
+        try:
+            chat_session = self._get_owned_session(user=user, chat_session_id=chat_session_id)
+            chat_session.is_started = True
             self._session.commit()
             return chat_session
         except Exception:

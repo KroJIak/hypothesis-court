@@ -55,14 +55,17 @@ def list_chat_sessions(
 @router.post("", response_model=ChatSessionResponse, status_code=status.HTTP_201_CREATED)
 def create_chat_session(
     payload: ChatSessionCreateRequest,
+    response: Response,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
 ) -> ChatSessionResponse:
     service = _get_chat_session_service(session)
     try:
-        chat_session = service.create_session(user=current_user, title=payload.title)
+        chat_session, was_created = service.create_session(user=current_user, title=payload.title)
     except ServiceError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    if not was_created:
+        response.status_code = status.HTTP_200_OK
     return ChatSessionResponse.model_validate(chat_session)
 
 
@@ -113,6 +116,20 @@ def unpin_chat_session(
     service = _get_chat_session_service(session)
     try:
         chat_session = service.unpin_session(user=current_user, chat_session_id=chat_session_id)
+    except ServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    return ChatSessionResponse.model_validate(chat_session)
+
+
+@router.post("/{chat_session_id}/start", response_model=ChatSessionResponse)
+def start_chat_session(
+    chat_session_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+) -> ChatSessionResponse:
+    service = _get_chat_session_service(session)
+    try:
+        chat_session = service.start_session(user=current_user, chat_session_id=chat_session_id)
     except ServiceError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     return ChatSessionResponse.model_validate(chat_session)

@@ -394,19 +394,48 @@
 }
 
 .chat-delete-modal {
+  position: relative;
   width: min(100%, 360px);
   box-sizing: border-box;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 24px;
+  border-radius: 28px;
   background: #1f1f1f;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.42);
-  padding: 22px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.4);
+  padding: 28px;
+}
+
+.chat-delete-modal__close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #d8d8d8;
+  cursor: pointer;
+}
+
+.chat-delete-modal__close:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.chat-delete-modal__close svg {
+  width: 18px;
+  height: 18px;
+  display: block;
 }
 
 .chat-delete-modal__title {
+  padding-right: 42px;
   color: #f3f3f3;
-  font-size: 1.15rem;
+  font-size: 1.3rem;
   font-weight: 600;
+  line-height: 1.1;
 }
 
 .chat-delete-modal__text {
@@ -423,11 +452,11 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
-  margin-top: 20px;
+  margin-top: 24px;
 }
 
 .chat-delete-modal__actions button {
-  min-height: 40px;
+  min-height: 42px;
   border: 0;
   border-radius: 13px;
   background: rgba(255, 255, 255, 0.055);
@@ -441,11 +470,12 @@
 }
 
 .chat-delete-modal__actions .chat-delete-modal__confirm {
-  background: rgba(145, 43, 43, 0.42);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: transparent;
 }
 
 .chat-delete-modal__actions .chat-delete-modal__confirm:hover {
-  background: rgba(165, 48, 48, 0.52);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .chat-list__empty,

@@ -71,6 +71,7 @@ export function applyChatSessionMetadata(session, chatSession) {
     ...session,
     id: chatSession.id,
     title: chatSession.title,
+    isStarted: chatSession.isStarted,
     isPinned: chatSession.isPinned,
     pinnedAt: chatSession.pinnedAt,
     createdAt: chatSession.createdAt,
@@ -80,11 +81,32 @@ export function applyChatSessionMetadata(session, chatSession) {
 
 export function createWorkspaceSessionFromChatSession(chatSession, templateSessions, paletteAgents) {
   const templateSession = getTemplateSession(chatSession.id, templateSessions);
+  const session = chatSession.isStarted
+    ? templateSession
+    : createUnstartedSessionTemplate(templateSession, paletteAgents);
 
   return createWorkspaceSession(
-    applyChatSessionMetadata(templateSession, chatSession),
+    applyChatSessionMetadata(session, chatSession),
     paletteAgents,
   );
+}
+
+function createUnstartedSessionTemplate(templateSession, paletteAgents) {
+  return {
+    ...templateSession,
+    query: "Новая гипотеза появится здесь после отправки запроса.",
+    answer: "",
+    attachments: [],
+    composerRequests: [],
+    launchedRequests: [],
+    hypotheses: [],
+    availableAgents: sortAvailableAgents(paletteAgents.filter((agent) => !agent.isEmpty)),
+    evaluation: {
+      ...templateSession.evaluation,
+      layoutBias: undefined,
+      agents: [],
+    },
+  };
 }
 
 function getTemplateSession(chatSessionId, templateSessions) {

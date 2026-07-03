@@ -37,6 +37,7 @@ class ChatSession(Base):
         index=True,
     )
     title: Mapped[str] = mapped_column(String(200), nullable=False)
+    is_started: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
     is_pinned: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
     pinned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(

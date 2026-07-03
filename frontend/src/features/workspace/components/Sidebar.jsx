@@ -10,6 +10,7 @@ import {
   Scale,
   Search,
   Trash2,
+  X,
 } from "lucide-react";
 
 import { SidebarAccountControl } from "../../account/components/SidebarAccountControl";
@@ -302,6 +303,14 @@ export function Sidebar({
             aria-label="Удаление чата"
             onClick={(event) => event.stopPropagation()}
           >
+            <button
+              type="button"
+              className="chat-delete-modal__close"
+              aria-label="Закрыть"
+              onClick={() => setDeleteCandidate(null)}
+            >
+              <X strokeWidth={2} />
+            </button>
             <div className="chat-delete-modal__title">Удалить чат?</div>
             <div className="chat-delete-modal__text">{deleteCandidate.title}</div>
             <div className="chat-delete-modal__actions">
