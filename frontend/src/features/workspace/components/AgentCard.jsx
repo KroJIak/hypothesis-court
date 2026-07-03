@@ -15,6 +15,7 @@ export function AgentCard({
   compact = false,
   avatarRef = null,
   draggable = false,
+  hideStatus = false,
   onDragStart,
   onDragEnd,
 }) {
@@ -87,7 +88,7 @@ export function AgentCard({
             document.body,
           )
         : null}
-      {status ? (
+      {status && !hideStatus ? (
         <span className="scene-agent__status">
           {capitalizeFirst(status)}
           <span className="scene-agent__status-tail" aria-hidden="true">...</span>

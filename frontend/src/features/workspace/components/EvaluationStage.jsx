@@ -1,4 +1,5 @@
 import { AgentCard } from "./AgentCard";
+import { JudgeVerdict } from "./JudgeVerdict";
 import {
   EVALUATION_AGENT_GAP,
   EVALUATION_AGENT_SLOT_WIDTH,
@@ -12,6 +13,7 @@ export function EvaluationStage({
   evaluation,
   answer,
   isAnswerVisible,
+  hideAgentStatus,
   onAgentAvatarRef,
   judgeAvatarRef,
   onAgentDragStart,
@@ -36,11 +38,25 @@ export function EvaluationStage({
     onDropAgent(event, side);
   }
 
+  function handleWideDrop(event) {
+    if (!isDropTargetVisible) {
+      return;
+    }
+
+    const dropRect = event.currentTarget.getBoundingClientRect();
+    const dropSide = event.clientX < dropRect.left + (dropRect.width / 2)
+      ? EVALUATION_SIDE_LEFT
+      : EVALUATION_SIDE_RIGHT;
+
+    handleDrop(event, dropSide);
+  }
+
   return (
     <section className="evaluation-stage" aria-label="Оценка гипотезы">
       <div
         className="evaluation-stage__agents"
         onDragOver={handleDragOver}
+        onDrop={handleWideDrop}
         aria-label="Перетащите сюда оценочного агента"
       >
         <div
@@ -66,6 +82,7 @@ export function EvaluationStage({
                   {...agent}
                   compact
                   draggable
+                  hideStatus={hideAgentStatus}
                   avatarRef={(node) => onAgentAvatarRef(agent.id, node)}
                   onDragStart={(event) => onAgentDragStart(event, "evaluation", agent.id)}
                   onDragEnd={onAgentDragEnd}
@@ -90,6 +107,7 @@ export function EvaluationStage({
                   {...agent}
                   compact
                   draggable
+                  hideStatus={hideAgentStatus}
                   avatarRef={(node) => onAgentAvatarRef(agent.id, node)}
                   onDragStart={(event) => onAgentDragStart(event, "evaluation", agent.id)}
                   onDragEnd={onAgentDragEnd}
@@ -107,13 +125,11 @@ export function EvaluationStage({
       </div>
 
       <div className="evaluation-stage__judge">
-        <AgentCard {...evaluation.judge} compact avatarRef={judgeAvatarRef} />
+        <AgentCard {...evaluation.judge} compact hideStatus={hideAgentStatus} avatarRef={judgeAvatarRef} />
       </div>
 
       {isAnswerVisible && answer ? (
-        <div className="judge-verdict" aria-live="polite">
-          <p>{answer}</p>
-        </div>
+        <JudgeVerdict answer={answer} />
       ) : null}
     </section>
   );

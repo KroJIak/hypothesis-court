@@ -8,8 +8,7 @@ export function DebateStage({
   debate,
   manufacturerAvatarRef,
   activeConnectionDirections,
-  isPlaybackRunning,
-  onPlay,
+  hideAgentStatus,
 }) {
   const stageRef = useRef(null);
   const topLeftAvatarRef = useRef(null);
@@ -119,23 +118,19 @@ export function DebateStage({
         </svg>
       ) : null}
       <div className="debate-stage__triangle debate-stage__triangle--left">
-        <AgentCard {...rolesByPlacement["top-left"]} avatarRef={topLeftAvatarRef} />
+        <AgentCard {...rolesByPlacement["top-left"]} hideStatus={hideAgentStatus} avatarRef={topLeftAvatarRef} />
       </div>
       <div className="debate-stage__triangle debate-stage__triangle--center">
-        <button
-          type="button"
-          className={isPlaybackRunning ? "play-button play-button--active" : "play-button"}
-          aria-label={debate.playLabel}
-          onClick={onPlay}
-        >
+        <button type="button" className="play-button" aria-label={debate.playLabel}>
           <span className="play-button__icon"><Play aria-hidden="true" strokeWidth={2.1} /></span>
+          <span className="play-button__tooltip">{debate.playLabel}</span>
         </button>
       </div>
       <div className="debate-stage__triangle debate-stage__triangle--right">
-        <AgentCard {...rolesByPlacement["top-right"]} avatarRef={topRightAvatarRef} />
+        <AgentCard {...rolesByPlacement["top-right"]} hideStatus={hideAgentStatus} avatarRef={topRightAvatarRef} />
       </div>
       <div className="debate-stage__triangle debate-stage__triangle--bottom">
-        <AgentCard {...rolesByPlacement["bottom-center"]} avatarRef={setBottomAvatarRef} />
+        <AgentCard {...rolesByPlacement["bottom-center"]} hideStatus={hideAgentStatus} avatarRef={setBottomAvatarRef} />
       </div>
     </section>
   );

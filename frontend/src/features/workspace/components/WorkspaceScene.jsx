@@ -17,9 +17,8 @@ export function WorkspaceScene({ session, onAgentDragStart, onAgentDragEnd, onDr
     activeEvaluationConnectionDirections,
     hypotheses,
     isAnswerVisible,
-    isRunning,
-    startPlayback,
   } = useScenePlayback(session);
+  const hasHypotheses = (session.hypotheses ?? []).length > 0;
 
   const setEvaluationAvatarRef = useCallback((agentId, node) => {
     if (node) {
@@ -141,13 +140,13 @@ export function WorkspaceScene({ session, onAgentDragStart, onAgentDragEnd, onDr
         debate={session.debate}
         manufacturerAvatarRef={manufacturerAvatarRef}
         activeConnectionDirections={activeDebateConnectionDirections}
-        isPlaybackRunning={isRunning}
-        onPlay={startPlayback}
+        hideAgentStatus={!hasHypotheses}
       />
       <EvaluationStage
         evaluation={session.evaluation}
         answer={session.answer}
         isAnswerVisible={isAnswerVisible}
+        hideAgentStatus={!hasHypotheses}
         onAgentAvatarRef={setEvaluationAvatarRef}
         judgeAvatarRef={judgeAvatarRef}
         onAgentDragStart={onAgentDragStart}
