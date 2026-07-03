@@ -14,7 +14,6 @@ import {
 
 import { SidebarAccountControl } from "../../account/components/SidebarAccountControl";
 import { COLLAPSED_RECENT_CHAT_LIMIT } from "../constants";
-import { matchesChatSearch } from "../model/workspaceSessionModel";
 
 export function Sidebar({
   accessToken,
@@ -30,25 +29,28 @@ export function Sidebar({
   onUpdateCurrentUserProfile,
   onUploadAvatar,
   onChangePassword,
+  chatSearchQuery,
+  chatHistoryError,
   onSelectChat,
   onCreateChat,
   onToggleSidebar,
+  onChatSearchQueryChange,
   onRenameChat,
   onTogglePinChat,
   onDeleteChat,
 }) {
   const [isCollapsedChatListOpen, setIsCollapsedChatListOpen] = useState(false);
-  const [chatSearchQuery, setChatSearchQuery] = useState("");
   const [activeChatMenuId, setActiveChatMenuId] = useState(null);
   const [renamingChatId, setRenamingChatId] = useState(null);
   const [renameDraft, setRenameDraft] = useState("");
   const [deleteCandidate, setDeleteCandidate] = useState(null);
   const chatMenuRef = useRef(null);
+  const skipRenameCommitRef = useRef(false);
   const sortedSessions = useMemo(
     () => [...sessions].sort((first, second) => Number(Boolean(second.isPinned)) - Number(Boolean(first.isPinned))),
     [sessions],
   );
-  const filteredSessions = sortedSessions.filter((session) => matchesChatSearch(session, chatSearchQuery));
+  const filteredSessions = sortedSessions;
   const recentCollapsedSessions = filteredSessions.slice(0, COLLAPSED_RECENT_CHAT_LIMIT);
 
   useEffect(() => {
@@ -97,6 +99,13 @@ export function Sidebar({
   }
 
   function handleFinishRename(chatId) {
+    if (skipRenameCommitRef.current) {
+      skipRenameCommitRef.current = false;
+      setRenamingChatId(null);
+      setRenameDraft("");
+      return;
+    }
+
     onRenameChat(chatId, renameDraft);
     setRenamingChatId(null);
     setRenameDraft("");
@@ -109,6 +118,7 @@ export function Sidebar({
     }
 
     if (event.key === "Escape") {
+      skipRenameCommitRef.current = true;
       setRenamingChatId(null);
       setRenameDraft("");
     }
@@ -178,7 +188,7 @@ export function Sidebar({
           className="chat-search__input"
           type="search"
           value={chatSearchQuery}
-          onChange={(event) => setChatSearchQuery(event.target.value)}
+          onChange={(event) => onChatSearchQueryChange(event.target.value)}
           placeholder={shell.navigation.searchLabel}
         />
       </label>
@@ -276,6 +286,9 @@ export function Sidebar({
           ))}
           {filteredSessions.length === 0 ? (
             <span className="chat-list__empty">Ничего не найдено</span>
+          ) : null}
+          {chatHistoryError ? (
+            <span className="chat-list__error">{chatHistoryError}</span>
           ) : null}
         </div>
       )}

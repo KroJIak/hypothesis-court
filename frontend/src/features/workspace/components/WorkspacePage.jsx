@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useDeferredValue, useEffect, useState } from "react";
 
 import { AgentPalette } from "./AgentPalette";
 import { Composer } from "./Composer";
@@ -6,6 +6,14 @@ import { RequestSummaryRail } from "./RequestSummaryRail";
 import { Sidebar } from "./Sidebar";
 import { WorkspaceScene } from "./WorkspaceScene";
 import { WorkspaceError, WorkspaceSkeleton } from "./WorkspaceStatus";
+import {
+  createChatSession,
+  deleteChatSession,
+  listChatSessions,
+  pinChatSession,
+  renameChatSession,
+  unpinChatSession,
+} from "../api/chatSessions";
 import {
   AGENT_DRAG_MIME_TYPE,
   EVALUATION_SIDE_RIGHT,
@@ -15,9 +23,9 @@ import {
   createEvaluationAgent,
   createPendingAgent,
   createComposerRequest,
-  createDraftWorkspaceSession,
   createHypothesesFromRequests,
-  createWorkspaceSession,
+  applyChatSessionMetadata,
+  createWorkspaceSessionFromChatSession,
   formatComposerRequest,
   getInitialAvailableAgents,
   hasPendingAgent,
@@ -45,15 +53,46 @@ export function WorkspacePage({
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [dragSource, setDragSource] = useState(null);
   const [sessions, setSessions] = useState([]);
+  const [chatSearchQuery, setChatSearchQuery] = useState("");
+  const [chatHistoryError, setChatHistoryError] = useState("");
+  const [isCreatingChat, setIsCreatingChat] = useState(false);
+  const deferredChatSearchQuery = useDeferredValue(chatSearchQuery);
 
   useEffect(() => {
     if (status !== "success" || !data) {
       return;
     }
 
-    setSessions(data.sessions.map((session) => createWorkspaceSession(session, data.palette.agents)));
-    setSelectedChatId(data.shell.currentChatId);
-  }, [data, status]);
+    const controller = new AbortController();
+
+    listChatSessions({
+      accessToken,
+      search: deferredChatSearchQuery,
+      signal: controller.signal,
+    })
+      .then((payload) => {
+        const nextSessions = payload.items.map((chatSession) =>
+          createWorkspaceSessionFromChatSession(chatSession, data.sessions, data.palette.agents),
+        );
+
+        setSessions(nextSessions);
+        setSelectedChatId((currentChatId) =>
+          nextSessions.some((session) => session.id === currentChatId)
+            ? currentChatId
+            : nextSessions[0]?.id ?? null,
+        );
+        setChatHistoryError("");
+      })
+      .catch((error) => {
+        if (error?.name === "AbortError") {
+          return;
+        }
+
+        setChatHistoryError(error instanceof Error ? error.message : "Не удалось загрузить историю чатов.");
+      });
+
+    return () => controller.abort();
+  }, [accessToken, data, deferredChatSearchQuery, status]);
 
   if (status === "loading") {
     return <WorkspaceSkeleton />;
@@ -64,11 +103,6 @@ export function WorkspacePage({
   }
 
   const selectedSession = sessions.find((session) => session.id === selectedChatId) ?? sessions[0] ?? null;
-  const pendingDraftSession = sessions.find((session) => session.isPendingDraft) ?? null;
-
-  if (!selectedSession) {
-    return <WorkspaceSkeleton />;
-  }
 
   function updateSelectedSession(mapSelectedSession) {
     setSessions((currentSessions) =>
@@ -87,64 +121,96 @@ export function WorkspacePage({
     setDraftMessage("");
   }
 
-  function handleCreateChat() {
-    if (pendingDraftSession) {
-      setSelectedChatId(pendingDraftSession.id);
+  async function handleCreateChat() {
+    setIsCreatingChat(true);
+    setChatHistoryError("");
+
+    try {
+      const chatSession = await createChatSession({
+        accessToken,
+        title: data.shell.navigation.newChatLabel,
+      });
+      const nextSession = createWorkspaceSessionFromChatSession(chatSession, data.sessions, data.palette.agents);
+      setSessions((currentSessions) => [
+        nextSession,
+        ...currentSessions.filter((session) => session.id !== nextSession.id),
+      ]);
+      setSelectedChatId(nextSession.id);
       setDraftMessage("");
-      return;
+    } catch (error) {
+      setChatHistoryError(error instanceof Error ? error.message : "Не удалось создать чат.");
+    } finally {
+      setIsCreatingChat(false);
     }
-
-    const newChatId = `draft-${Date.now()}`;
-    const newSession = createDraftWorkspaceSession(selectedSession, data.palette.agents, newChatId);
-
-    setSessions((currentSessions) => [newSession, ...currentSessions]);
-    setSelectedChatId(newChatId);
-    setDraftMessage("");
   }
 
   function handleToggleSidebar() {
     setIsSidebarCollapsed((currentValue) => !currentValue);
   }
 
-  function handleRenameChat(chatId, nextTitle) {
+  async function handleRenameChat(chatId, nextTitle) {
     const normalizedTitle = nextTitle.trim();
 
     if (!normalizedTitle) {
       return;
     }
 
-    setSessions((currentSessions) =>
-      currentSessions.map((session) =>
-        session.id === chatId
-          ? {
-              ...session,
-              title: normalizedTitle,
-            }
-          : session,
-      ),
-    );
+    setChatHistoryError("");
+
+    try {
+      const chatSession = await renameChatSession({
+        accessToken,
+        chatSessionId: chatId,
+        title: normalizedTitle,
+      });
+      setSessions((currentSessions) =>
+        currentSessions.map((session) =>
+          session.id === chatId ? applyChatSessionMetadata(session, chatSession) : session,
+        ),
+      );
+    } catch (error) {
+      setChatHistoryError(error instanceof Error ? error.message : "Не удалось переименовать чат.");
+    }
   }
 
-  function handleTogglePinChat(chatId) {
-    setSessions((currentSessions) =>
-      currentSessions.map((session) =>
-        session.id === chatId
-          ? {
-              ...session,
-              isPinned: !session.isPinned,
-            }
-          : session,
-      ),
-    );
+  async function handleTogglePinChat(chatId) {
+    const session = sessions.find((item) => item.id === chatId);
+
+    if (!session) {
+      return;
+    }
+
+    setChatHistoryError("");
+
+    try {
+      const chatSession = session.isPinned
+        ? await unpinChatSession({ accessToken, chatSessionId: chatId })
+        : await pinChatSession({ accessToken, chatSessionId: chatId });
+
+      setSessions((currentSessions) =>
+        currentSessions.map((item) =>
+          item.id === chatId ? applyChatSessionMetadata(item, chatSession) : item,
+        ),
+      );
+    } catch (error) {
+      setChatHistoryError(error instanceof Error ? error.message : "Не удалось изменить закрепление чата.");
+    }
   }
 
-  function handleDeleteChat(chatId) {
-    const nextSessions = sessions.filter((session) => session.id !== chatId);
+  async function handleDeleteChat(chatId) {
+    setChatHistoryError("");
 
-    setSessions(nextSessions);
+    try {
+      await deleteChatSession({ accessToken, chatSessionId: chatId });
+      const nextSessions = sessions.filter((session) => session.id !== chatId);
 
-    if (selectedChatId === chatId) {
-      setSelectedChatId(nextSessions[0]?.id ?? null);
+      setSessions(nextSessions);
+
+      if (selectedChatId === chatId) {
+        setSelectedChatId(nextSessions[0]?.id ?? null);
+      }
+    } catch (error) {
+      setChatHistoryError(error instanceof Error ? error.message : "Не удалось удалить чат.");
     }
   }
 
@@ -294,6 +360,7 @@ export function WorkspacePage({
       hypotheses: createHypothesesFromRequests(composerRequests),
       composerRequests: [],
     }));
+    void handleRenameChat(selectedSession.id, nextTitle);
 
     setDraftMessage("");
   }
@@ -305,29 +372,46 @@ export function WorkspacePage({
     }));
   }
 
+  const sidebar = (
+    <Sidebar
+      accessToken={accessToken}
+      shell={data.shell}
+      currentUser={currentUser}
+      accountProfile={accountProfile}
+      sessions={sessions}
+      selectedChatId={selectedSession?.id ?? null}
+      isCollapsed={isSidebarCollapsed}
+      isNewChatDisabled={isCreatingChat}
+      chatSearchQuery={chatSearchQuery}
+      chatHistoryError={chatHistoryError}
+      onLogout={onLogout}
+      onLogoutAll={onLogoutAll}
+      onUpdateCurrentUserProfile={onUpdateCurrentUserProfile}
+      onUploadAvatar={onUploadAvatar}
+      onChangePassword={onChangePassword}
+      onSelectChat={handleSelectChat}
+      onCreateChat={handleCreateChat}
+      onToggleSidebar={handleToggleSidebar}
+      onChatSearchQueryChange={setChatSearchQuery}
+      onRenameChat={handleRenameChat}
+      onTogglePinChat={handleTogglePinChat}
+      onDeleteChat={handleDeleteChat}
+    />
+  );
+
+  if (!selectedSession) {
+    return (
+      <main className={`workspace${isSidebarCollapsed ? " workspace--sidebar-collapsed" : ""}`}>
+        {sidebar}
+        <section className="workspace-main workspace-main--empty" />
+        <aside className="agent-palette" aria-hidden="true" />
+      </main>
+    );
+  }
+
   return (
     <main className={`workspace${isSidebarCollapsed ? " workspace--sidebar-collapsed" : ""}`}>
-      <Sidebar
-        accessToken={accessToken}
-        shell={data.shell}
-        currentUser={currentUser}
-        accountProfile={accountProfile}
-        sessions={sessions}
-        selectedChatId={selectedSession.id}
-        isCollapsed={isSidebarCollapsed}
-        isNewChatDisabled={Boolean(pendingDraftSession)}
-        onLogout={onLogout}
-        onLogoutAll={onLogoutAll}
-        onUpdateCurrentUserProfile={onUpdateCurrentUserProfile}
-        onUploadAvatar={onUploadAvatar}
-        onChangePassword={onChangePassword}
-        onSelectChat={handleSelectChat}
-        onCreateChat={handleCreateChat}
-        onToggleSidebar={handleToggleSidebar}
-        onRenameChat={handleRenameChat}
-        onTogglePinChat={handleTogglePinChat}
-        onDeleteChat={handleDeleteChat}
-      />
+      {sidebar}
 
       <section className="workspace-main">
         <RequestSummaryRail requests={selectedSession.launchedRequests ?? []} />
