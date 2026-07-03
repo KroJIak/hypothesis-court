@@ -2,6 +2,7 @@ import { useCallback, useLayoutEffect, useRef, useState } from "react";
 
 import { DebateStage } from "./DebateStage";
 import { EvaluationStage } from "./EvaluationStage";
+import { HypothesisCandidates } from "./HypothesisCandidates";
 import { getElementCenter, createStraightPath } from "../utils/geometry";
 
 export function WorkspaceScene({ session, onAgentDragStart, onAgentDragEnd, onDropAgentToEvaluation, dragSource }) {
@@ -110,6 +111,7 @@ export function WorkspaceScene({ session, onAgentDragStart, onAgentDragEnd, onDr
         </svg>
       ) : null}
 
+      <HypothesisCandidates hypotheses={session.hypotheses ?? []} />
       <DebateStage debate={session.debate} manufacturerAvatarRef={manufacturerAvatarRef} />
       <EvaluationStage
         evaluation={session.evaluation}

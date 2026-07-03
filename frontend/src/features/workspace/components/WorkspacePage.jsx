@@ -16,11 +16,13 @@ import {
   createPendingAgent,
   createComposerRequest,
   createDraftWorkspaceSession,
+  createHypothesesFromRequests,
   createWorkspaceSession,
   formatComposerRequest,
   getInitialAvailableAgents,
   hasPendingAgent,
   insertEvaluationAgentAtEdge,
+  reorderAvailableAgents,
   sortAvailableAgents,
 } from "../model/workspaceSessionModel";
 import { readAgentDragPayload } from "../utils/dragPayload";
@@ -201,6 +203,19 @@ export function WorkspacePage({
     handleMoveAgentToPalette(payload.agentId);
   }
 
+  function handleReorderPaletteAgent(agentId, targetAgentId, placement) {
+    runLayoutTransition(() => {
+      updateSelectedSession((session) => {
+        const availableAgents = session.availableAgents ?? getInitialAvailableAgents(session, data.palette.agents);
+
+        return {
+          ...session,
+          availableAgents: reorderAvailableAgents(availableAgents, agentId, targetAgentId, placement),
+        };
+      });
+    });
+  }
+
   function handleSend({ context, text }) {
     const nextText = text.trim();
     const composerRequests = selectedSession.composerRequests ?? [];
@@ -230,6 +245,7 @@ export function WorkspacePage({
       title: nextTitle,
       query: nextQuery,
       launchedRequests: composerRequests,
+      hypotheses: createHypothesesFromRequests(composerRequests),
       composerRequests: [],
     }));
 
@@ -261,11 +277,7 @@ export function WorkspacePage({
       />
 
       <section className="workspace-main">
-        {(selectedSession.launchedRequests ?? []).length > 0 ? (
-          <RequestSummaryRail requests={selectedSession.launchedRequests ?? []} />
-        ) : (
-          <div className="workspace-main__question">{selectedSession.query}</div>
-        )}
+        <RequestSummaryRail requests={selectedSession.launchedRequests ?? []} />
 
         <div className="workspace-main__scene">
           <WorkspaceScene
@@ -294,6 +306,7 @@ export function WorkspacePage({
         onAgentDragStart={handleAgentDragStart}
         onAgentDragEnd={handleAgentDragEnd}
         onDropAgentToPalette={handleDropAgentToPalette}
+        onReorderPaletteAgent={handleReorderPaletteAgent}
         isDropTargetVisible={dragSource === "evaluation"}
         isAddAgentDisabled={hasPendingAgent(selectedSession)}
         onAddAgent={handleAddAgent}
