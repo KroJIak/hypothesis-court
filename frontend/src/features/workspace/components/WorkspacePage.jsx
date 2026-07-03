@@ -2,7 +2,10 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import {
   CircleUserRound,
   FileText,
+  MessageSquare,
   Paperclip,
+  PanelLeftClose,
+  PanelLeftOpen,
   Play,
   Plus,
   Scale,
@@ -22,27 +25,57 @@ function capitalizeFirst(text) {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-function Sidebar({ shell, sessions, selectedChatId, onSelectChat, onCreateChat }) {
+function Sidebar({
+  shell,
+  sessions,
+  selectedChatId,
+  isCollapsed,
+  isNewChatDisabled,
+  onSelectChat,
+  onCreateChat,
+  onToggleSidebar,
+}) {
   return (
-    <aside className="workspace-sidebar">
-      <div className="brand-lockup">
-        <div className="brand-mark">
-          <Scale aria-hidden="true" strokeWidth={2.1} />
-        </div>
-        <div className="brand-copy">
-          <span>Hypothesis</span>
-          <span>Court</span>
-        </div>
+    <aside className={`workspace-sidebar${isCollapsed ? " workspace-sidebar--collapsed" : ""}`}>
+      <div className="sidebar-topbar">
+        <button type="button" className="brand-lockup" onClick={onCreateChat} aria-label="Hypothesis Court">
+          <span className="brand-mark">
+            <Scale aria-hidden="true" strokeWidth={2.1} />
+          </span>
+          <span className="brand-copy">
+            <span>Hypothesis</span>
+            <span>Court</span>
+          </span>
+        </button>
+
+        <button
+          type="button"
+          className="sidebar-toggle"
+          onClick={onToggleSidebar}
+          aria-label={isCollapsed ? "Показать меню" : "Скрыть меню"}
+          title={isCollapsed ? "Показать меню" : "Скрыть меню"}
+        >
+          {isCollapsed ? (
+            <PanelLeftOpen aria-hidden="true" strokeWidth={2.1} />
+          ) : (
+            <PanelLeftClose aria-hidden="true" strokeWidth={2.1} />
+          )}
+        </button>
       </div>
 
-      <button type="button" className="nav-button nav-button--primary" onClick={onCreateChat}>
+      <button
+        type="button"
+        className="nav-button nav-button--primary"
+        disabled={isNewChatDisabled}
+        onClick={onCreateChat}
+      >
         <span className="nav-button__icon"><Plus aria-hidden="true" strokeWidth={2.1} /></span>
-        <span>{shell.navigation.newChatLabel}</span>
+        <span className="sidebar-label">{shell.navigation.newChatLabel}</span>
       </button>
 
       <button type="button" className="nav-button nav-button--ghost">
         <span className="nav-button__icon"><Search aria-hidden="true" strokeWidth={2.1} /></span>
-        <span>{shell.navigation.searchLabel}</span>
+        <span className="sidebar-label">{shell.navigation.searchLabel}</span>
       </button>
 
       <div className="chat-list" role="list" aria-label="История чатов">
@@ -52,8 +85,10 @@ function Sidebar({ shell, sessions, selectedChatId, onSelectChat, onCreateChat }
             type="button"
             className={`chat-list__item${session.id === selectedChatId ? " chat-list__item--active" : ""}`}
             onClick={() => onSelectChat(session.id)}
+            title={session.title}
           >
-            {session.title}
+            <span className="chat-list__icon"><MessageSquare aria-hidden="true" strokeWidth={1.9} /></span>
+            <span className="sidebar-label">{session.title}</span>
           </button>
         ))}
       </div>
@@ -184,7 +219,7 @@ function DebateStage({ debate, manufacturerAvatarRef }) {
   );
 }
 
-function EvaluationStage({ evaluation, onAgentAvatarRef, judgeAvatarRef }) {
+function EvaluationStage({ evaluation, answer, onAgentAvatarRef, judgeAvatarRef }) {
   return (
     <section className="evaluation-stage" aria-label="Оценка гипотезы">
       <div className="evaluation-stage__agents">
@@ -197,6 +232,11 @@ function EvaluationStage({ evaluation, onAgentAvatarRef, judgeAvatarRef }) {
 
       <div className="evaluation-stage__judge">
         <AgentCard {...evaluation.judge} compact avatarRef={judgeAvatarRef} />
+        {answer ? (
+          <div className="judge-verdict">
+            <p>{answer}</p>
+          </div>
+        ) : null}
       </div>
     </section>
   );
@@ -313,6 +353,7 @@ function WorkspaceScene({ session }) {
       <DebateStage debate={session.debate} manufacturerAvatarRef={manufacturerAvatarRef} />
       <EvaluationStage
         evaluation={session.evaluation}
+        answer={session.answer}
         onAgentAvatarRef={setEvaluationAvatarRef}
         judgeAvatarRef={judgeAvatarRef}
       />
@@ -409,6 +450,7 @@ export function WorkspacePage() {
   const { status, data } = useWorkspaceScene();
   const [selectedChatId, setSelectedChatId] = useState(null);
   const [draftMessage, setDraftMessage] = useState("");
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [sessions, setSessions] = useState([]);
 
   useEffect(() => {
@@ -429,6 +471,7 @@ export function WorkspacePage() {
   }
 
   const selectedSession = sessions.find((session) => session.id === selectedChatId) ?? sessions[0] ?? null;
+  const pendingDraftSession = sessions.find((session) => session.isPendingDraft) ?? null;
 
   if (!selectedSession) {
     return <WorkspaceSkeleton />;
@@ -440,10 +483,17 @@ export function WorkspacePage() {
   }
 
   function handleCreateChat() {
+    if (pendingDraftSession) {
+      setSelectedChatId(pendingDraftSession.id);
+      setDraftMessage("");
+      return;
+    }
+
     const newChatId = `draft-${Date.now()}`;
     const newSession = {
       ...selectedSession,
       id: newChatId,
+      isPendingDraft: true,
       title: "Новый чат",
       query: "Новая гипотеза появится здесь после отправки запроса.",
       answer:
@@ -454,6 +504,10 @@ export function WorkspacePage() {
     setSessions((currentSessions) => [newSession, ...currentSessions]);
     setSelectedChatId(newChatId);
     setDraftMessage("");
+  }
+
+  function handleToggleSidebar() {
+    setIsSidebarCollapsed((currentValue) => !currentValue);
   }
 
   function handleSend(event) {
@@ -473,7 +527,8 @@ export function WorkspacePage() {
 
         return {
           ...session,
-          title: nextQuery.slice(0, 46),
+          isPendingDraft: false,
+          title: nextQuery,
           query: nextQuery,
         };
       }),
@@ -483,13 +538,16 @@ export function WorkspacePage() {
   }
 
   return (
-    <main className="workspace">
+    <main className={`workspace${isSidebarCollapsed ? " workspace--sidebar-collapsed" : ""}`}>
       <Sidebar
         shell={data.shell}
         sessions={sessions}
         selectedChatId={selectedSession.id}
+        isCollapsed={isSidebarCollapsed}
+        isNewChatDisabled={Boolean(pendingDraftSession)}
         onSelectChat={handleSelectChat}
         onCreateChat={handleCreateChat}
+        onToggleSidebar={handleToggleSidebar}
       />
 
       <section className="workspace-main">
@@ -497,10 +555,6 @@ export function WorkspacePage() {
 
         <div className="workspace-main__scene">
           <WorkspaceScene session={selectedSession} />
-        </div>
-
-        <div className="workspace-main__answer">
-          <p>{selectedSession.answer}</p>
         </div>
 
         <Composer
