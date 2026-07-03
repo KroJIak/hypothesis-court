@@ -426,26 +426,20 @@
   gap: 8px;
 }
 
-.workspace-main__question {
-  --question-offset-y: 8px;
-  align-self: center;
-  width: min(610px, 100%);
-  border-radius: 18px;
-  background: #202020;
-  color: #fbfbfb;
-  padding: 9px 14px;
-  font-size: clamp(0.98rem, 1vw, 1.18rem);
-  line-height: 1.28;
-  transform: translateY(var(--question-offset-y));
-}
-
 .request-summary-rail {
   align-self: center;
   display: flex;
-  justify-content: center;
+  justify-content: safe center;
   width: var(--workspace-answer-column-width);
   gap: 10px;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
   padding: 6px 0 10px;
+  scrollbar-width: none;
+}
+
+.request-summary-rail::-webkit-scrollbar {
+  display: none;
 }
 
 .request-summary-card {
@@ -533,12 +527,12 @@
   --hypothesis-gap: 10px;
   --hypothesis-card-gap: 8px;
   --hypothesis-card-width: calc(
-    (var(--workspace-answer-column-width) - var(--hypothesis-agent-size) - var(--hypothesis-gap) - (2 * var(--hypothesis-card-gap))) / 3
+    (var(--workspace-answer-column-width) - (2 * var(--hypothesis-card-gap))) / 3
   );
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: var(--hypothesis-agent-size) minmax(0, 1fr);
+  grid-template-columns: var(--hypothesis-agent-size) var(--workspace-answer-column-width);
   align-items: center;
   gap: var(--hypothesis-gap);
   width: var(--workspace-answer-column-width);

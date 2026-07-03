@@ -86,6 +86,29 @@ function createHypotheses({ idPrefix, count, topic }) {
   }));
 }
 
+const requestContexts = [
+  { value: "kpi", label: "KPI" },
+  { value: "constraints", label: "Ограничения" },
+  { value: "context", label: "Контекст" },
+];
+
+function createLaunchedRequests({ idPrefix, count, topic }) {
+  const requestTexts = [
+    `Измеримый эффект для ${topic} должен быть подтверждён короткой серией испытаний.`,
+    "Не выходить за доступное производственное окно и текущие ограничения оборудования.",
+    "Учитывать только источники, где явно описаны успешные и провальные подходы.",
+    "Сравнить варианты по стоимости пилота, риску масштабирования и времени проверки.",
+    "Отдельно отметить зависимости от поставщиков и редких компонентов.",
+    "Проверить, можно ли валидировать гипотезу без полной перестройки процесса.",
+  ];
+
+  return Array.from({ length: count }, (_, index) => ({
+    id: `${idPrefix}-request-${index + 1}`,
+    context: requestContexts[index % requestContexts.length],
+    text: requestTexts[index % requestTexts.length],
+  }));
+}
+
 function createSession({
   id,
   title,
@@ -93,6 +116,7 @@ function createSession({
   answer,
   attachments,
   hypothesisCount = 3,
+  requestCount = 3,
 }) {
   return {
     id,
@@ -102,6 +126,11 @@ function createSession({
     hypotheses: createHypotheses({
       idPrefix: id,
       count: hypothesisCount,
+      topic: title.toLocaleLowerCase(),
+    }),
+    launchedRequests: createLaunchedRequests({
+      idPrefix: id,
+      count: requestCount,
       topic: title.toLocaleLowerCase(),
     }),
     attachments,
@@ -212,6 +241,7 @@ export const mockWorkspaceSceneDto = {
       answer:
         "Имеет смысл идти в короткий цикл проверки гипотез, если сразу отсечь конфигурации с дорогой системой освещения. Ключевой шанс лежит в упрощении обслуживания и верификации прироста выхода на единицу площади, иначе экономический эффект быстро размывается.",
       hypothesisCount: 4,
+      requestCount: 1,
       attachments: [
         {
           id: "att-101",
@@ -241,6 +271,7 @@ export const mockWorkspaceSceneDto = {
       answer:
         "Гипотеза выглядит жизнеспособной только при жёстком сценарии интеграции с уже существующей логистической цепочкой. Главный риск связан не с самой химией, а с циклом дегидрирования и требованиями к тепловому контуру на точке выгрузки.",
       hypothesisCount: 5,
+      requestCount: 5,
       attachments: [
         {
           id: "att-201",
@@ -270,6 +301,7 @@ export const mockWorkspaceSceneDto = {
       answer:
         "Да, но только если исследование сразу ограничить узкими сценариями применения и заранее привязать к измеримому росту адгезии. Без такого сужения проект рискует расползтись в демонстрации без производственного выхода.",
       hypothesisCount: 4,
+      requestCount: 2,
       attachments: [
         {
           id: "att-301",
@@ -292,6 +324,7 @@ export const mockWorkspaceSceneDto = {
         "Есть ли основания запускать проект по ферментативному разложению PET на пилотном уровне?",
       answer:
         "Основания есть, если сфокусироваться на узком потоке сырья с контролируемым загрязнением. На смешанных и грязных потоках биокаталитическое окно слишком хрупкое, поэтому пилот лучше проектировать как доказательство применимости на премиальном сырье.",
+      requestCount: 6,
       attachments: [
         {
           id: "att-401",
@@ -320,6 +353,7 @@ export const mockWorkspaceSceneDto = {
         "Нужно ли начинать исследовательскую программу по сверхпроводящему кабелю для городских узлов высокой плотности?",
       answer:
         "Пока это скорее стратегическая разведка, чем быстрый продуктовый шанс. Сильный довод в пользу проекта есть только при наличии внешнего заказчика, который готов совместно нести стоимость демонстратора и инфраструктуры охлаждения.",
+      requestCount: 4,
       attachments: [
         {
           id: "att-501",

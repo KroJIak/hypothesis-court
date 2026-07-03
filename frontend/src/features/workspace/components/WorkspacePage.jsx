@@ -268,11 +268,7 @@ export function WorkspacePage() {
       />
 
       <section className="workspace-main">
-        {(selectedSession.launchedRequests ?? []).length > 0 ? (
-          <RequestSummaryRail requests={selectedSession.launchedRequests ?? []} />
-        ) : (
-          <div className="workspace-main__question">{selectedSession.query}</div>
-        )}
+        <RequestSummaryRail requests={selectedSession.launchedRequests ?? []} />
 
         <div className="workspace-main__scene">
           <WorkspaceScene
