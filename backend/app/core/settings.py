@@ -39,6 +39,16 @@ def _parse_duration(raw_value: str) -> timedelta:
     return timedelta(**{unit_map[unit]: value})
 
 
+def _parse_non_negative_int(raw_value: str, name: str) -> int:
+    try:
+        value = int(raw_value)
+    except ValueError:
+        raise ValueError(f"{name} must be an integer.") from None
+    if value < 0:
+        raise ValueError(f"{name} must be greater than or equal to 0.")
+    return value
+
+
 def _get_env(name: str, default: str | None = None) -> str:
     value = os.getenv(name, default)
     if value is None:
@@ -59,6 +69,7 @@ class Settings:
     superadmin_password: str
     superadmin_first_name: str | None
     superadmin_last_name: str | None
+    chat_max_pinned_sessions: int
     avatar_upload_max_bytes: int = 5 * 1024 * 1024
 
     @property
@@ -95,4 +106,8 @@ def get_settings() -> Settings:
         superadmin_password=_get_env("SUPERADMIN_PASSWORD", "change-me"),
         superadmin_first_name=os.getenv("SUPERADMIN_FIRST_NAME") or None,
         superadmin_last_name=os.getenv("SUPERADMIN_LAST_NAME") or None,
+        chat_max_pinned_sessions=_parse_non_negative_int(
+            _get_env("CHAT_MAX_PINNED_SESSIONS", "5"),
+            "CHAT_MAX_PINNED_SESSIONS",
+        ),
     )

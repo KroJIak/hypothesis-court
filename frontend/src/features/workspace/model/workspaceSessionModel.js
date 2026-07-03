@@ -66,34 +66,34 @@ export function createWorkspaceSession(session, paletteAgents) {
   };
 }
 
-export function createDraftWorkspaceSession(baseSession, paletteAgents, newChatId) {
-  const availableAgents = baseSession.availableAgents ?? getInitialAvailableAgents(baseSession, paletteAgents);
-
+export function applyChatSessionMetadata(session, chatSession) {
   return {
-    ...baseSession,
-    id: newChatId,
-    isPendingDraft: true,
-    title: "Новый чат",
-    query: "Новая гипотеза появится здесь после отправки запроса.",
-    answer:
-      "После подключения API здесь появится вердикт судьи и итоговая рекомендация по собранной сцене.",
-    attachments: [],
-    composerRequests: [],
-    launchedRequests: [],
-    hypotheses: [],
-    availableAgents: sortAvailableAgents(
-      [
-        ...paletteAgents.filter((agent) => !agent.isEmpty),
-        ...availableAgents,
-        ...baseSession.evaluation.agents,
-      ].filter((agent, index, agents) => agents.findIndex((item) => item.id === agent.id) === index),
-    ),
-    evaluation: {
-      ...baseSession.evaluation,
-      layoutBias: undefined,
-      agents: [],
-    },
+    ...session,
+    id: chatSession.id,
+    title: chatSession.title,
+    isPinned: chatSession.isPinned,
+    pinnedAt: chatSession.pinnedAt,
+    createdAt: chatSession.createdAt,
+    updatedAt: chatSession.updatedAt,
   };
+}
+
+export function createWorkspaceSessionFromChatSession(chatSession, templateSessions, paletteAgents) {
+  const templateSession = getTemplateSession(chatSession.id, templateSessions);
+
+  return createWorkspaceSession(
+    applyChatSessionMetadata(templateSession, chatSession),
+    paletteAgents,
+  );
+}
+
+function getTemplateSession(chatSessionId, templateSessions) {
+  if (templateSessions.length === 0) {
+    throw new Error("At least one workspace session template is required.");
+  }
+
+  const hash = [...chatSessionId].reduce((sum, character) => sum + character.charCodeAt(0), 0);
+  return templateSessions[hash % templateSessions.length];
 }
 
 export function createEvaluationAgent(agent) {
@@ -155,18 +155,6 @@ export function hasPendingAgent(session) {
   const availableAgents = session.availableAgents ?? [];
 
   return [...availableAgents, ...session.evaluation.agents].some((agent) => agent.isPendingSetup);
-}
-
-export function matchesChatSearch(session, query) {
-  const normalizedQuery = query.trim().toLocaleLowerCase();
-
-  if (!normalizedQuery) {
-    return true;
-  }
-
-  return [session.title, session.query]
-    .filter(Boolean)
-    .some((value) => value.toLocaleLowerCase().includes(normalizedQuery));
 }
 
 export function splitAgentsAroundCenter(agents, layoutBias = EVALUATION_SIDE_LEFT) {

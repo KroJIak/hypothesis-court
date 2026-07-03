@@ -449,10 +449,19 @@
 }
 
 .chat-list__empty,
+.chat-list__error,
 .collapsed-chat-history__empty {
   color: #bdbdbd;
   font-size: 0.92rem;
   padding: 10px 12px;
+}
+
+.chat-list__error {
+  color: #ffd2d2;
+}
+
+.workspace-main--empty {
+  background: #050505;
 }
 
 .collapsed-chat-history {
