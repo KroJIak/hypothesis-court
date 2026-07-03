@@ -42,6 +42,20 @@ export function WorkspaceScene({ session, onAgentDragStart, onAgentDragEnd, onDr
   }
 
   useLayoutEffect(() => {
+    const scrollContainer = sceneRef.current?.parentElement;
+
+    if (!scrollContainer) {
+      return;
+    }
+
+    scrollContainer.scrollTo({
+      top: 0,
+      left: 0,
+      behavior: "auto",
+    });
+  }, [session.id]);
+
+  useLayoutEffect(() => {
     const updateConnections = () => {
       const sceneElement = sceneRef.current;
       const manufacturerAvatar = manufacturerAvatarRef.current;
