@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import auth_router, health_router, users_router
+from app.core.middleware import ForwardedPrefixMiddleware
 from app.core.settings import get_settings
 
 
@@ -11,6 +12,7 @@ def create_app() -> FastAPI:
         title="Hypothesis Court API",
         version="0.1.0",
     )
+    app.add_middleware(ForwardedPrefixMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(settings.cors_allow_origins),
