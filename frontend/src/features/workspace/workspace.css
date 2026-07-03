@@ -286,6 +286,22 @@
   border-radius: 12px;
 }
 
+.chat-list__pin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  color: #bdbdbd;
+}
+
+.chat-list__pin svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
 .chat-list__icon {
   display: none;
   width: 19px;
@@ -300,18 +316,48 @@
   height: 100%;
 }
 
+.chat-list__meta {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  box-sizing: border-box;
+  width: 66px;
+  flex: 0 0 66px;
+  min-height: 34px;
+  padding-right: 10px;
+}
+
+.chat-list__time {
+  max-width: 54px;
+  overflow: hidden;
+  color: #8f8f8f;
+  font-size: 0.62rem;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 1;
+}
+
 .chat-list__actions-trigger {
+  position: absolute;
+  right: 2px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 30px;
   height: 30px;
-  margin-right: 2px;
   border: 0;
   border-radius: 10px;
   background: transparent;
   color: #eeeeee;
   cursor: pointer;
+  opacity: 0;
+}
+
+.chat-list__row:hover .chat-list__time,
+.chat-list__row:focus-within .chat-list__time,
+.chat-list__meta:has(.chat-list__actions-trigger[aria-expanded="true"]) .chat-list__time {
   opacity: 0;
 }
 
