@@ -321,16 +321,18 @@
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  width: 58px;
-  flex: 0 0 58px;
+  box-sizing: border-box;
+  width: 66px;
+  flex: 0 0 66px;
   min-height: 34px;
+  padding-right: 10px;
 }
 
 .chat-list__time {
-  max-width: 58px;
+  max-width: 54px;
   overflow: hidden;
   color: #8f8f8f;
-  font-size: 0.68rem;
+  font-size: 0.62rem;
   line-height: 1;
   text-overflow: ellipsis;
   white-space: nowrap;
