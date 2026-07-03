@@ -153,8 +153,6 @@ sequenceDiagram
 - `AUTH_JWT_SECRET`
 - `AUTH_ACCESS_TOKEN_TTL=1d`
 - `AUTH_REFRESH_TOKEN_TTL=1w`
-- `AUTH_ISSUER`
-- `AUTH_AUDIENCE`
 
 ## Связанные документы
 

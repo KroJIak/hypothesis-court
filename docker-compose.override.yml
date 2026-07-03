@@ -1,4 +1,8 @@
 services:
+  postgres:
+    ports:
+      - "${POSTGRES_EXTERNAL_PORT}:5432"
+
   backend:
     ports:
       - "${BACKEND_EXTERNAL_PORT}:8000"

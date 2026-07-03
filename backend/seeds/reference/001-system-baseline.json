@@ -1,0 +1,7 @@
+{
+  "seed_key": "reference:001-system-baseline",
+  "handler": "record_only",
+  "payload": {
+    "description": "Baseline internal reference seed for a fresh environment."
+  }
+}

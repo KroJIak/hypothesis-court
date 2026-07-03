@@ -1,23 +1,93 @@
 import os
+import re
 from dataclasses import dataclass
+from datetime import timedelta
+from functools import lru_cache
+from pathlib import Path
+from typing import Final
+
+from dotenv import load_dotenv
+
+_DURATION_PATTERN: Final[re.Pattern[str]] = re.compile(r"^(?P<value>\d+)(?P<unit>[smhdw])$")
+
+
+def _load_env() -> None:
+    root_env_path = Path(__file__).resolve().parents[3] / ".env"
+    load_dotenv(root_env_path, override=False)
 
 
 def _parse_csv(raw_value: str) -> tuple[str, ...]:
-    return tuple(
-        item.strip()
-        for item in raw_value.split(",")
-        if item.strip()
-    )
+    return tuple(item.strip() for item in raw_value.split(",") if item.strip())
+
+
+def _parse_duration(raw_value: str) -> timedelta:
+    match = _DURATION_PATTERN.fullmatch(raw_value.strip())
+    if match is None:
+        raise ValueError(
+            "Invalid duration format. Expected values like 15m, 12h, 1d, or 1w."
+        )
+
+    value = int(match.group("value"))
+    unit = match.group("unit")
+    unit_map = {
+        "s": "seconds",
+        "m": "minutes",
+        "h": "hours",
+        "d": "days",
+        "w": "weeks",
+    }
+    return timedelta(**{unit_map[unit]: value})
+
+
+def _get_env(name: str, default: str | None = None) -> str:
+    value = os.getenv(name, default)
+    if value is None:
+        raise ValueError(f"Missing required environment variable: {name}")
+    return value
 
 
 @dataclass(frozen=True)
 class Settings:
     cors_allow_origins: tuple[str, ...]
+    postgres_db: str
+    postgres_user: str
+    postgres_password: str
+    auth_jwt_secret: str
+    auth_access_token_ttl: timedelta
+    auth_refresh_token_ttl: timedelta
+    superadmin_username: str
+    superadmin_password: str
+    superadmin_first_name: str | None
+    superadmin_last_name: str | None
+
+    @property
+    def database_url(self) -> str:
+        return (
+            "postgresql+psycopg://"
+            f"{self.postgres_user}:{self.postgres_password}"
+            f"@postgres:5432/{self.postgres_db}"
+        )
 
 
+@lru_cache(maxsize=1)
 def get_settings() -> Settings:
-    raw_origins = os.getenv(
+    _load_env()
+    raw_origins = _get_env(
         "BACKEND_CORS_ALLOW_ORIGINS",
         "http://localhost:5173,http://127.0.0.1:5173",
     )
-    return Settings(cors_allow_origins=_parse_csv(raw_origins))
+    return Settings(
+        cors_allow_origins=_parse_csv(raw_origins),
+        postgres_db=_get_env("POSTGRES_DB", "hypothesis_court"),
+        postgres_user=_get_env("POSTGRES_USER", "hypothesis_court"),
+        postgres_password=_get_env("POSTGRES_PASSWORD", "hypothesis_court"),
+        auth_jwt_secret=_get_env("AUTH_JWT_SECRET", "change-me-in-local-env"),
+        auth_access_token_ttl=_parse_duration(_get_env("AUTH_ACCESS_TOKEN_TTL", "1d")),
+        auth_refresh_token_ttl=_parse_duration(
+            _get_env("AUTH_REFRESH_TOKEN_TTL", "1w")
+        ),
+        superadmin_username=_get_env("SUPERADMIN_USERNAME", "superadmin"),
+        superadmin_password=_get_env("SUPERADMIN_PASSWORD", "change-me"),
+        superadmin_first_name=os.getenv("SUPERADMIN_FIRST_NAME") or None,
+        superadmin_last_name=os.getenv("SUPERADMIN_LAST_NAME") or None,
+    )
