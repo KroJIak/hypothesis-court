@@ -15,7 +15,7 @@ export function mapWorkspaceScene(dto) {
         id: attachment.id,
         kind: attachment.kind,
         shortLabel: attachment.kind.toUpperCase(),
-        tooltip: `${attachment.fileName} · ${attachment.summary}`,
+        tooltip: attachment.fileName,
       })),
       debate: {
         playLabel: session.debate.playLabel,

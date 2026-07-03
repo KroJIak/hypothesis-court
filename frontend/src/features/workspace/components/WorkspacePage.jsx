@@ -20,11 +20,30 @@ import "../workspace.css";
 const COLLAPSED_RECENT_CHAT_LIMIT = 5;
 const AGENT_DRAG_MIME_TYPE = "application/x-hypothesis-court-agent";
 const DEFAULT_EVALUATION_AGENT_STATUS = "оценивает";
+const PENDING_AGENT_NAME = "Новый агент";
+const ATTACHMENT_TOOLTIP_GAP = 10;
+const ATTACHMENT_TOOLTIP_EDGE_OFFSET = 32;
 
 function getInitialAvailableAgents(session, paletteAgents) {
   const selectedAgentIds = new Set(session.evaluation.agents.map((agent) => agent.id));
 
-  return paletteAgents.filter((agent) => !selectedAgentIds.has(agent.id));
+  return sortAvailableAgents(
+    paletteAgents.filter((agent) => !agent.isEmpty && !selectedAgentIds.has(agent.id)),
+  );
+}
+
+function sortAvailableAgents(agents) {
+  return [...agents].sort((firstAgent, secondAgent) => {
+    if (firstAgent.isPendingSetup !== secondAgent.isPendingSetup) {
+      return firstAgent.isPendingSetup ? -1 : 1;
+    }
+
+    if (firstAgent.isEmpty === secondAgent.isEmpty) {
+      return 0;
+    }
+
+    return firstAgent.isEmpty ? 1 : -1;
+  });
 }
 
 function createWorkspaceSession(session, paletteAgents) {
@@ -39,6 +58,34 @@ function createEvaluationAgent(agent) {
     ...agent,
     status: agent.status ?? DEFAULT_EVALUATION_AGENT_STATUS,
   };
+}
+
+function createPendingAgent() {
+  return {
+    id: `pending-agent-${Date.now()}`,
+    name: PENDING_AGENT_NAME,
+    variant: "empty",
+    isEmpty: true,
+    isPendingSetup: true,
+  };
+}
+
+function hasPendingAgent(session) {
+  const availableAgents = session.availableAgents ?? [];
+
+  return [...availableAgents, ...session.evaluation.agents].some((agent) => agent.isPendingSetup);
+}
+
+function matchesChatSearch(session, query) {
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+
+  if (!normalizedQuery) {
+    return true;
+  }
+
+  return [session.title, session.query]
+    .filter(Boolean)
+    .some((value) => value.toLocaleLowerCase().includes(normalizedQuery));
 }
 
 function readAgentDragPayload(event) {
@@ -63,6 +110,10 @@ function capitalizeFirst(text) {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
+function clampNumber(value, min, max) {
+  return Math.min(Math.max(value, min), max);
+}
+
 function Sidebar({
   shell,
   sessions,
@@ -74,7 +125,9 @@ function Sidebar({
   onToggleSidebar,
 }) {
   const [isCollapsedChatListOpen, setIsCollapsedChatListOpen] = useState(false);
-  const recentCollapsedSessions = sessions.slice(0, COLLAPSED_RECENT_CHAT_LIMIT);
+  const [chatSearchQuery, setChatSearchQuery] = useState("");
+  const filteredSessions = sessions.filter((session) => matchesChatSearch(session, chatSearchQuery));
+  const recentCollapsedSessions = filteredSessions.slice(0, COLLAPSED_RECENT_CHAT_LIMIT);
 
   function handleCollapsedChatSelect(chatId) {
     onSelectChat(chatId);
@@ -119,10 +172,17 @@ function Sidebar({
         <span className="sidebar-label">{shell.navigation.newChatLabel}</span>
       </button>
 
-      <button type="button" className="nav-button nav-button--ghost">
+      <label className="chat-search">
         <span className="nav-button__icon"><Search aria-hidden="true" strokeWidth={2.1} /></span>
-        <span className="sidebar-label">{shell.navigation.searchLabel}</span>
-      </button>
+        <span className="sr-only">{shell.navigation.searchLabel}</span>
+        <input
+          className="chat-search__input"
+          type="search"
+          value={chatSearchQuery}
+          onChange={(event) => setChatSearchQuery(event.target.value)}
+          placeholder={shell.navigation.searchLabel}
+        />
+      </label>
 
       {isCollapsed ? (
         <div className="collapsed-chat-history">
@@ -148,12 +208,15 @@ function Sidebar({
                   {session.title}
                 </button>
               ))}
+              {recentCollapsedSessions.length === 0 ? (
+                <span className="collapsed-chat-history__empty">Ничего не найдено</span>
+              ) : null}
             </div>
           ) : null}
         </div>
       ) : (
         <div className="chat-list" role="list" aria-label="История чатов">
-          {sessions.map((session) => (
+          {filteredSessions.map((session) => (
             <button
               key={session.id}
               type="button"
@@ -165,6 +228,9 @@ function Sidebar({
               <span className="sidebar-label">{session.title}</span>
             </button>
           ))}
+          {filteredSessions.length === 0 ? (
+            <span className="chat-list__empty">Ничего не найдено</span>
+          ) : null}
         </div>
       )}
 
@@ -183,12 +249,14 @@ function AgentCard({
   avatarRef = null,
   draggable = false,
   onDragStart,
+  onDragEnd,
 }) {
   return (
     <div
       className={`scene-agent${compact ? " scene-agent--compact" : ""}${draggable ? " scene-agent--draggable" : ""}`}
       draggable={draggable}
       onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
     >
       <span className="scene-agent__avatar-anchor" ref={avatarRef}>
         <span className="scene-agent__name">{name}</span>
@@ -312,7 +380,9 @@ function EvaluationStage({
   onAgentAvatarRef,
   judgeAvatarRef,
   onAgentDragStart,
+  onAgentDragEnd,
   onDropAgent,
+  isDropTargetVisible,
 }) {
   function handleDragOver(event) {
     event.preventDefault();
@@ -336,10 +406,14 @@ function EvaluationStage({
                 draggable
                 avatarRef={(node) => onAgentAvatarRef(agent.id, node)}
                 onDragStart={(event) => onAgentDragStart(event, "evaluation", agent.id)}
+                onDragEnd={onAgentDragEnd}
               />
             </div>
           ))}
-          {evaluation.agents.length === 0 ? (
+          {isDropTargetVisible ? (
+            <div className="agent-drop-slot" aria-hidden="true" />
+          ) : null}
+          {evaluation.agents.length === 0 && !isDropTargetVisible ? (
             <div className="evaluation-stage__empty">Перетащите агента для оценки</div>
           ) : null}
         </div>
@@ -358,7 +432,8 @@ function EvaluationStage({
 }
 
 function getElementCenter(element, rootRect) {
-  const elementRect = element.getBoundingClientRect();
+  const targetElement = element.querySelector?.(".agent-avatar__plate") ?? element;
+  const elementRect = targetElement.getBoundingClientRect();
 
   return {
     x: elementRect.left + elementRect.width / 2 - rootRect.left,
@@ -366,7 +441,7 @@ function getElementCenter(element, rootRect) {
   };
 }
 
-function WorkspaceScene({ session, onAgentDragStart, onDropAgentToEvaluation }) {
+function WorkspaceScene({ session, onAgentDragStart, onAgentDragEnd, onDropAgentToEvaluation, dragSource }) {
   const sceneRef = useRef(null);
   const manufacturerAvatarRef = useRef(null);
   const judgeAvatarRef = useRef(null);
@@ -396,7 +471,7 @@ function WorkspaceScene({ session, onAgentDragStart, onDropAgentToEvaluation }) 
       const manufacturerSource = getElementCenter(manufacturerAvatar, sceneRect);
       const judgeAvatar = judgeAvatarRef.current;
       const judgeTarget = judgeAvatar ? getElementCenter(judgeAvatar, sceneRect) : null;
-      const paths = session.evaluation.agents
+      const agentPaths = session.evaluation.agents
         .flatMap((agent) => {
           const targetElement = evaluationAvatarRefs.current.get(agent.id);
 
@@ -421,6 +496,14 @@ function WorkspaceScene({ session, onAgentDragStart, onDropAgentToEvaluation }) 
 
           return agentConnections;
         });
+      const paths = session.evaluation.agents.length === 0 && judgeTarget
+        ? [
+            {
+              id: "manufacturer-judge",
+              d: `M${manufacturerSource.x.toFixed(1)} ${manufacturerSource.y.toFixed(1)}L${judgeTarget.x.toFixed(1)} ${judgeTarget.y.toFixed(1)}`,
+            },
+          ]
+        : agentPaths;
 
       setConnectionLayer({
         width: sceneRect.width,
@@ -474,13 +557,26 @@ function WorkspaceScene({ session, onAgentDragStart, onDropAgentToEvaluation }) 
         onAgentAvatarRef={setEvaluationAvatarRef}
         judgeAvatarRef={judgeAvatarRef}
         onAgentDragStart={onAgentDragStart}
+        onAgentDragEnd={onAgentDragEnd}
         onDropAgent={onDropAgentToEvaluation}
+        isDropTargetVisible={dragSource === "palette"}
       />
     </div>
   );
 }
 
-function AgentPalette({ palette, agents, onAgentDragStart, onDropAgentToPalette }) {
+function AgentPalette({
+  palette,
+  agents,
+  onAgentDragStart,
+  onAgentDragEnd,
+  onDropAgentToPalette,
+  isDropTargetVisible,
+  isAddAgentDisabled,
+  onAddAgent,
+}) {
+  const sortedAgents = sortAvailableAgents(agents);
+
   function handleDragOver(event) {
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
@@ -493,24 +589,34 @@ function AgentPalette({ palette, agents, onAgentDragStart, onDropAgentToPalette 
       onDrop={onDropAgentToPalette}
       aria-label="Доступные агенты"
     >
-      <button type="button" className="palette-add-button" aria-label={palette.addAgentLabel}>
+      <button
+        type="button"
+        className="palette-add-button"
+        disabled={isAddAgentDisabled}
+        onClick={onAddAgent}
+        aria-label={palette.addAgentLabel}
+      >
         <Plus aria-hidden="true" strokeWidth={2.1} />
       </button>
       <span className="palette-add-label">{palette.addAgentLabel}</span>
 
       <div className="palette-list">
-        {agents.map((agent) => (
+        {isDropTargetVisible ? (
+          <div className="agent-drop-slot" aria-hidden="true" />
+        ) : null}
+        {sortedAgents.map((agent) => (
           <div
             key={agent.id}
             className="palette-list__item palette-list__item--draggable"
             draggable
             onDragStart={(event) => onAgentDragStart(event, "palette", agent.id)}
+            onDragEnd={onAgentDragEnd}
           >
             <AgentAvatar variant={agent.variant} size="regular" />
             <span className="palette-list__label">{agent.name}</span>
           </div>
         ))}
-        {agents.length === 0 ? (
+        {sortedAgents.length === 0 && !isDropTargetVisible ? (
           <span className="palette-list__empty">Все агенты на сцене</span>
         ) : null}
       </div>
@@ -519,22 +625,83 @@ function AgentPalette({ palette, agents, onAgentDragStart, onDropAgentToPalette 
 }
 
 function Composer({ composer, attachments, draftMessage, onDraftMessageChange, onSend }) {
+  const attachmentButtonRefs = useRef(new Map());
+  const [activeAttachmentId, setActiveAttachmentId] = useState(null);
+  const [attachmentTooltipStyle, setAttachmentTooltipStyle] = useState({ left: "0px", top: "0px" });
+  const activeAttachment = attachments.find((attachment) => attachment.id === activeAttachmentId) ?? null;
+
+  const setAttachmentButtonRef = useCallback((attachmentId, node) => {
+    if (node) {
+      attachmentButtonRefs.current.set(attachmentId, node);
+      return;
+    }
+
+    attachmentButtonRefs.current.delete(attachmentId);
+  }, []);
+
+  const updateAttachmentTooltip = useCallback((attachmentId) => {
+    const buttonElement = attachmentButtonRefs.current.get(attachmentId);
+
+    if (!buttonElement) {
+      return;
+    }
+
+    const buttonRect = buttonElement.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const tooltipTop = clampNumber(
+      buttonRect.top + buttonRect.height / 2,
+      ATTACHMENT_TOOLTIP_EDGE_OFFSET,
+      viewportHeight - ATTACHMENT_TOOLTIP_EDGE_OFFSET,
+    );
+
+    setAttachmentTooltipStyle({
+      left: `${buttonRect.right + ATTACHMENT_TOOLTIP_GAP}px`,
+      top: `${tooltipTop}px`,
+    });
+  }, []);
+
+  const showAttachmentTooltip = useCallback((attachmentId) => {
+    setActiveAttachmentId(attachmentId);
+    window.requestAnimationFrame(() => updateAttachmentTooltip(attachmentId));
+  }, [updateAttachmentTooltip]);
+
+  const hideAttachmentTooltip = useCallback(() => {
+    setActiveAttachmentId(null);
+  }, []);
+
+  const handleAttachmentRailScroll = useCallback(() => {
+    if (!activeAttachmentId) {
+      return;
+    }
+
+    updateAttachmentTooltip(activeAttachmentId);
+  }, [activeAttachmentId, updateAttachmentTooltip]);
+
   return (
     <div className="composer-shell">
-      <div className="attachment-rail" aria-label="Вложения">
+      <div className="attachment-rail" aria-label="Вложения" onScroll={handleAttachmentRailScroll}>
         {attachments.map((attachment) => (
           <button
             key={attachment.id}
+            ref={(node) => setAttachmentButtonRef(attachment.id, node)}
             type="button"
             className="attachment-chip"
-            title={attachment.tooltip}
             aria-label={attachment.tooltip}
+            onMouseEnter={() => showAttachmentTooltip(attachment.id)}
+            onMouseLeave={hideAttachmentTooltip}
+            onFocus={() => showAttachmentTooltip(attachment.id)}
+            onBlur={hideAttachmentTooltip}
           >
             <span className="attachment-chip__icon"><FileText aria-hidden="true" strokeWidth={1.9} /></span>
             <span className="attachment-chip__label">{attachment.shortLabel}</span>
           </button>
         ))}
       </div>
+      {activeAttachment ? (
+        <span className="attachment-tooltip" style={attachmentTooltipStyle}>
+          {activeAttachment.tooltip}
+        </span>
+      ) : null}
 
       <form className="composer-panel" onSubmit={onSend}>
         <label className="composer-panel__input-wrap">
@@ -544,7 +711,7 @@ function Composer({ composer, attachments, draftMessage, onDraftMessageChange, o
             value={draftMessage}
             onChange={(event) => onDraftMessageChange(event.target.value)}
             placeholder={composer.placeholder}
-            rows={3}
+            rows={1}
           />
         </label>
 
@@ -588,6 +755,7 @@ export function WorkspacePage() {
   const [selectedChatId, setSelectedChatId] = useState(null);
   const [draftMessage, setDraftMessage] = useState("");
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [dragSource, setDragSource] = useState(null);
   const [sessions, setSessions] = useState([]);
 
   useEffect(() => {
@@ -647,10 +815,36 @@ export function WorkspacePage() {
     setIsSidebarCollapsed((currentValue) => !currentValue);
   }
 
+  function handleAddAgent() {
+    if (hasPendingAgent(selectedSession)) {
+      return;
+    }
+
+    setSessions((currentSessions) =>
+      currentSessions.map((session) => {
+        if (session.id !== selectedSession.id) {
+          return session;
+        }
+
+        const availableAgents = session.availableAgents ?? getInitialAvailableAgents(session, data.palette.agents);
+
+        return {
+          ...session,
+          availableAgents: sortAvailableAgents([...availableAgents, createPendingAgent()]),
+        };
+      }),
+    );
+  }
+
   function handleAgentDragStart(event, source, agentId) {
+    setDragSource(source);
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData(AGENT_DRAG_MIME_TYPE, JSON.stringify({ source, agentId }));
     event.dataTransfer.setData("text/plain", agentId);
+  }
+
+  function handleAgentDragEnd() {
+    setDragSource(null);
   }
 
   function handleMoveAgentToEvaluation(agentId) {
@@ -695,7 +889,7 @@ export function WorkspacePage() {
         const availableAgents = session.availableAgents ?? getInitialAvailableAgents(session, data.palette.agents);
         const nextAvailableAgents = availableAgents.some((agent) => agent.id === agentId)
           ? availableAgents
-          : [...availableAgents, movingAgent];
+          : sortAvailableAgents([...availableAgents, movingAgent]);
 
         return {
           ...session,
@@ -711,6 +905,7 @@ export function WorkspacePage() {
 
   function handleDropAgentToEvaluation(event) {
     event.preventDefault();
+    setDragSource(null);
 
     const payload = readAgentDragPayload(event);
 
@@ -723,6 +918,7 @@ export function WorkspacePage() {
 
   function handleDropAgentToPalette(event) {
     event.preventDefault();
+    setDragSource(null);
 
     const payload = readAgentDragPayload(event);
 
@@ -780,7 +976,9 @@ export function WorkspacePage() {
           <WorkspaceScene
             session={selectedSession}
             onAgentDragStart={handleAgentDragStart}
+            onAgentDragEnd={handleAgentDragEnd}
             onDropAgentToEvaluation={handleDropAgentToEvaluation}
+            dragSource={dragSource}
           />
         </div>
 
@@ -797,7 +995,11 @@ export function WorkspacePage() {
         palette={data.palette}
         agents={selectedSession.availableAgents ?? getInitialAvailableAgents(selectedSession, data.palette.agents)}
         onAgentDragStart={handleAgentDragStart}
+        onAgentDragEnd={handleAgentDragEnd}
         onDropAgentToPalette={handleDropAgentToPalette}
+        isDropTargetVisible={dragSource === "evaluation"}
+        isAddAgentDisabled={hasPendingAgent(selectedSession)}
+        onAddAgent={handleAddAgent}
       />
     </main>
   );
