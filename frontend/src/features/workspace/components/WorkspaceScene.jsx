@@ -6,7 +6,14 @@ import { HypothesisCandidates } from "./HypothesisCandidates";
 import { useScenePlayback } from "../hooks/useScenePlayback";
 import { getElementCenter, createStraightPath } from "../utils/geometry";
 
-export function WorkspaceScene({ session, onAgentDragStart, onAgentDragEnd, onDropAgentToEvaluation, dragSource }) {
+export function WorkspaceScene({
+  session,
+  onAgentDragStart,
+  onAgentDragEnd,
+  onDropAgentToEvaluation,
+  dragSource,
+  isAgentEditingLocked,
+}) {
   const sceneRef = useRef(null);
   const manufacturerAvatarRef = useRef(null);
   const judgeAvatarRef = useRef(null);
@@ -179,6 +186,7 @@ export function WorkspaceScene({ session, onAgentDragStart, onAgentDragEnd, onDr
       />
       <EvaluationStage
         evaluation={evaluation}
+        sessionId={session.id}
         answer={session.answer}
         isAnswerVisible={isAnswerVisible}
         hideAgentStatus={!hasHypotheses}
@@ -187,7 +195,8 @@ export function WorkspaceScene({ session, onAgentDragStart, onAgentDragEnd, onDr
         onAgentDragStart={onAgentDragStart}
         onAgentDragEnd={onAgentDragEnd}
         onDropAgent={onDropAgentToEvaluation}
-        isDropTargetVisible={dragSource === "palette"}
+        isDropTargetVisible={!isAgentEditingLocked && dragSource === "palette"}
+        isAgentEditingLocked={isAgentEditingLocked}
       />
     </div>
   );

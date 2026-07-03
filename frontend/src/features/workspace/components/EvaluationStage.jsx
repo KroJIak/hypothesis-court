@@ -11,6 +11,7 @@ import { getAgentViewTransitionName } from "../utils/layoutTransition";
 
 export function EvaluationStage({
   evaluation,
+  sessionId,
   answer,
   isAnswerVisible,
   hideAgentStatus,
@@ -20,6 +21,7 @@ export function EvaluationStage({
   onAgentDragEnd,
   onDropAgent,
   isDropTargetVisible,
+  isAgentEditingLocked,
 }) {
   const { leftAgents, rightAgents } = splitAgentsAroundCenter(evaluation.agents, evaluation.layoutBias);
   const leftSideCount = leftAgents.length + (isDropTargetVisible ? 1 : 0);
@@ -28,6 +30,10 @@ export function EvaluationStage({
   const sideWidth = (sideSlotCount * EVALUATION_AGENT_SLOT_WIDTH) - EVALUATION_AGENT_GAP;
 
   function handleDragOver(event) {
+    if (isAgentEditingLocked) {
+      return;
+    }
+
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
   }
@@ -35,6 +41,11 @@ export function EvaluationStage({
   function handleDrop(event, side) {
     event.preventDefault();
     event.stopPropagation();
+
+    if (isAgentEditingLocked) {
+      return;
+    }
+
     onDropAgent(event, side);
   }
 
@@ -81,7 +92,7 @@ export function EvaluationStage({
                 <AgentCard
                   {...agent}
                   compact
-                  draggable
+                  draggable={!isAgentEditingLocked}
                   hideStatus={hideAgentStatus}
                   avatarRef={(node) => onAgentAvatarRef(agent.id, node)}
                   onDragStart={(event) => onAgentDragStart(event, "evaluation", agent.id)}
@@ -129,7 +140,7 @@ export function EvaluationStage({
       </div>
 
       {isAnswerVisible && answer ? (
-        <JudgeVerdict answer={answer} />
+        <JudgeVerdict answer={answer} sessionId={sessionId} />
       ) : null}
     </section>
   );

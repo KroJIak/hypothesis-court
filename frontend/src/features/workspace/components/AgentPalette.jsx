@@ -14,17 +14,23 @@ export function AgentPalette({
   onReorderPaletteAgent,
   isDropTargetVisible,
   isAddAgentDisabled,
+  isAgentEditingLocked,
+  lockedReason,
   onAddAgent,
 }) {
   const sortedAgents = sortAvailableAgents(agents);
 
   function handleDragOver(event) {
+    if (isAgentEditingLocked) {
+      return;
+    }
+
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
   }
 
   function handlePaletteItemDragOver(event, agent) {
-    if (agent.isEmpty) {
+    if (isAgentEditingLocked || agent.isEmpty) {
       return;
     }
 
@@ -35,7 +41,7 @@ export function AgentPalette({
   function handlePaletteItemDrop(event, targetAgent) {
     const payload = readAgentDragPayload(event);
 
-    if (payload?.source !== "palette" || targetAgent.isEmpty) {
+    if (isAgentEditingLocked || payload?.source !== "palette" || targetAgent.isEmpty) {
       return;
     }
 
@@ -62,10 +68,14 @@ export function AgentPalette({
         disabled={isAddAgentDisabled}
         onClick={onAddAgent}
         aria-label={palette.addAgentLabel}
+        title={isAgentEditingLocked ? lockedReason : palette.addAgentLabel}
       >
         <Plus aria-hidden="true" strokeWidth={2.1} />
       </button>
       <span className="palette-add-label">{palette.addAgentLabel}</span>
+      {isAgentEditingLocked ? (
+        <span className="agent-palette__notice">{lockedReason}</span>
+      ) : null}
 
       <div className="palette-list">
         {sortedAgents.map((agent) => (
@@ -77,7 +87,7 @@ export function AgentPalette({
                 : "palette-list__item palette-list__item--draggable"
             }
             style={{ viewTransitionName: getAgentViewTransitionName(agent.id) }}
-            draggable={!agent.isEmpty}
+            draggable={!isAgentEditingLocked && !agent.isEmpty}
             onDragStart={(event) => onAgentDragStart(event, "palette", agent.id)}
             onDragEnd={onAgentDragEnd}
             onDragOver={(event) => handlePaletteItemDragOver(event, agent)}
