@@ -10,6 +10,9 @@ export const AGENT_TOOLTIP_GAP = 6;
 export const AGENT_TOOLTIP_EDGE_OFFSET = 12;
 export const ATTACHMENT_TOOLTIP_GAP = 10;
 export const ATTACHMENT_TOOLTIP_EDGE_OFFSET = 32;
+export const PROCESSING_STATUS_PROCESSING = "processing";
+export const PROCESSING_STATUS_PROCESSED = "processed";
+export const PROCESSING_STATUS_QUEUED = "queued";
 export const COMPOSER_CONTEXT_OPTIONS = [
   { value: "kpi", label: "KPI" },
   { value: "constraints", label: "Ограничения" },

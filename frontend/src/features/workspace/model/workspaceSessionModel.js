@@ -4,6 +4,7 @@ import {
   EVALUATION_SIDE_RIGHT,
   PENDING_AGENT_NAME,
 } from "../constants";
+import { getSequentialProcessingStatus } from "../utils/processingStatus";
 
 export function sortAvailableAgents(agents) {
   return [...agents].sort((firstAgent, secondAgent) => {
@@ -146,6 +147,7 @@ export function createHypothesesFromRequests(requests, count = 4) {
     id: `generated-hypothesis-${index + 1}`,
     title: `Гипотеза ${index + 1}`,
     description: requestSummary ? `${description} Исходный фокус: ${requestSummary}.` : description,
+    processingStatus: getSequentialProcessingStatus(index, count),
   }));
 }
 

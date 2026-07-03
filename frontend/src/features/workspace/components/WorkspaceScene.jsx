@@ -3,6 +3,7 @@ import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { DebateStage } from "./DebateStage";
 import { EvaluationStage } from "./EvaluationStage";
 import { HypothesisCandidates } from "./HypothesisCandidates";
+import { useScenePlayback } from "../hooks/useScenePlayback";
 import { getElementCenter, createStraightPath } from "../utils/geometry";
 
 export function WorkspaceScene({ session, onAgentDragStart, onAgentDragEnd, onDropAgentToEvaluation, dragSource }) {
@@ -11,6 +12,13 @@ export function WorkspaceScene({ session, onAgentDragStart, onAgentDragEnd, onDr
   const judgeAvatarRef = useRef(null);
   const evaluationAvatarRefs = useRef(new Map());
   const [connectionLayer, setConnectionLayer] = useState({ width: 0, height: 0, paths: [] });
+  const {
+    activeDebateConnectionIds,
+    activeEvaluationConnectionIds,
+    isAnswerVisible,
+    isRunning,
+    startPlayback,
+  } = useScenePlayback(session);
 
   const setEvaluationAvatarRef = useCallback((agentId, node) => {
     if (node) {
@@ -106,16 +114,27 @@ export function WorkspaceScene({ session, onAgentDragStart, onAgentDragEnd, onDr
           aria-hidden="true"
         >
           {connectionLayer.paths.map((path) => (
-            <path key={path.id} d={path.d} />
+            <path
+              key={path.id}
+              className={activeEvaluationConnectionIds.has(path.id) ? "connection-path connection-path--active" : "connection-path"}
+              d={path.d}
+            />
           ))}
         </svg>
       ) : null}
 
       <HypothesisCandidates hypotheses={session.hypotheses ?? []} />
-      <DebateStage debate={session.debate} manufacturerAvatarRef={manufacturerAvatarRef} />
+      <DebateStage
+        debate={session.debate}
+        manufacturerAvatarRef={manufacturerAvatarRef}
+        activeConnectionIds={activeDebateConnectionIds}
+        isPlaybackRunning={isRunning}
+        onPlay={startPlayback}
+      />
       <EvaluationStage
         evaluation={session.evaluation}
         answer={session.answer}
+        isAnswerVisible={isAnswerVisible}
         onAgentAvatarRef={setEvaluationAvatarRef}
         judgeAvatarRef={judgeAvatarRef}
         onAgentDragStart={onAgentDragStart}

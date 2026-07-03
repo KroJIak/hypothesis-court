@@ -1,5 +1,7 @@
 import { BrainCircuit } from "lucide-react";
 
+import { ProcessingStatusBadge } from "./ProcessingStatusBadge";
+
 export function HypothesisCandidates({ hypotheses }) {
   if (!hypotheses || hypotheses.length === 0) {
     return null;
@@ -14,6 +16,7 @@ export function HypothesisCandidates({ hypotheses }) {
       <div className="hypothesis-candidates__list">
         {hypotheses.map((hypothesis) => (
           <article key={hypothesis.id} className="hypothesis-card">
+            <ProcessingStatusBadge status={hypothesis.processingStatus} />
             <h2 className="hypothesis-card__title">{hypothesis.title}</h2>
             <p className="hypothesis-card__description">{hypothesis.description}</p>
           </article>

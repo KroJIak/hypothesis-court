@@ -1,3 +1,5 @@
+import { normalizeAttachmentProcessingStatus } from "../utils/processingStatus";
+
 export function mapWorkspaceScene(dto) {
   return {
     shell: {
@@ -23,12 +25,14 @@ export function mapWorkspaceScene(dto) {
         id: hypothesis.id,
         title: hypothesis.title,
         description: hypothesis.description,
+        processingStatus: hypothesis.processingStatus,
       })),
       attachments: session.attachments.map((attachment) => ({
         id: attachment.id,
         kind: attachment.kind,
         shortLabel: attachment.kind.toUpperCase(),
         tooltip: attachment.fileName,
+        processingStatus: normalizeAttachmentProcessingStatus(attachment.processingStatus),
       })),
       debate: {
         playLabel: session.debate.playLabel,

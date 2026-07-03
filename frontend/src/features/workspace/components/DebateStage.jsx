@@ -4,7 +4,13 @@ import { Play } from "lucide-react";
 import { AgentCard } from "./AgentCard";
 import { getElementCenter } from "../utils/geometry";
 
-export function DebateStage({ debate, manufacturerAvatarRef }) {
+export function DebateStage({
+  debate,
+  manufacturerAvatarRef,
+  activeConnectionIds,
+  isPlaybackRunning,
+  onPlay,
+}) {
   const stageRef = useRef(null);
   const topLeftAvatarRef = useRef(null);
   const topRightAvatarRef = useRef(null);
@@ -84,7 +90,11 @@ export function DebateStage({ debate, manufacturerAvatarRef }) {
           aria-hidden="true"
         >
           {connectionLayer.paths.map((path) => (
-            <path key={path.id} d={path.d} />
+            <path
+              key={path.id}
+              className={activeConnectionIds.has(path.id) ? "connection-path connection-path--active" : "connection-path"}
+              d={path.d}
+            />
           ))}
         </svg>
       ) : null}
@@ -92,7 +102,12 @@ export function DebateStage({ debate, manufacturerAvatarRef }) {
         <AgentCard {...rolesByPlacement["top-left"]} avatarRef={topLeftAvatarRef} />
       </div>
       <div className="debate-stage__triangle debate-stage__triangle--center">
-        <button type="button" className="play-button" aria-label={debate.playLabel}>
+        <button
+          type="button"
+          className={isPlaybackRunning ? "play-button play-button--active" : "play-button"}
+          aria-label={debate.playLabel}
+          onClick={onPlay}
+        >
           <span className="play-button__icon"><Play aria-hidden="true" strokeWidth={2.1} /></span>
         </button>
       </div>

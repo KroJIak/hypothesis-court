@@ -1,3 +1,6 @@
+import { PROCESSING_STATUS_QUEUED } from "../constants";
+import { getBinaryProcessingStatus, getSequentialProcessingStatus } from "../utils/processingStatus";
+
 function createDebateRoles() {
   return [
     {
@@ -57,6 +60,48 @@ function createEvaluationAgents() {
   ];
 }
 
+const attachmentKindSizeWeight = {
+  txt: 120,
+  csv: 260,
+  doc: 420,
+  docx: 440,
+  pdf: 680,
+  xls: 760,
+  xlsx: 780,
+  image: 940,
+  jpg: 940,
+  jpeg: 940,
+  png: 980,
+  zip: 1300,
+};
+
+function estimateAttachmentSizeKb(attachment, index) {
+  const kindWeight = attachmentKindSizeWeight[attachment.kind] ?? 520;
+  return attachment.sizeKb ?? kindWeight + ((index + 1) * 37);
+}
+
+function createAttachmentProcessingState(attachments) {
+  const orderedAttachmentIds = [...attachments]
+    .map((attachment, index) => ({
+      id: attachment.id,
+      sizeKb: estimateAttachmentSizeKb(attachment, index),
+    }))
+    .sort((firstAttachment, secondAttachment) => firstAttachment.sizeKb - secondAttachment.sizeKb)
+    .map((attachment) => attachment.id);
+  const processingStatusById = new Map(
+    orderedAttachmentIds.map((attachmentId, index) => [
+      attachmentId,
+      getBinaryProcessingStatus(index, orderedAttachmentIds.length),
+    ]),
+  );
+
+  return attachments.map((attachment, index) => ({
+    ...attachment,
+    sizeKb: estimateAttachmentSizeKb(attachment, index),
+    processingStatus: processingStatusById.get(attachment.id) ?? PROCESSING_STATUS_QUEUED,
+  }));
+}
+
 function createAttachmentSeries({ idPrefix, count, kind, fileNamePrefix, summary }) {
   return Array.from({ length: count }, (_, index) => {
     const attachmentNumber = String(index + 1).padStart(2, "0");
@@ -83,6 +128,7 @@ function createHypotheses({ idPrefix, count, topic }) {
     id: `${idPrefix}-hypothesis-${index + 1}`,
     title: `Гипотеза ${index + 1}`,
     description,
+    processingStatus: getSequentialProcessingStatus(index, count),
   }));
 }
 
@@ -133,7 +179,7 @@ function createSession({
       count: requestCount,
       topic: title.toLocaleLowerCase(),
     }),
-    attachments,
+    attachments: createAttachmentProcessingState(attachments),
     debate: {
       playLabel: "Открыть сцену",
       roles: createDebateRoles(),
