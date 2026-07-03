@@ -1,12 +1,12 @@
 import {
   BookOpenText,
+  Fence,
   FileText,
-  ShieldAlert,
   Target,
 } from "lucide-react";
 
 const requestIconByContextValue = {
-  constraints: ShieldAlert,
+  constraints: Fence,
   context: BookOpenText,
   kpi: Target,
 };
@@ -36,7 +36,6 @@ export function RequestSummaryRail({ requests }) {
             aria-label={`${request.context.label}: ${request.text}`}
           >
             <RequestIcon aria-hidden="true" strokeWidth={1.8} />
-            <span className="request-summary-card__label">{request.context.label}</span>
             <span className="request-summary-card__tooltip" role="tooltip">
               <span className="request-summary-card__tooltip-type">{request.context.label}</span>
               <span className="request-summary-card__tooltip-text">{request.text}</span>

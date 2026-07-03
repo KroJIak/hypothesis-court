@@ -454,10 +454,10 @@
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  width: 54px;
-  height: 54px;
+  width: 44px;
+  height: 44px;
   border: 0;
-  border-radius: 15px;
+  border-radius: 13px;
   background: #202020;
   color: rgba(244, 244, 244, 0.78);
   cursor: default;
@@ -466,20 +466,6 @@
 .request-summary-card svg {
   width: 22px;
   height: 22px;
-}
-
-.request-summary-card__label {
-  position: absolute;
-  left: 50%;
-  bottom: 6px;
-  max-width: calc(100% - 8px);
-  color: rgba(244, 244, 244, 0.45);
-  font-size: 0.46rem;
-  line-height: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  transform: translateX(-50%);
-  white-space: nowrap;
 }
 
 .request-summary-card__tooltip {
