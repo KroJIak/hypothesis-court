@@ -14,6 +14,10 @@ class ModelProviderSettings(Base):
         CheckConstraint("char_length(btrim(provider)) > 0", name="provider_not_blank"),
         CheckConstraint("char_length(btrim(base_url)) > 0", name="base_url_not_blank"),
         CheckConstraint(
+            "model is null or char_length(btrim(model)) > 0",
+            name="model_not_blank",
+        ),
+        CheckConstraint(
             "api_token is null or char_length(btrim(api_token)) > 0",
             name="api_token_not_blank",
         ),
@@ -21,6 +25,7 @@ class ModelProviderSettings(Base):
 
     provider: Mapped[str] = mapped_column(String(32), primary_key=True)
     base_url: Mapped[str] = mapped_column(String(2048), nullable=False)
+    model: Mapped[str | None] = mapped_column(String(255), nullable=True)
     api_token: Mapped[str | None] = mapped_column(String, nullable=True)
     created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),

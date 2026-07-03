@@ -502,7 +502,36 @@
   background: rgba(255, 255, 255, 0.05);
 }
 
+.account-admin-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.account-admin-test-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  background: transparent;
+  color: #f1f1f1;
+  cursor: pointer;
+}
+
+.account-admin-test-button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.account-admin-test-button svg {
+  width: 18px;
+  height: 18px;
+}
+
 .account-admin-button:disabled,
+.account-admin-test-button:disabled,
 .account-admin-delete:disabled,
 .account-admin-password-cell button:disabled {
   cursor: not-allowed;
@@ -517,6 +546,16 @@
   line-height: 1.45;
   background: rgba(120, 28, 28, 0.24);
   color: #ffd2d2;
+}
+
+.account-admin-success {
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border-radius: 14px;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  background: rgba(42, 112, 54, 0.2);
+  color: #c8f4ce;
 }
 
 .account-admin-table-wrap {

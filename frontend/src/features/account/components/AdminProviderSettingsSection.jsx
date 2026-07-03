@@ -1,31 +1,54 @@
-import { useEffect, useState } from "react";
-import { Eye, EyeOff } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Eye, EyeOff, PlugZap } from "lucide-react";
 
 import {
-  getOpenAIProviderSettings,
-  updateOpenAIProviderSettings,
+  getProviderSettings,
+  listProviderModels,
+  testProviderConnection,
+  updateProviderSettings,
 } from "../api/adminModelProviderSettings";
 
-export function AdminProviderSettingsSection({ accessToken }) {
+function mergeModelOptions(...modelGroups) {
+  return [...new Set(modelGroups.flat().filter(Boolean))];
+}
+
+export function AdminProviderSettingsSection({
+  accessToken,
+  provider,
+  title,
+  providerLabel,
+}) {
   const [baseUrl, setBaseUrl] = useState("");
   const [apiToken, setApiToken] = useState("");
+  const [model, setModel] = useState("");
+  const [availableModels, setAvailableModels] = useState([]);
   const [hasApiToken, setHasApiToken] = useState(false);
   const [isApiTokenVisible, setIsApiTokenVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
+  const modelOptions = useMemo(
+    () => mergeModelOptions([model], availableModels),
+    [availableModels, model],
+  );
 
   useEffect(() => {
     let isActive = true;
 
-    getOpenAIProviderSettings(accessToken)
+    setIsLoading(true);
+    getProviderSettings({ accessToken, provider })
       .then((settings) => {
         if (!isActive) {
           return;
         }
 
+        const nextModel = settings?.model ?? "";
         setBaseUrl(settings?.base_url ?? "");
+        setModel(nextModel);
         setHasApiToken(Boolean(settings?.has_api_token));
+        setAvailableModels(mergeModelOptions([nextModel]));
         setErrorMessage("");
       })
       .catch((error) => {
@@ -44,22 +67,40 @@ export function AdminProviderSettingsSection({ accessToken }) {
     return () => {
       isActive = false;
     };
-  }, [accessToken]);
+  }, [accessToken, provider]);
+
+  async function refreshModels() {
+    const payload = await listProviderModels({
+      accessToken,
+      provider,
+      baseUrl,
+      apiToken: apiToken.trim() || null,
+    });
+
+    const nextModels = payload.models ?? [];
+    setAvailableModels(mergeModelOptions(nextModels, [model]));
+    return nextModels;
+  }
 
   async function handleSubmit(event) {
     event.preventDefault();
     setIsSaving(true);
     setErrorMessage("");
+    setSuccessMessage("");
 
     try {
-      const settings = await updateOpenAIProviderSettings({
+      const settings = await updateProviderSettings({
         accessToken,
+        provider,
         baseUrl,
+        model,
         apiToken: apiToken.trim() || null,
       });
       setBaseUrl(settings.base_url);
+      setModel(settings.model);
       setApiToken("");
       setHasApiToken(Boolean(settings.has_api_token));
+      setSuccessMessage("Сохранено.");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Не удалось сохранить настройки провайдера.");
     } finally {
@@ -67,11 +108,45 @@ export function AdminProviderSettingsSection({ accessToken }) {
     }
   }
 
+  async function handleTestConnection() {
+    setIsTesting(true);
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    try {
+      const payload = await testProviderConnection({
+        accessToken,
+        provider,
+        baseUrl,
+        model,
+        apiToken: apiToken.trim() || null,
+      });
+      setAvailableModels(mergeModelOptions(payload.models ?? [], [model]));
+      setSuccessMessage("Подключение работает.");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Не удалось проверить подключение.");
+    } finally {
+      setIsTesting(false);
+    }
+  }
+
+  async function handleModelSelectFocus() {
+    if (isLoading || isTesting || !baseUrl.trim()) {
+      return;
+    }
+
+    try {
+      await refreshModels();
+    } catch {
+      // The explicit test button is responsible for showing connection errors.
+    }
+  }
+
   return (
     <section className="account-admin-section">
       <div className="account-admin-section__header">
-        <h3>Провайдер модели</h3>
-        <span>OpenAI</span>
+        <h3>{title}</h3>
+        <span>{providerLabel}</span>
       </div>
 
       <form className="account-admin-form" onSubmit={handleSubmit}>
@@ -85,6 +160,23 @@ export function AdminProviderSettingsSection({ accessToken }) {
             onChange={(event) => setBaseUrl(event.target.value)}
             required
           />
+        </label>
+
+        <label className="account-admin-field">
+          <span>Модель</span>
+          <select
+            value={model}
+            disabled={isLoading}
+            onFocus={handleModelSelectFocus}
+            onChange={(event) => setModel(event.target.value)}
+            required
+          >
+            {modelOptions.map((modelOption) => (
+              <option key={modelOption} value={modelOption}>
+                {modelOption}
+              </option>
+            ))}
+          </select>
         </label>
 
         <label className="account-admin-field">
@@ -109,10 +201,22 @@ export function AdminProviderSettingsSection({ accessToken }) {
         </label>
 
         {errorMessage ? <div className="account-admin-error">{errorMessage}</div> : null}
+        {successMessage ? <div className="account-admin-success">{successMessage}</div> : null}
 
-        <button type="submit" className="account-admin-button" disabled={isLoading || isSaving}>
-          {isSaving ? "Сохранение..." : "Сохранить провайдера"}
-        </button>
+        <div className="account-admin-actions">
+          <button
+            type="button"
+            className="account-admin-test-button"
+            disabled={isLoading || isTesting || !baseUrl.trim() || !model.trim()}
+            aria-label="Проверить подключение"
+            onClick={handleTestConnection}
+          >
+            <PlugZap aria-hidden="true" strokeWidth={1.95} />
+          </button>
+          <button type="submit" className="account-admin-button" disabled={isLoading || isSaving}>
+            {isSaving ? "Сохранение..." : "Сохранить"}
+          </button>
+        </div>
       </form>
     </section>
   );

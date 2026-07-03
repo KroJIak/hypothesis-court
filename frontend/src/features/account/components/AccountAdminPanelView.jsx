@@ -12,7 +12,18 @@ export function AccountAdminPanelView({ accessToken, currentUser, onClose }) {
       <div className="account-modal__title">Панель управления</div>
 
       <div className="account-admin-panel">
-        <AdminProviderSettingsSection accessToken={accessToken} />
+        <AdminProviderSettingsSection
+          accessToken={accessToken}
+          provider="openai"
+          title="Провайдер модели"
+          providerLabel="OpenAI-compatible"
+        />
+        <AdminProviderSettingsSection
+          accessToken={accessToken}
+          provider="embedding"
+          title="Embedding модель"
+          providerLabel="OpenAI-compatible"
+        />
         <AdminUsersSection accessToken={accessToken} currentUser={currentUser} />
       </div>
     </AccountModalShell>
