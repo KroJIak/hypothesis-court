@@ -32,6 +32,7 @@ export default function App() {
 
   return (
     <WorkspacePage
+      accessToken={session.accessToken}
       currentUser={session.user}
       accountProfile={session.profile}
       onLogout={signOut}

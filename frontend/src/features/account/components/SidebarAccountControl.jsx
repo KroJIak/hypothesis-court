@@ -11,6 +11,7 @@ const SETTINGS_VIEW = "settings";
 const ADMIN_VIEW = "admin";
 
 export function SidebarAccountControl({
+  accessToken,
   user,
   profile,
   isSidebarCollapsed,
@@ -158,7 +159,7 @@ export function SidebarAccountControl({
       ) : null}
 
       {activeView === ADMIN_VIEW ? (
-        <AccountAdminPanelView onClose={handleCloseModal} />
+        <AccountAdminPanelView accessToken={accessToken} currentUser={user} onClose={handleCloseModal} />
       ) : null}
 
       <button

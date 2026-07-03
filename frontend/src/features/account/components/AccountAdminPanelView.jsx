@@ -1,8 +1,8 @@
-import { Users, UserCog } from "lucide-react";
-
 import { AccountModalShell } from "./AccountModalShell";
+import { AdminProviderSettingsSection } from "./AdminProviderSettingsSection";
+import { AdminUsersSection } from "./AdminUsersSection";
 
-export function AccountAdminPanelView({ onClose }) {
+export function AccountAdminPanelView({ accessToken, currentUser, onClose }) {
   return (
     <AccountModalShell
       ariaLabel="Панель управления"
@@ -12,19 +12,8 @@ export function AccountAdminPanelView({ onClose }) {
       <div className="account-modal__title">Панель управления</div>
 
       <div className="account-admin-panel">
-        <button type="button" className="account-admin-panel__item">
-          <span className="account-admin-panel__icon">
-            <Users strokeWidth={1.95} />
-          </span>
-          <span>Пользователи</span>
-        </button>
-
-        <button type="button" className="account-admin-panel__item">
-          <span className="account-admin-panel__icon">
-            <UserCog strokeWidth={1.95} />
-          </span>
-          <span>Администраторы</span>
-        </button>
+        <AdminProviderSettingsSection accessToken={accessToken} />
+        <AdminUsersSection accessToken={accessToken} currentUser={currentUser} />
       </div>
     </AccountModalShell>
   );

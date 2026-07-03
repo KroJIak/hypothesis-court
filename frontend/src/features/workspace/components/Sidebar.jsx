@@ -13,6 +13,7 @@ import { COLLAPSED_RECENT_CHAT_LIMIT } from "../constants";
 import { matchesChatSearch } from "../model/workspaceSessionModel";
 
 export function Sidebar({
+  accessToken,
   shell,
   currentUser,
   accountProfile,
@@ -140,6 +141,7 @@ export function Sidebar({
       )}
 
       <SidebarAccountControl
+        accessToken={accessToken}
         user={currentUser}
         profile={accountProfile}
         isSidebarCollapsed={isCollapsed}
