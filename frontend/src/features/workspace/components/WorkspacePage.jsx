@@ -30,6 +30,7 @@ import { runLayoutTransition } from "../utils/layoutTransition";
 import "../workspace.css";
 
 export function WorkspacePage({
+  accessToken,
   currentUser,
   accountProfile,
   onLogout,
@@ -265,6 +266,7 @@ export function WorkspacePage({
   return (
     <main className={`workspace${isSidebarCollapsed ? " workspace--sidebar-collapsed" : ""}`}>
       <Sidebar
+        accessToken={accessToken}
         shell={data.shell}
         currentUser={currentUser}
         accountProfile={accountProfile}
