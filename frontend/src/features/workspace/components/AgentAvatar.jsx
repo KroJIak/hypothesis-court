@@ -35,7 +35,7 @@ export function AgentAvatar({ variant, size = "regular" }) {
         <UserRound className="agent-avatar__base-icon" aria-hidden="true" strokeWidth={1.3} />
         {AccessoryIcon ? (
           <span className="agent-avatar__accessory" aria-hidden="true">
-            <AccessoryIcon className="agent-avatar__accessory-icon" strokeWidth={2.8} />
+            <AccessoryIcon className="agent-avatar__accessory-icon" strokeWidth={2.05} />
           </span>
         ) : null}
       </div>
