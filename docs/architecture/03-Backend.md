@@ -5,27 +5,35 @@ tags:
   - backend
 ---
 
-# Бэкенд
+# Backend
 
 ## Роль backend
 
-Backend должен быть не просто “тонким API”, а управляемой точкой входа в исследовательский pipeline:
+Backend выступает как API- и orchestration-layer платформы. Он управляет жизненным циклом research session, хранит артефакты гипотез и публикует состояние системы для frontend.
 
-- принимать команды пользователя;
-- хранить сессии и документы;
-- запускать и координировать шаги анализа;
-- сохранять артефакты;
-- отдавать frontend наблюдаемое состояние процесса.
+## Основные зоны ответственности
 
-## Что есть сейчас
+- intake исследовательской задачи;
+- загрузка и регистрация документов;
+- запуск hypothesis pipeline;
+- хранение evidence, hypothesis versions и verdict;
+- выдача структурированных данных в workspace UI.
 
-- FastAPI app с маршрутом `/health`
-- env-настройка CORS
-- минимальная структура `api / schemas / services / core`
+## Логическая структура
 
-## Что должно быть дальше
+```text
+backend/app/
+├── api/            - routes, request/response contracts
+├── core/           - settings and cross-cutting config
+├── schemas/        - typed payloads
+├── services/       - application services
+├── orchestrators/  - multi-step research flows
+├── repositories/   - persistence access
+├── models/         - domain entities
+└── workers/        - long-running or async jobs
+```
 
-### Базовые сущности
+## Domain entities
 
 - `research_session`
 - `source_document`
@@ -34,83 +42,49 @@ Backend должен быть не просто “тонким API”, а уп�
 - `hypothesis`
 - `debate_round`
 - `evaluation_result`
-- `final_recommendation`
+- `judge_verdict`
 
-### Базовые endpoint-группы
+## Endpoint groups
 
 - `health`
 - `research sessions`
 - `documents`
-- `analysis runs`
+- `evidence`
 - `hypotheses`
 - `debates`
 - `evaluations`
-- `recommendations`
+- `verdicts`
 
-## Предпочтительная внутренняя структура
-
-```text
-backend/app/
-├── api/
-│   ├── deps/
-│   └── routes/
-├── core/
-├── db/
-├── models/
-├── repositories/
-├── schemas/
-├── services/
-├── orchestrators/
-└── workers/
-```
-
-## Принцип разделения ответственности
-
-> [!check]
-> Для этого проекта важно сохранить управляемость и тестируемость.
-
-- `routes` принимают и валидируют HTTP.
-- `services` содержат прикладную бизнес-логику.
-- `repositories` работают с БД.
-- `orchestrators` управляют многошаговым pipeline.
-- `schemas` определяют внешние и внутренние контракты данных.
-
-## Канонический сценарий backend-пайплайна
+## Прикладной поток
 
 ```mermaid
 sequenceDiagram
     participant UI as Frontend
     participant API as FastAPI
     participant ORCH as Orchestrator
-    participant RET as Retrieval
-    participant DEB as Debate
-    participant EVA as Evaluators
-    participant J as Judge
+    participant DATA as Data Layer
+    participant AI as Debate/Evaluation Layers
 
-    UI->>API: create research session
-    UI->>API: upload documents
-    UI->>API: start analysis
-    API->>ORCH: run(session_id)
-    ORCH->>RET: build evidence pack
-    RET-->>ORCH: evidence
-    ORCH->>DEB: refine hypothesis
-    DEB-->>ORCH: debated hypothesis
-    ORCH->>EVA: evaluate
-    EVA-->>ORCH: metrics
-    ORCH->>J: synthesize
-    J-->>API: final recommendation
-    API-->>UI: session state + results
+    UI->>API: create session
+    UI->>API: upload sources
+    UI->>API: run analysis
+    API->>ORCH: start pipeline
+    ORCH->>DATA: build evidence pack
+    ORCH->>AI: run hypothesis flow
+    AI-->>ORCH: debated hypothesis + scores
+    ORCH-->>API: final verdict
+    API-->>UI: session state and outputs
 ```
 
-## Что важно не делать
+## Правила backend-слоя
 
-- Не прятать всё в одном giant service.
-- Не привязывать доменную логику к HTTP-слою.
-- Не делать неструктурированные LLM-ответы основным контрактом между слоями.
-- Не превращать debate loop в бесконтрольный агентный sandbox.
+- HTTP-контракты остаются тонкими и typed.
+- Оркестрация живёт отдельно от transport layer.
+- LLM outputs нормализуются схемами.
+- Все исследовательские артефакты сохраняются как session state.
 
 ## Связанные документы
 
-- [[02-Target-System]]
+- [[02-System-Architecture]]
 - [[05-Data-and-Retrieval]]
 - [[product/03-Hypothesis-Pipeline]]
