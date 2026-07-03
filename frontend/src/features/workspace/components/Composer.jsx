@@ -20,6 +20,7 @@ import {
   COMPOSER_CONTEXT_OPTIONS,
 } from "../constants";
 import { clampNumber } from "../utils/format";
+import { ProcessingStatusBadge } from "./ProcessingStatusBadge";
 
 const attachmentIconByKind = {
   csv: FileSpreadsheet,
@@ -65,6 +66,7 @@ function AttachmentChip({
       onFocus={(event) => showAttachmentTooltip(attachment.id, event.currentTarget)}
       onBlur={hideAttachmentTooltip}
     >
+      <ProcessingStatusBadge status={attachment.processingStatus} />
       <span className="attachment-chip__icon">
         <AttachmentIcon aria-hidden="true" strokeWidth={1.9} />
       </span>

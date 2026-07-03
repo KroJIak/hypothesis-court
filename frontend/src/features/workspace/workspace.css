@@ -92,10 +92,43 @@
 .palette-add-button svg,
 .attachment-chip__icon svg,
 .attachment-attach-button svg,
+.processing-status-badge svg,
 .composer-action svg {
   width: 100%;
   height: 100%;
   display: block;
+}
+
+.processing-status-badge {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  color: rgba(235, 235, 235, 0.82);
+  pointer-events: none;
+}
+
+.processing-status-badge--processed {
+  color: #3fb950;
+}
+
+.processing-status-badge--processing {
+  color: rgba(235, 235, 235, 0.82);
+}
+
+.processing-status-badge--processing svg {
+  animation: processing-status-spin 850ms linear infinite;
+}
+
+@keyframes processing-status-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .brand-copy {
@@ -561,12 +594,13 @@
 
 .hypothesis-card {
   box-sizing: border-box;
+  position: relative;
   flex: 0 0 var(--hypothesis-card-width);
   min-width: 0;
   border-radius: 15px;
   background: rgba(255, 255, 255, 0.045);
   color: rgba(244, 244, 244, 0.88);
-  padding: 9px 10px;
+  padding: 9px 30px 9px 10px;
 }
 
 .hypothesis-card__title {
@@ -1025,6 +1059,8 @@
   --attachment-rail-gap: 12px;
   --attachment-rail-width: 42px;
   --attachment-item-size: 42px;
+  --attachment-item-gap: 8px;
+  --attachment-visible-count: 8;
   flex: 0 0 auto;
   position: relative;
   z-index: 5;
@@ -1039,16 +1075,20 @@
   z-index: 6;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--attachment-item-gap);
   width: var(--attachment-rail-width);
   max-height: calc(100vh - 92px);
 }
 
 .attachment-rail {
   display: flex;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--attachment-item-gap);
+  max-height: calc(
+    (var(--attachment-item-size) * var(--attachment-visible-count)) +
+      (var(--attachment-item-gap) * (var(--attachment-visible-count) - 1))
+  );
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -1061,6 +1101,7 @@
 }
 
 .attachment-chip {
+  position: relative;
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
@@ -1502,6 +1543,7 @@
 
   .attachment-rail {
     flex-direction: row;
+    max-height: none;
     overflow-x: auto;
     overflow-y: visible;
   }
