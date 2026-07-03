@@ -9,13 +9,14 @@ tags:
 
 ## Роль frontend
 
-Frontend организует research workspace, в котором пользователь ведёт сессию, наблюдает debate, читает evidence и получает verdict.
+Frontend организует research workspace, в котором пользователь ведёт сессию, видит initial hypothesis set, наблюдает debate по активной гипотезе, читает evidence и получает verdict.
 
 ## Основные UI-зоны
 
 - session sidebar;
+- hypothesis list;
 - debate scene;
-- evaluation panel;
+- evaluation and ranking panel;
 - evidence and attachment panel;
 - session composer.
 
@@ -29,6 +30,7 @@ frontend/src/
 │   ├── research-session/
 │   ├── document-upload/
 │   ├── evidence-viewer/
+│   ├── hypothesis-list/
 │   ├── debate-scene/
 │   ├── evaluation-panel/
 │   └── final-verdict/
@@ -40,6 +42,7 @@ frontend/src/
 - `intake`
 - `ingestion`
 - `evidence-ready`
+- `hypotheses-ready`
 - `debating`
 - `evaluating`
 - `completed`
@@ -47,7 +50,7 @@ frontend/src/
 ## Визуальный принцип
 
 Интерфейс работает как сцена обсуждения, а не как корпоративная форма ввода.
-Центральное место занимает гипотеза и её refinement through roles.
+Центральное место занимает активная гипотеза из current hypothesis set и её refinement through roles.
 
 ## Клиентский поток данных
 
@@ -55,9 +58,10 @@ frontend/src/
 flowchart LR
     A[Session selection] --> B[Brief and sources]
     B --> C[Evidence view]
-    C --> D[Debate scene]
-    D --> E[Evaluation panel]
-    E --> F[Judge verdict]
+    C --> D[Initial hypothesis set]
+    D --> E[Debate scene]
+    E --> F[Evaluation and ranking panel]
+    F --> G[Judge verdict]
 ```
 
 ## Интеграция с backend

@@ -16,6 +16,7 @@ tags:
 3. [[03-Hypothesis-Pipeline]]
 4. [[04-Agents-and-Judge]]
 5. [[05-Interface-and-Scene]]
+6. [[06-Session-Walkthrough]]
 
 ## Логика чтения
 
@@ -24,6 +25,7 @@ tags:
 - [[03-Hypothesis-Pipeline]] фиксирует логику генерации и refinement.
 - [[04-Agents-and-Judge]] описывает debate и evaluation roles.
 - [[05-Interface-and-Scene]] связывает эту механику с UX.
+- [[06-Session-Walkthrough]] показывает один реалистичный проход по сессии пошагово.
 
 ## Соседние разделы
 

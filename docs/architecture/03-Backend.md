@@ -7,84 +7,57 @@ tags:
 
 # Backend
 
+> [!abstract]
+> Backend состоит из двух слоёв документации: прикладной backend-контур и отдельный database-контур. Этот файл служит входной точкой и короткой картой.
+
 ## Роль backend
 
-Backend выступает как API- и orchestration-layer платформы. Он управляет жизненным циклом research session, хранит артефакты гипотез и публикует состояние системы для frontend.
+Backend выступает как API-, auth- и orchestration-layer платформы. Он управляет доступом пользователей, жизненным циклом исследовательских сессий, хранит артефакты гипотез и публикует состояние системы для frontend.
 
-## Основные зоны ответственности
+## Что входит в backend-контур
 
-- intake исследовательской задачи;
-- загрузка и регистрация документов;
-- запуск hypothesis pipeline;
-- хранение evidence, hypothesis versions и verdict;
-- выдача структурированных данных в workspace UI.
+- `API layer` — маршруты, зависимости, auth guards и HTTP-контракты;
+- `service layer` — бизнес-правила, транзакции и orchestration;
+- `repository layer` — чтение и запись в PostgreSQL;
+- `identity and access` — login, refresh, logout, управление пользователями;
+- `db-init` — применение миграций, bootstrap superadmin и запуск seed-пакетов;
+- `research pipeline` — document ingestion, retrieval, debate, evaluation и judge.
 
 ## Логическая структура
 
 ```text
 backend/app/
-├── api/            - routes, request/response contracts
-├── core/           - settings and cross-cutting config
-├── schemas/        - typed payloads
-├── services/       - application services
-├── orchestrators/  - multi-step research flows
-├── repositories/   - persistence access
-├── models/         - domain entities
+├── api/            - routers, dependencies, auth guards, HTTP contracts
+├── core/           - settings, security config, shared policies
+├── db/             - engine, session factory, naming convention
+├── models/         - SQLAlchemy entities and enums
+├── repositories/   - persistence access without business rules
+├── schemas/        - Pydantic request/response models
+├── security/       - password hashing, JWT, refresh token hashing
+├── services/       - business logic and transaction boundaries
+├── orchestrators/  - research pipeline flows
+├── seed/           - bootstrap and static seed execution
 └── workers/        - long-running or async jobs
 ```
 
-## Domain entities
+## Рабочее правило слоя
 
-- `research_session`
-- `source_document`
-- `document_chunk`
-- `evidence_item`
-- `hypothesis`
-- `debate_round`
-- `evaluation_result`
-- `judge_verdict`
+Backend следует явной цепочке `router -> service -> repository -> model/db`.
+HTTP-слой остаётся тонким, бизнес-решения живут в сервисах, а репозитории отвечают только за persistence.
 
-## Endpoint groups
+## Детальные разделы
 
-- `health`
-- `research sessions`
-- `documents`
-- `evidence`
-- `hypotheses`
-- `debates`
-- `evaluations`
-- `verdicts`
-
-## Прикладной поток
-
-```mermaid
-sequenceDiagram
-    participant UI as Frontend
-    participant API as FastAPI
-    participant ORCH as Orchestrator
-    participant DATA as Data Layer
-    participant AI as Debate/Evaluation Layers
-
-    UI->>API: create session
-    UI->>API: upload sources
-    UI->>API: run analysis
-    API->>ORCH: start pipeline
-    ORCH->>DATA: build evidence pack
-    ORCH->>AI: run hypothesis flow
-    AI-->>ORCH: debated hypothesis + scores
-    ORCH-->>API: final verdict
-    API-->>UI: session state and outputs
-```
-
-## Правила backend-слоя
-
-- HTTP-контракты остаются тонкими и typed.
-- Оркестрация живёт отдельно от transport layer.
-- LLM outputs нормализуются схемами.
-- Все исследовательские артефакты сохраняются как session state.
+- [[backend/01-Backend-Overview]] — состав backend и пакетная структура.
+- [[backend/02-Authentication-and-Tokens]] — логин, refresh rotation, logout и политика сессий.
+- [[backend/03-Users-and-Admin]] — CRUD пользователей, self-service и ограничения суперпользователя.
+- [[backend/04-Db-Init-and-Seeds]] — жизненный цикл `db-init`, миграции и первичные seed-паки.
+- [[database/01-Identity-and-Auth-Schema]] — схема таблиц auth и identity.
+- [[database/02-Constraints-Indexes-and-Checks]] — checks, indexes, оптимизация и naming convention.
 
 ## Связанные документы
 
 - [[02-System-Architecture]]
+- [[backend/00-INDEX]]
+- [[database/00-INDEX]]
 - [[05-Data-and-Retrieval]]
 - [[product/03-Hypothesis-Pipeline]]

@@ -8,7 +8,7 @@ tags:
 # Hypothesis Factory Sections
 
 > [!note]
-> Здесь то же самое ТЗ, что и в [[sources/hypothesis-factory/01-Full-Spec]], но разложенное по отдельным главам.
+> Здесь то же самое ТЗ, что и в [[sources/Organizer-Materials/Hypothesis-Factory/01-Full-Spec]], но разложенное по отдельным главам.
 
 ## Sections
 
