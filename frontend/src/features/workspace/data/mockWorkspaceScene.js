@@ -57,6 +57,19 @@ function createEvaluationAgents() {
   ];
 }
 
+function createAttachmentSeries({ idPrefix, count, kind, fileNamePrefix, summary }) {
+  return Array.from({ length: count }, (_, index) => {
+    const attachmentNumber = String(index + 1).padStart(2, "0");
+
+    return {
+      id: `${idPrefix}-${attachmentNumber}`,
+      kind,
+      fileName: `${fileNamePrefix}-${attachmentNumber}.${kind}`,
+      summary,
+    };
+  });
+}
+
 function createSession({
   id,
   title,
@@ -139,6 +152,34 @@ export const mockWorkspaceSceneDto = {
           fileName: "meeting-notes.txt",
           summary: "Замечания технологов по чувствительности процесса к чистоте сырья.",
         },
+        ...createAttachmentSeries({
+          idPrefix: "att-review",
+          count: 10,
+          kind: "pdf",
+          fileNamePrefix: "catalyst-literature-pack",
+          summary: "Дополнительные статьи и обзоры для проверки исходной гипотезы.",
+        }),
+        ...createAttachmentSeries({
+          idPrefix: "att-lab",
+          count: 8,
+          kind: "csv",
+          fileNamePrefix: "electrolysis-lab-run",
+          summary: "Сырые экспериментальные серии по стабильности и деградации.",
+        }),
+        ...createAttachmentSeries({
+          idPrefix: "att-model",
+          count: 6,
+          kind: "xlsx",
+          fileNamePrefix: "cost-sensitivity-model",
+          summary: "Расчётные таблицы по стоимости прекурсоров и масштабированию.",
+        }),
+        ...createAttachmentSeries({
+          idPrefix: "att-protocol",
+          count: 4,
+          kind: "docx",
+          fileNamePrefix: "pilot-validation-protocol",
+          summary: "Протоколы валидации и технологические ограничения пилота.",
+        }),
       ],
     }),
     createSession({
