@@ -31,6 +31,7 @@ export function createWorkspaceSession(session, paletteAgents) {
   return {
     ...session,
     composerRequests: session.composerRequests ?? [],
+    launchedRequests: session.launchedRequests ?? [],
     availableAgents: getInitialAvailableAgents(session, paletteAgents),
   };
 }
@@ -48,6 +49,7 @@ export function createDraftWorkspaceSession(baseSession, paletteAgents, newChatI
       "После подключения API здесь появится вердикт судьи и итоговая рекомендация по собранной сцене.",
     attachments: [],
     composerRequests: [],
+    launchedRequests: [],
     availableAgents: sortAvailableAgents(
       [
         ...paletteAgents.filter((agent) => !agent.isEmpty),
