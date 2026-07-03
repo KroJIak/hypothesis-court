@@ -7,7 +7,7 @@ import { getElementCenter } from "../utils/geometry";
 export function DebateStage({
   debate,
   manufacturerAvatarRef,
-  activeConnectionIds,
+  activeConnectionDirections,
   isPlaybackRunning,
   onPlay,
 }) {
@@ -31,6 +31,14 @@ export function DebateStage({
     }
   }, [manufacturerAvatarRef]);
 
+  function getConnectionClassName(connectionId) {
+    if (!activeConnectionDirections.has(connectionId)) {
+      return "connection-path";
+    }
+
+    return "connection-path connection-path--active";
+  }
+
   useLayoutEffect(() => {
     const updateConnections = () => {
       const stageElement = stageRef.current;
@@ -52,9 +60,21 @@ export function DebateStage({
         width: stageRect.width,
         height: stageElement.scrollHeight,
         paths: [
-          { id: "top-left-top-right", d: `M${topLeft.x.toFixed(1)} ${topLeft.y.toFixed(1)}L${topRight.x.toFixed(1)} ${topRight.y.toFixed(1)}` },
-          { id: "top-left-bottom", d: `M${topLeft.x.toFixed(1)} ${topLeft.y.toFixed(1)}L${bottom.x.toFixed(1)} ${bottom.y.toFixed(1)}` },
-          { id: "top-right-bottom", d: `M${topRight.x.toFixed(1)} ${topRight.y.toFixed(1)}L${bottom.x.toFixed(1)} ${bottom.y.toFixed(1)}` },
+          {
+            id: "top-left-top-right",
+            d: `M${topLeft.x.toFixed(1)} ${topLeft.y.toFixed(1)}L${topRight.x.toFixed(1)} ${topRight.y.toFixed(1)}`,
+            reverseD: `M${topRight.x.toFixed(1)} ${topRight.y.toFixed(1)}L${topLeft.x.toFixed(1)} ${topLeft.y.toFixed(1)}`,
+          },
+          {
+            id: "top-left-bottom",
+            d: `M${topLeft.x.toFixed(1)} ${topLeft.y.toFixed(1)}L${bottom.x.toFixed(1)} ${bottom.y.toFixed(1)}`,
+            reverseD: `M${bottom.x.toFixed(1)} ${bottom.y.toFixed(1)}L${topLeft.x.toFixed(1)} ${topLeft.y.toFixed(1)}`,
+          },
+          {
+            id: "top-right-bottom",
+            d: `M${topRight.x.toFixed(1)} ${topRight.y.toFixed(1)}L${bottom.x.toFixed(1)} ${bottom.y.toFixed(1)}`,
+            reverseD: `M${bottom.x.toFixed(1)} ${bottom.y.toFixed(1)}L${topRight.x.toFixed(1)} ${topRight.y.toFixed(1)}`,
+          },
         ],
       });
     };
@@ -92,8 +112,8 @@ export function DebateStage({
           {connectionLayer.paths.map((path) => (
             <path
               key={path.id}
-              className={activeConnectionIds.has(path.id) ? "connection-path connection-path--active" : "connection-path"}
-              d={path.d}
+              className={getConnectionClassName(path.id)}
+              d={activeConnectionDirections.get(path.id) === "reverse" ? path.reverseD : path.d}
             />
           ))}
         </svg>

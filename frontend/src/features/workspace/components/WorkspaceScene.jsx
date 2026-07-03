@@ -13,8 +13,9 @@ export function WorkspaceScene({ session, onAgentDragStart, onAgentDragEnd, onDr
   const evaluationAvatarRefs = useRef(new Map());
   const [connectionLayer, setConnectionLayer] = useState({ width: 0, height: 0, paths: [] });
   const {
-    activeDebateConnectionIds,
-    activeEvaluationConnectionIds,
+    activeDebateConnectionDirections,
+    activeEvaluationConnectionDirections,
+    hypotheses,
     isAnswerVisible,
     isRunning,
     startPlayback,
@@ -28,6 +29,18 @@ export function WorkspaceScene({ session, onAgentDragStart, onAgentDragEnd, onDr
 
     evaluationAvatarRefs.current.delete(agentId);
   }, []);
+
+  function getEvaluationConnectionClassName(connectionId) {
+    const direction = activeEvaluationConnectionDirections.get(connectionId);
+
+    if (!direction) {
+      return "connection-path";
+    }
+
+    return direction === "reverse"
+      ? "connection-path connection-path--active connection-path--reverse"
+      : "connection-path connection-path--active";
+  }
 
   useLayoutEffect(() => {
     const updateConnections = () => {
@@ -116,18 +129,18 @@ export function WorkspaceScene({ session, onAgentDragStart, onAgentDragEnd, onDr
           {connectionLayer.paths.map((path) => (
             <path
               key={path.id}
-              className={activeEvaluationConnectionIds.has(path.id) ? "connection-path connection-path--active" : "connection-path"}
+              className={getEvaluationConnectionClassName(path.id)}
               d={path.d}
             />
           ))}
         </svg>
       ) : null}
 
-      <HypothesisCandidates hypotheses={session.hypotheses ?? []} />
+      <HypothesisCandidates hypotheses={hypotheses} />
       <DebateStage
         debate={session.debate}
         manufacturerAvatarRef={manufacturerAvatarRef}
-        activeConnectionIds={activeDebateConnectionIds}
+        activeConnectionDirections={activeDebateConnectionDirections}
         isPlaybackRunning={isRunning}
         onPlay={startPlayback}
       />
