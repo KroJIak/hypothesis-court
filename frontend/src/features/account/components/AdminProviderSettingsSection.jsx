@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 
 import {
   getOpenAIProviderSettings,
@@ -9,6 +10,7 @@ export function AdminProviderSettingsSection({ accessToken }) {
   const [baseUrl, setBaseUrl] = useState("");
   const [apiToken, setApiToken] = useState("");
   const [hasApiToken, setHasApiToken] = useState(false);
+  const [isApiTokenVisible, setIsApiTokenVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -87,13 +89,23 @@ export function AdminProviderSettingsSection({ accessToken }) {
 
         <label className="account-admin-field">
           <span>API токен</span>
-          <input
-            type="password"
-            value={apiToken}
-            placeholder={hasApiToken ? "Токен уже сохранён" : "Введите API токен"}
-            disabled={isLoading}
-            onChange={(event) => setApiToken(event.target.value)}
-          />
+          <span className="account-admin-password-input">
+            <input
+              type={isApiTokenVisible ? "text" : "password"}
+              value={apiToken}
+              placeholder={hasApiToken ? "Токен уже сохранён" : "Введите API токен"}
+              disabled={isLoading}
+              onChange={(event) => setApiToken(event.target.value)}
+            />
+            <button
+              type="button"
+              aria-label={isApiTokenVisible ? "Скрыть токен" : "Показать токен"}
+              disabled={isLoading}
+              onClick={() => setIsApiTokenVisible((currentValue) => !currentValue)}
+            >
+              {isApiTokenVisible ? <EyeOff strokeWidth={1.9} /> : <Eye strokeWidth={1.9} />}
+            </button>
+          </span>
         </label>
 
         {errorMessage ? <div className="account-admin-error">{errorMessage}</div> : null}

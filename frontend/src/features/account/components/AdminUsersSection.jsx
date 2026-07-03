@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Trash2 } from "lucide-react";
+import { Eye, EyeOff, Trash2 } from "lucide-react";
 
 import {
   createAdminUser,
@@ -15,9 +15,12 @@ export function AdminUsersSection({ accessToken, currentUser }) {
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("user");
   const [passwordDrafts, setPasswordDrafts] = useState({});
+  const [isCreatePasswordVisible, setIsCreatePasswordVisible] = useState(false);
+  const [visiblePasswordDrafts, setVisiblePasswordDrafts] = useState({});
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const canManageAdmins = Boolean(currentUser?.is_superadmin);
 
   useEffect(() => {
     let isActive = true;
@@ -135,20 +138,29 @@ export function AdminUsersSection({ accessToken, currentUser }) {
 
         <label className="account-admin-field">
           <span>Пароль</span>
-          <input
-            type="password"
-            value={password}
-            autoComplete="new-password"
-            onChange={(event) => setPassword(event.target.value)}
-            required
-          />
+          <span className="account-admin-password-input">
+            <input
+              type={isCreatePasswordVisible ? "text" : "password"}
+              value={password}
+              autoComplete="new-password"
+              onChange={(event) => setPassword(event.target.value)}
+              required
+            />
+            <button
+              type="button"
+              aria-label={isCreatePasswordVisible ? "Скрыть пароль" : "Показать пароль"}
+              onClick={() => setIsCreatePasswordVisible((currentValue) => !currentValue)}
+            >
+              {isCreatePasswordVisible ? <EyeOff strokeWidth={1.9} /> : <Eye strokeWidth={1.9} />}
+            </button>
+          </span>
         </label>
 
         <label className="account-admin-field">
           <span>Роль</span>
           <select value={role} onChange={(event) => setRole(event.target.value)}>
             <option value="user">Пользователь</option>
-            <option value="admin">Админ</option>
+            {canManageAdmins ? <option value="admin">Админ</option> : null}
           </select>
         </label>
 
@@ -172,7 +184,9 @@ export function AdminUsersSection({ accessToken, currentUser }) {
           <tbody>
             {users.map((user) => {
               const isCurrentUser = user.id === currentUser?.id;
+              const isAdminLocked = user.is_admin && !canManageAdmins;
               const passwordDraft = passwordDrafts[user.id] ?? "";
+              const isPasswordVisible = Boolean(visiblePasswordDrafts[user.id]);
 
               return (
                 <tr key={user.id}>
@@ -180,7 +194,7 @@ export function AdminUsersSection({ accessToken, currentUser }) {
                   <td>
                     <select
                       value={user.is_admin ? "admin" : "user"}
-                      disabled={user.is_superadmin}
+                      disabled={user.is_superadmin || isAdminLocked}
                       onChange={(event) => handleRoleChange(user, event.target.value)}
                     >
                       <option value="user">Пользователь</option>
@@ -189,21 +203,37 @@ export function AdminUsersSection({ accessToken, currentUser }) {
                   </td>
                   <td>
                     <div className="account-admin-password-cell">
-                      <input
-                        type="password"
-                        value={passwordDraft}
-                        autoComplete="new-password"
-                        placeholder="Новый пароль"
-                        onChange={(event) =>
-                          setPasswordDrafts((currentDrafts) => ({
-                            ...currentDrafts,
-                            [user.id]: event.target.value,
-                          }))
-                        }
-                      />
+                      <span className="account-admin-password-input">
+                        <input
+                          type={isPasswordVisible ? "text" : "password"}
+                          value={passwordDraft}
+                          autoComplete="new-password"
+                          placeholder="Новый пароль"
+                          disabled={isAdminLocked}
+                          onChange={(event) =>
+                            setPasswordDrafts((currentDrafts) => ({
+                              ...currentDrafts,
+                              [user.id]: event.target.value,
+                            }))
+                          }
+                        />
+                        <button
+                          type="button"
+                          aria-label={isPasswordVisible ? "Скрыть пароль" : "Показать пароль"}
+                          disabled={isAdminLocked}
+                          onClick={() =>
+                            setVisiblePasswordDrafts((currentDrafts) => ({
+                              ...currentDrafts,
+                              [user.id]: !currentDrafts[user.id],
+                            }))
+                          }
+                        >
+                          {isPasswordVisible ? <EyeOff strokeWidth={1.9} /> : <Eye strokeWidth={1.9} />}
+                        </button>
+                      </span>
                       <button
                         type="button"
-                        disabled={!passwordDraft}
+                        disabled={!passwordDraft || isAdminLocked}
                         onClick={() => handlePasswordReset(user)}
                       >
                         Сменить
@@ -215,7 +245,7 @@ export function AdminUsersSection({ accessToken, currentUser }) {
                       type="button"
                       className="account-admin-delete"
                       aria-label={`Удалить ${user.username}`}
-                      disabled={user.is_superadmin || isCurrentUser}
+                      disabled={user.is_superadmin || isCurrentUser || isAdminLocked}
                       onClick={() => handleDelete(user)}
                     >
                       <Trash2 strokeWidth={1.95} />

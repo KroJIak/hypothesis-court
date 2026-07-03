@@ -86,6 +86,9 @@ class UserService:
         last_name: str | None,
     ) -> User:
         try:
+            if is_admin and not actor.is_superadmin:
+                raise AuthorizationError("Only superadmin can create admins.")
+
             normalized_username = normalize_username(username)
             validate_password(password)
             if self._users.get_by_username(self._session, normalized_username) is not None:
@@ -132,6 +135,9 @@ class UserService:
     ) -> User:
         try:
             user = self.get_user(user_id)
+            self._ensure_actor_can_manage_user(actor=actor, user=user)
+            if is_admin and not actor.is_superadmin:
+                raise AuthorizationError("Only superadmin can grant admin access.")
             if user.is_superadmin:
                 if is_admin is False:
                     raise AuthorizationError("Superadmin cannot lose admin access.")
@@ -166,6 +172,7 @@ class UserService:
     def reset_password(self, *, actor: User, user_id: uuid.UUID, new_password: str) -> None:
         try:
             user = self.get_user(user_id)
+            self._ensure_actor_can_manage_user(actor=actor, user=user)
             validate_password(new_password)
             now = datetime.now(UTC)
             user.password_hash = hash_password(new_password)
@@ -193,6 +200,7 @@ class UserService:
     def delete_user(self, *, actor: User, user_id: uuid.UUID) -> None:
         try:
             user = self.get_user(user_id)
+            self._ensure_actor_can_manage_user(actor=actor, user=user)
             if user.is_superadmin:
                 raise AuthorizationError("Superadmin cannot be deleted.")
 
@@ -220,6 +228,11 @@ class UserService:
         except Exception:
             self._session.rollback()
             raise
+
+    @staticmethod
+    def _ensure_actor_can_manage_user(*, actor: User, user: User) -> None:
+        if user.is_admin and not actor.is_superadmin:
+            raise AuthorizationError("Admins can manage regular users only.")
 
     def update_profile(self, *, user: User, first_name: str | None, last_name: str | None) -> User:
         try:

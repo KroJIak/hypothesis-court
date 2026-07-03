@@ -202,8 +202,8 @@ export const mockWorkspaceSceneDto = {
       name: "Hypothesis Court",
     },
     navigation: {
-      newChatLabel: "New chat",
-      searchLabel: "Search",
+      newChatLabel: "Новый чат",
+      searchLabel: "Поиск",
     },
     currentChatId: "low-temp-electrolysis",
     user: {

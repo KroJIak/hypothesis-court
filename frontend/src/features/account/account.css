@@ -434,6 +434,47 @@
   padding: 0 11px;
 }
 
+.account-admin-password-input {
+  position: relative;
+  display: block;
+}
+
+.account-admin-password-input input {
+  padding-right: 42px;
+}
+
+.account-admin-password-input button {
+  position: absolute;
+  top: 50%;
+  right: 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #d8d8d8;
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+
+.account-admin-password-input button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.account-admin-password-input button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.account-admin-password-input svg {
+  width: 17px;
+  height: 17px;
+  display: block;
+}
+
 .account-admin-field input:focus,
 .account-admin-field select:focus,
 .account-admin-table input:focus,
@@ -522,8 +563,17 @@
   padding: 0 12px;
 }
 
+.account-admin-password-cell .account-admin-password-input button {
+  min-height: 0;
+  padding: 0;
+}
+
 .account-admin-password-cell button:hover {
   background: rgba(255, 255, 255, 0.09);
+}
+
+.account-admin-password-cell .account-admin-password-input button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .account-admin-delete {
