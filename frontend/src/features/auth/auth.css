@@ -67,10 +67,18 @@
   justify-content: center;
   width: 56px;
   height: 56px;
+  color: #ffffff;
+}
+
+.auth-brand__mark {
+  width: 54px;
+  height: 54px;
+}
+
+.auth-bootstrap__mark {
   border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.15);
   background: rgba(255, 255, 255, 0.03);
-  color: #ffffff;
 }
 
 .auth-brand__mark svg,
@@ -109,40 +117,9 @@
 
 .auth-summary {
   margin: 0;
-  max-width: 520px;
   color: #c4c4c4;
   font-size: 1rem;
   line-height: 1.6;
-}
-
-.auth-notes {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-  max-width: 560px;
-}
-
-.auth-note {
-  display: grid;
-  gap: 6px;
-  padding: 16px 18px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.025);
-  backdrop-filter: blur(12px);
-}
-
-.auth-note__label {
-  color: #9d9d9d;
-  font-size: 0.74rem;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
-}
-
-.auth-note__value {
-  color: #f0f0f0;
-  font-size: 0.96rem;
-  line-height: 1.4;
 }
 
 .auth-panel {
@@ -165,13 +142,6 @@
   margin: 0 0 8px;
   font-size: 1.75rem;
   letter-spacing: -0.04em;
-}
-
-.auth-panel__subtitle {
-  margin: 0;
-  color: #aaaaaa;
-  font-size: 0.95rem;
-  line-height: 1.55;
 }
 
 .auth-form {
@@ -316,10 +286,6 @@
 
   .auth-title {
     max-width: none;
-  }
-
-  .auth-notes {
-    grid-template-columns: 1fr;
   }
 
   .auth-panel {
