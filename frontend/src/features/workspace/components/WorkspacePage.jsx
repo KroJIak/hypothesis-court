@@ -106,6 +106,48 @@ export function WorkspacePage({
     setIsSidebarCollapsed((currentValue) => !currentValue);
   }
 
+  function handleRenameChat(chatId, nextTitle) {
+    const normalizedTitle = nextTitle.trim();
+
+    if (!normalizedTitle) {
+      return;
+    }
+
+    setSessions((currentSessions) =>
+      currentSessions.map((session) =>
+        session.id === chatId
+          ? {
+              ...session,
+              title: normalizedTitle,
+            }
+          : session,
+      ),
+    );
+  }
+
+  function handleTogglePinChat(chatId) {
+    setSessions((currentSessions) =>
+      currentSessions.map((session) =>
+        session.id === chatId
+          ? {
+              ...session,
+              isPinned: !session.isPinned,
+            }
+          : session,
+      ),
+    );
+  }
+
+  function handleDeleteChat(chatId) {
+    const nextSessions = sessions.filter((session) => session.id !== chatId);
+
+    setSessions(nextSessions);
+
+    if (selectedChatId === chatId) {
+      setSelectedChatId(nextSessions[0]?.id ?? null);
+    }
+  }
+
   function handleAddAgent() {
     if (hasPendingAgent(selectedSession)) {
       return;
@@ -282,6 +324,9 @@ export function WorkspacePage({
         onSelectChat={handleSelectChat}
         onCreateChat={handleCreateChat}
         onToggleSidebar={handleToggleSidebar}
+        onRenameChat={handleRenameChat}
+        onTogglePinChat={handleTogglePinChat}
+        onDeleteChat={handleDeleteChat}
       />
 
       <section className="workspace-main">
