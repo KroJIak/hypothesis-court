@@ -117,7 +117,8 @@
 }
 
 .account-modal--settings {
-  padding: 22px;
+  width: min(100%, 560px);
+  padding: 28px;
 }
 
 .account-modal--admin {
@@ -154,18 +155,38 @@
 .account-modal__title {
   padding-right: 42px;
   color: #f3f3f3;
-  font-size: 1rem;
+  font-size: 1.45rem;
   font-weight: 600;
+  line-height: 1.1;
 }
 
-.account-settings-panel {
+.account-settings {
+  display: grid;
+  gap: 0;
+  padding-top: 26px;
+}
+
+.account-settings__profile-layout {
+  display: grid;
+  grid-template-columns: 128px minmax(0, 1fr);
+  align-items: start;
+  gap: 20px;
+}
+
+.account-settings__avatar-column {
   display: grid;
   justify-items: center;
-  gap: 18px;
-  padding-top: 22px;
+  gap: 10px;
 }
 
-.account-settings-panel__avatar {
+.account-settings__avatar-action {
+  position: relative;
+  display: inline-flex;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.account-settings__avatar {
   --account-avatar-size: 96px;
 }
 
@@ -177,50 +198,163 @@
   font-size: 0.95rem;
 }
 
-.account-settings-panel__label {
+.account-settings__avatar-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0);
+  opacity: 0;
+  transition:
+    background 150ms ease,
+    opacity 150ms ease;
+}
+
+.account-settings__avatar-action:hover .account-settings__avatar-overlay,
+.account-settings__avatar-action:focus-within .account-settings__avatar-overlay {
+  background: rgba(0, 0, 0, 0.42);
+  opacity: 1;
+}
+
+.account-settings__avatar-edit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #1f1f1f;
+}
+
+.account-settings__avatar-edit svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+.account-settings__identity {
+  min-width: 0;
+  width: 100%;
+  text-align: center;
+}
+
+.account-settings__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: #f3f3f3;
-  font-size: 0.98rem;
+  font-size: 1rem;
   font-weight: 600;
 }
 
-.account-settings-panel__upload {
+.account-settings__username {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #a9a9a9;
+  font-size: 0.9rem;
+}
+
+.account-settings__section {
+  display: grid;
+  gap: 12px;
+  padding: 22px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.account-settings__section-title {
+  color: #f3f3f3;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.account-settings__field-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.account-settings__field {
+  display: grid;
+  gap: 6px;
+  color: #b7b7b7;
+  font-size: 0.84rem;
+}
+
+.account-settings__field input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 40px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.22);
+  color: #f3f3f3;
+  font: inherit;
+  font-size: 0.92rem;
+  outline: none;
+  padding: 0 12px;
+}
+
+.account-settings__field input:focus {
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.account-settings__button {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  min-height: 40px;
-  padding: 0 14px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: transparent;
+  justify-content: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 42px;
+  border: 0;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.055);
   color: #f1f1f1;
   cursor: pointer;
-  font-size: 0.9rem;
+  font: inherit;
+  font-size: 0.92rem;
+}
+
+.account-settings__button:hover {
+  background: rgba(255, 255, 255, 0.085);
+}
+
+.account-settings__button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.account-settings__button svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.account-settings__button--primary {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: transparent;
   font-weight: 500;
 }
 
-.account-settings-panel__upload:hover {
+.account-settings__button--primary:hover {
   background: rgba(255, 255, 255, 0.05);
 }
 
-.account-settings-panel__upload-icon {
-  width: 16px;
-  height: 16px;
+.account-settings__session-actions {
+  display: grid;
+  gap: 10px;
 }
 
-.account-settings-panel__upload-icon svg {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-
-.account-settings-panel__error {
-  width: 100%;
+.account-settings__error {
+  box-sizing: border-box;
   padding: 10px 12px;
   border-radius: 14px;
-  background: rgba(120, 28, 28, 0.24);
-  color: #ffd2d2;
   font-size: 0.88rem;
   line-height: 1.45;
+  background: rgba(120, 28, 28, 0.24);
+  color: #ffd2d2;
 }
 
 .account-admin-panel {
@@ -366,5 +500,21 @@
 
   .account-admin-panel {
     grid-template-columns: 1fr;
+  }
+
+  .account-settings__profile-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-height: 760px) {
+  .account-modal--settings {
+    max-height: calc(100vh - 48px);
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+
+  .account-modal--settings::-webkit-scrollbar {
+    display: none;
   }
 }

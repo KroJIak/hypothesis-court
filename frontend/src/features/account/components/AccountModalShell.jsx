@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { X } from "lucide-react";
 
 export function AccountModalShell({
@@ -6,6 +7,18 @@ export function AccountModalShell({
   className = "",
   onClose,
 }) {
+  useEffect(() => {
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
   return (
     <div className="account-modal-backdrop" role="presentation" onClick={onClose}>
       <div

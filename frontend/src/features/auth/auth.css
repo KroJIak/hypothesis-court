@@ -13,6 +13,7 @@
 .auth-shell--loading {
   grid-template-columns: 1fr;
   place-items: center;
+  background: #050505;
 }
 
 .auth-ambient {
@@ -60,8 +61,7 @@
   gap: 12px;
 }
 
-.auth-brand__mark,
-.auth-bootstrap__mark {
+.auth-brand__mark {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -75,14 +75,7 @@
   height: 54px;
 }
 
-.auth-bootstrap__mark {
-  border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  background: rgba(255, 255, 255, 0.03);
-}
-
 .auth-brand__mark svg,
-.auth-bootstrap__mark svg,
 .auth-field__icon svg,
 .auth-submit__icon svg {
   width: 100%;
@@ -248,21 +241,6 @@
 
 .auth-spinner {
   animation: auth-spin 0.9s linear infinite;
-}
-
-.auth-bootstrap {
-  display: inline-flex;
-  align-items: center;
-  gap: 16px;
-  padding: 18px 22px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 24px;
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.auth-bootstrap__text {
-  color: #d8d8d8;
-  font-size: 0.98rem;
 }
 
 @keyframes auth-spin {

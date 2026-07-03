@@ -17,7 +17,7 @@ export function AccountMenuView({
       <div className="account-popover__header">
         <AccountAvatar
           user={user}
-          avatarDataUrl={profile?.avatarDataUrl ?? null}
+          avatarUrl={profile?.avatarUrl ?? null}
           className="account-popover__avatar"
           fallbackClassName="account-avatar__fallback--menu"
         />

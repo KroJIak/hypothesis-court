@@ -15,7 +15,10 @@ export function SidebarAccountControl({
   profile,
   isSidebarCollapsed,
   onLogout,
-  onUpdateProfile,
+  onLogoutAll,
+  onUpdateCurrentUserProfile,
+  onUploadAvatar,
+  onChangePassword,
 }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeView, setActiveView] = useState(null);
@@ -32,11 +35,10 @@ export function SidebarAccountControl({
       }
 
       setIsMenuOpen(false);
-      setActiveView(null);
       setErrorMessage("");
     }
 
-    if (!isMenuOpen && !activeView) {
+    if (!isMenuOpen || activeView) {
       return undefined;
     }
 
@@ -110,12 +112,11 @@ export function SidebarAccountControl({
     }
 
     try {
-      const avatarDataUrl = await readFileAsDataUrl(file);
-      onUpdateProfile({ avatarDataUrl });
+      await onUploadAvatar(file);
       setErrorMessage("");
       event.target.value = "";
-    } catch {
-      setErrorMessage("Не удалось загрузить изображение.");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Не удалось загрузить изображение.");
       event.target.value = "";
     }
   }
@@ -146,7 +147,11 @@ export function SidebarAccountControl({
         <AccountSettingsView
           errorMessage={errorMessage}
           onClose={handleCloseModal}
+          onLogout={onLogout}
+          onLogoutAll={onLogoutAll}
           onFileChange={handleFileChange}
+          onUpdateCurrentUserProfile={onUpdateCurrentUserProfile}
+          onChangePassword={onChangePassword}
           profile={profile}
           user={user}
         />
@@ -166,7 +171,7 @@ export function SidebarAccountControl({
       >
         <AccountAvatar
           user={user}
-          avatarDataUrl={profile?.avatarDataUrl ?? null}
+          avatarUrl={profile?.avatarUrl ?? null}
           className="account-button__avatar"
         />
         <span className="account-button__content">
@@ -176,14 +181,4 @@ export function SidebarAccountControl({
       </button>
     </>
   );
-}
-
-function readFileAsDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
 }

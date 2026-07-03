@@ -15,6 +15,7 @@ class UserResponse(BaseModel):
     is_superadmin: bool
     first_name: str | None
     last_name: str | None
+    avatar_url: str | None
     status: UserStatus
     created_at: datetime
     updated_at: datetime

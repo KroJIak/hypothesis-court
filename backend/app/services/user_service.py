@@ -2,6 +2,7 @@ import uuid
 from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
+from fastapi import UploadFile
 
 from app.models.audit_event import AuditEvent
 from app.models.enums import AuditEventType, RefreshRevokeReason, UserStatus
@@ -10,6 +11,7 @@ from app.repositories.audit_repository import AuditRepository
 from app.repositories.auth_refresh_session_repository import AuthRefreshSessionRepository
 from app.repositories.user_repository import UserRepository
 from app.security.passwords import hash_password, verify_password
+from app.services.avatar_storage import AvatarStorage
 from app.services.exceptions import AuthorizationError, ConflictError, NotFoundError, ValidationError
 from app.services.validators import normalize_optional_name, normalize_username, validate_password
 
@@ -26,6 +28,28 @@ class UserService:
         self._users = user_repository
         self._refresh_sessions = refresh_session_repository
         self._audit = audit_repository
+
+    async def update_avatar(self, *, user: User, file: UploadFile, avatar_storage: AvatarStorage) -> User:
+        previous_object_key = user.avatar_object_key
+        next_object_key = await avatar_storage.save(file)
+        try:
+            user.avatar_object_key = next_object_key
+            self._audit.create(
+                self._session,
+                AuditEvent(
+                    actor_user_id=user.id,
+                    target_user_id=user.id,
+                    event_type=AuditEventType.USER_UPDATED,
+                    payload={"avatar_updated": True},
+                ),
+            )
+            self._session.commit()
+            avatar_storage.delete(previous_object_key)
+            return user
+        except Exception:
+            self._session.rollback()
+            avatar_storage.delete(next_object_key)
+            raise
 
     def list_users(
         self,

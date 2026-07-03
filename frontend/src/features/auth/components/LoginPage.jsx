@@ -105,14 +105,5 @@ export function LoginPage({ errorMessage, isSubmitting, onLogin }) {
 }
 
 export function AuthBootstrapScreen() {
-  return (
-    <main className="auth-shell auth-shell--loading">
-      <div className="auth-bootstrap">
-        <span className="auth-bootstrap__mark">
-          <Scale aria-hidden="true" strokeWidth={2.05} />
-        </span>
-        <span className="auth-bootstrap__text">Проверяем активную сессию…</span>
-      </div>
-    </main>
-  );
+  return <main className="auth-shell auth-shell--loading" aria-label="Проверка сессии" />;
 }

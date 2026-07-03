@@ -59,6 +59,7 @@ class Settings:
     superadmin_password: str
     superadmin_first_name: str | None
     superadmin_last_name: str | None
+    avatar_upload_max_bytes: int = 5 * 1024 * 1024
 
     @property
     def database_url(self) -> str:
@@ -67,6 +68,10 @@ class Settings:
             f"{self.postgres_user}:{self.postgres_password}"
             f"@postgres:5432/{self.postgres_db}"
         )
+
+    @property
+    def uploads_dir(self) -> Path:
+        return Path(__file__).resolve().parents[2] / "storage" / "uploads"
 
 
 @lru_cache(maxsize=1)

@@ -33,7 +33,10 @@ export function WorkspacePage({
   currentUser,
   accountProfile,
   onLogout,
-  onUpdateAccountProfile,
+  onLogoutAll,
+  onUpdateCurrentUserProfile,
+  onUploadAvatar,
+  onChangePassword,
 }) {
   const { status, data } = useWorkspaceScene();
   const [selectedChatId, setSelectedChatId] = useState(null);
@@ -270,7 +273,10 @@ export function WorkspacePage({
         isCollapsed={isSidebarCollapsed}
         isNewChatDisabled={Boolean(pendingDraftSession)}
         onLogout={onLogout}
-        onUpdateAccountProfile={onUpdateAccountProfile}
+        onLogoutAll={onLogoutAll}
+        onUpdateCurrentUserProfile={onUpdateCurrentUserProfile}
+        onUploadAvatar={onUploadAvatar}
+        onChangePassword={onChangePassword}
         onSelectChat={handleSelectChat}
         onCreateChat={handleCreateChat}
         onToggleSidebar={handleToggleSidebar}

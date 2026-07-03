@@ -37,3 +37,4 @@ pnpm-debug.log*
 *.log
 tmp/
 temp/
+/backend/storage/

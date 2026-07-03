@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react";
 
+import { changeOwnPassword } from "../../account/api/changeOwnPassword";
+import { updateOwnProfile } from "../../account/api/updateOwnProfile";
+import { uploadOwnAvatar } from "../../account/api/uploadOwnAvatar";
+import { buildAccountProfile } from "../../account/utils/accountProfile";
 import { login } from "../api/login";
 import { logout } from "../api/logout";
+import { logoutAll } from "../api/logoutAll";
 import { readCurrentUser } from "../api/readCurrentUser";
 import {
   clearStoredAuthSession,
@@ -15,13 +20,6 @@ const initialState = {
   errorMessage: "",
   isSubmitting: false,
 };
-
-function ensureProfile(profile) {
-  return {
-    avatarDataUrl:
-      typeof profile?.avatarDataUrl === "string" ? profile.avatarDataUrl : null,
-  };
-}
 
 export function useAuthSession() {
   const [state, setState] = useState(initialState);
@@ -42,24 +40,30 @@ export function useAuthSession() {
 
     readCurrentUser(storedSession.accessToken, controller.signal)
       .then((user) => {
+        const profile = buildAccountProfile(user);
+
         writeStoredAuthSession({
           ...storedSession,
-          profile: ensureProfile(storedSession.profile),
           user,
+          profile,
         });
 
         setState({
           status: "authenticated",
           session: {
             ...storedSession,
-            profile: ensureProfile(storedSession.profile),
             user,
+            profile,
           },
           errorMessage: "",
           isSubmitting: false,
         });
       })
-      .catch(() => {
+      .catch((error) => {
+        if (error?.name === "AbortError") {
+          return;
+        }
+
         clearStoredAuthSession();
         setState({
           status: "guest",
@@ -85,7 +89,7 @@ export function useAuthSession() {
         accessToken: authResponse.access_token,
         refreshToken: authResponse.refresh_token,
         user: authResponse.user,
-        profile: ensureProfile(null),
+        profile: buildAccountProfile(authResponse.user),
       };
 
       writeStoredAuthSession(nextSession);
@@ -127,7 +131,37 @@ export function useAuthSession() {
     });
   }
 
-  function updateProfile(patch) {
+  async function signOutAll() {
+    const accessToken = state.session?.accessToken;
+
+    try {
+      if (accessToken) {
+        await logoutAll(accessToken);
+      }
+    } finally {
+      clearStoredAuthSession();
+      setState({
+        status: "guest",
+        session: null,
+        errorMessage: "",
+        isSubmitting: false,
+      });
+    }
+  }
+
+  async function updateCurrentUserProfile({ firstName, lastName }) {
+    const accessToken = state.session?.accessToken;
+
+    if (!accessToken) {
+      throw new Error("Сессия истекла. Войдите заново.");
+    }
+
+    const user = await updateOwnProfile({
+      accessToken,
+      firstName,
+      lastName,
+    });
+
     setState((currentState) => {
       if (!currentState.session) {
         return currentState;
@@ -135,10 +169,8 @@ export function useAuthSession() {
 
       const nextSession = {
         ...currentState.session,
-        profile: {
-          ...ensureProfile(currentState.session.profile),
-          ...patch,
-        },
+        user,
+        profile: buildAccountProfile(user),
       };
 
       writeStoredAuthSession(nextSession);
@@ -148,6 +180,65 @@ export function useAuthSession() {
         session: nextSession,
       };
     });
+
+    return user;
+  }
+
+  async function changePassword(payload) {
+    const accessToken = state.session?.accessToken;
+
+    if (!accessToken) {
+      throw new Error("Сессия истекла. Войдите заново.");
+    }
+
+    await changeOwnPassword({
+      accessToken,
+      oldPassword: payload.oldPassword,
+      newPassword: payload.newPassword,
+      newPasswordRepeat: payload.newPasswordRepeat,
+    });
+
+    clearStoredAuthSession();
+    setState({
+      status: "guest",
+      session: null,
+      errorMessage: "",
+      isSubmitting: false,
+    });
+  }
+
+  async function uploadAvatar(file) {
+    const accessToken = state.session?.accessToken;
+
+    if (!accessToken) {
+      throw new Error("Сессия истекла. Войдите заново.");
+    }
+
+    const user = await uploadOwnAvatar({
+      accessToken,
+      file,
+    });
+
+    setState((currentState) => {
+      if (!currentState.session) {
+        return currentState;
+      }
+
+      const nextSession = {
+        ...currentState.session,
+        user,
+        profile: buildAccountProfile(user),
+      };
+
+      writeStoredAuthSession(nextSession);
+
+      return {
+        ...currentState,
+        session: nextSession,
+      };
+    });
+
+    return user;
   }
 
   return {
@@ -157,6 +248,9 @@ export function useAuthSession() {
     isSubmitting: state.isSubmitting,
     authenticate,
     signOut,
-    updateProfile,
+    signOutAll,
+    updateCurrentUserProfile,
+    changePassword,
+    uploadAvatar,
   };
 }

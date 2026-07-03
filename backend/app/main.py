@@ -8,6 +8,7 @@ from fastapi.openapi.docs import (
 )
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import auth_router, health_router, users_router
 from app.core.middleware import ForwardedPrefixMiddleware
@@ -16,6 +17,7 @@ from app.core.settings import get_settings
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    settings.uploads_dir.mkdir(parents=True, exist_ok=True)
     app = FastAPI(
         title="Hypothesis Court API",
         version="0.1.0",
@@ -34,6 +36,7 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(auth_router)
     app.include_router(users_router)
+    app.mount("/uploads", StaticFiles(directory=settings.uploads_dir), name="uploads")
     register_documentation_routes(app)
     return app
 

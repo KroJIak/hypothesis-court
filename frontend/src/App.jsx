@@ -10,7 +10,10 @@ export default function App() {
     isSubmitting,
     authenticate,
     signOut,
-    updateProfile,
+    signOutAll,
+    updateCurrentUserProfile,
+    changePassword,
+    uploadAvatar,
   } = useAuthSession();
 
   if (status === "loading") {
@@ -32,7 +35,10 @@ export default function App() {
       currentUser={session.user}
       accountProfile={session.profile}
       onLogout={signOut}
-      onUpdateAccountProfile={updateProfile}
+      onLogoutAll={signOutAll}
+      onUpdateCurrentUserProfile={updateCurrentUserProfile}
+      onUploadAvatar={uploadAvatar}
+      onChangePassword={changePassword}
     />
   );
 }

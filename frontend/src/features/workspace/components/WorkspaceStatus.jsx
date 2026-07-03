@@ -1,12 +1,5 @@
 export function WorkspaceSkeleton() {
-  return (
-    <main className="workspace-status">
-      <div className="workspace-status__card">
-        <span className="workspace-status__title">Hypothesis Court</span>
-        <p className="workspace-status__text">Собираем сцену из mock-данных...</p>
-      </div>
-    </main>
-  );
+  return <main className="workspace-status workspace-status--blank" aria-label="Загрузка рабочей области" />;
 }
 
 export function WorkspaceError() {

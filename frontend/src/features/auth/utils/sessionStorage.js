@@ -23,20 +23,8 @@ export function readStoredAuthSession() {
       return null;
     }
 
-    const profile = typeof payload?.profile === "object" && payload.profile !== null
-      ? {
-          avatarDataUrl:
-            typeof payload.profile.avatarDataUrl === "string"
-              ? payload.profile.avatarDataUrl
-              : null,
-        }
-      : {
-          avatarDataUrl: null,
-        };
-
     return {
       ...payload,
-      profile,
     };
   } catch {
     return null;

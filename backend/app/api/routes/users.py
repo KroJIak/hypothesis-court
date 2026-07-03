@@ -1,9 +1,10 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.api.deps.auth import CurrentPrincipal, get_current_admin, get_current_user
+from app.core.settings import Settings, get_settings
 from app.db.session import get_db_session
 from app.models.enums import UserStatus
 from app.repositories.audit_repository import AuditRepository
@@ -20,6 +21,7 @@ from app.schemas.user import (
     UserUpdateRequest,
 )
 from app.services.exceptions import ServiceError
+from app.services.avatar_storage import AvatarStorage
 from app.services.user_service import UserService
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -51,6 +53,29 @@ def update_profile(
             user=current_user,
             first_name=payload.first_name,
             last_name=payload.last_name,
+        )
+    except ServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    return UserResponse.model_validate(updated)
+
+
+@router.post("/me/avatar", response_model=UserResponse)
+async def update_avatar(
+    file: UploadFile = File(...),
+    current_user=Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> UserResponse:
+    service = _get_user_service(session)
+    avatar_storage = AvatarStorage(
+        uploads_dir=settings.uploads_dir,
+        max_bytes=settings.avatar_upload_max_bytes,
+    )
+    try:
+        updated = await service.update_avatar(
+            user=current_user,
+            file=file,
+            avatar_storage=avatar_storage,
         )
     except ServiceError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc

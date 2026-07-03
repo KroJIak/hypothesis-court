@@ -21,7 +21,10 @@ export function Sidebar({
   isCollapsed,
   isNewChatDisabled,
   onLogout,
-  onUpdateAccountProfile,
+  onLogoutAll,
+  onUpdateCurrentUserProfile,
+  onUploadAvatar,
+  onChangePassword,
   onSelectChat,
   onCreateChat,
   onToggleSidebar,
@@ -141,7 +144,10 @@ export function Sidebar({
         profile={accountProfile}
         isSidebarCollapsed={isCollapsed}
         onLogout={onLogout}
-        onUpdateProfile={onUpdateAccountProfile}
+        onLogoutAll={onLogoutAll}
+        onUpdateCurrentUserProfile={onUpdateCurrentUserProfile}
+        onUploadAvatar={onUploadAvatar}
+        onChangePassword={onChangePassword}
       />
     </aside>
   );

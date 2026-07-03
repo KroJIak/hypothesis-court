@@ -24,6 +24,10 @@ class User(Base):
             "last_name is null or (btrim(last_name) = last_name and char_length(last_name) > 0)",
             name="last_name_trimmed",
         ),
+        CheckConstraint(
+            "avatar_object_key is null or char_length(btrim(avatar_object_key)) > 0",
+            name="avatar_object_key_not_blank",
+        ),
         CheckConstraint("token_version >= 1", name="token_version_positive"),
         CheckConstraint("(not is_superadmin) or is_admin", name="superadmin_implies_admin"),
         CheckConstraint(
@@ -49,6 +53,7 @@ class User(Base):
     )
     first_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     last_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    avatar_object_key: Mapped[str | None] = mapped_column(String(255), nullable=True)
     status: Mapped[UserStatus] = mapped_column(
         Enum(UserStatus, name="user_status", values_callable=ENUM_VALUES),
         nullable=False,
@@ -83,3 +88,9 @@ class User(Base):
         onupdate=func.now(),
     )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    @property
+    def avatar_url(self) -> str | None:
+        if self.avatar_object_key is None:
+            return None
+        return f"/uploads/{self.avatar_object_key}"
