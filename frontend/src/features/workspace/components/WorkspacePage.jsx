@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { AgentPalette } from "./AgentPalette";
 import { Composer } from "./Composer";
+import { RequestSummaryRail } from "./RequestSummaryRail";
 import { Sidebar } from "./Sidebar";
 import { WorkspaceScene } from "./WorkspaceScene";
 import { WorkspaceError, WorkspaceSkeleton } from "./WorkspaceStatus";
@@ -223,6 +224,7 @@ export function WorkspacePage() {
       isPendingDraft: false,
       title: nextTitle,
       query: nextQuery,
+      launchedRequests: composerRequests,
       composerRequests: [],
     }));
 
@@ -250,7 +252,11 @@ export function WorkspacePage() {
       />
 
       <section className="workspace-main">
-        <div className="workspace-main__question">{selectedSession.query}</div>
+        {(selectedSession.launchedRequests ?? []).length > 0 ? (
+          <RequestSummaryRail requests={selectedSession.launchedRequests ?? []} />
+        ) : (
+          <div className="workspace-main__question">{selectedSession.query}</div>
+        )}
 
         <div className="workspace-main__scene">
           <WorkspaceScene
