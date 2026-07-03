@@ -529,12 +529,18 @@
 }
 
 .hypothesis-candidates {
+  --hypothesis-agent-size: 44px;
+  --hypothesis-gap: 10px;
+  --hypothesis-card-gap: 8px;
+  --hypothesis-card-width: calc(
+    (var(--workspace-answer-column-width) - var(--hypothesis-agent-size) - var(--hypothesis-gap) - (2 * var(--hypothesis-card-gap))) / 3
+  );
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr);
-  align-items: stretch;
-  gap: 10px;
+  grid-template-columns: var(--hypothesis-agent-size) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--hypothesis-gap);
   width: var(--workspace-answer-column-width);
   margin: 4px auto 10px;
 }
@@ -556,13 +562,20 @@
 }
 
 .hypothesis-candidates__list {
-  display: grid;
-  grid-template-columns: repeat(var(--hypothesis-count), minmax(0, 1fr));
-  gap: 8px;
+  display: flex;
+  gap: var(--hypothesis-card-gap);
   min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: none;
+}
+
+.hypothesis-candidates__list::-webkit-scrollbar {
+  display: none;
 }
 
 .hypothesis-card {
+  flex: 0 0 var(--hypothesis-card-width);
   min-width: 0;
   border-radius: 15px;
   background: rgba(255, 255, 255, 0.045);

@@ -2,6 +2,7 @@ import { Plus } from "lucide-react";
 
 import { AgentAvatar } from "./AgentAvatar";
 import { sortAvailableAgents } from "../model/workspaceSessionModel";
+import { readAgentDragPayload } from "../utils/dragPayload";
 import { getAgentViewTransitionName } from "../utils/layoutTransition";
 
 export function AgentPalette({
@@ -10,6 +11,7 @@ export function AgentPalette({
   onAgentDragStart,
   onAgentDragEnd,
   onDropAgentToPalette,
+  onReorderPaletteAgent,
   isDropTargetVisible,
   isAddAgentDisabled,
   onAddAgent,
@@ -19,6 +21,31 @@ export function AgentPalette({
   function handleDragOver(event) {
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
+  }
+
+  function handlePaletteItemDragOver(event, agent) {
+    if (agent.isEmpty) {
+      return;
+    }
+
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+  }
+
+  function handlePaletteItemDrop(event, targetAgent) {
+    const payload = readAgentDragPayload(event);
+
+    if (payload?.source !== "palette" || targetAgent.isEmpty) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const itemRect = event.currentTarget.getBoundingClientRect();
+    const placement = event.clientY > itemRect.top + itemRect.height / 2 ? "after" : "before";
+
+    onReorderPaletteAgent(payload.agentId, targetAgent.id, placement);
   }
 
   return (
@@ -43,11 +70,17 @@ export function AgentPalette({
         {sortedAgents.map((agent) => (
           <div
             key={agent.id}
-            className="palette-list__item palette-list__item--draggable"
+            className={
+              agent.isEmpty
+                ? "palette-list__item"
+                : "palette-list__item palette-list__item--draggable"
+            }
             style={{ viewTransitionName: getAgentViewTransitionName(agent.id) }}
-            draggable
+            draggable={!agent.isEmpty}
             onDragStart={(event) => onAgentDragStart(event, "palette", agent.id)}
             onDragEnd={onAgentDragEnd}
+            onDragOver={(event) => handlePaletteItemDragOver(event, agent)}
+            onDrop={(event) => handlePaletteItemDrop(event, agent)}
           >
             <AgentAvatar variant={agent.variant} size="regular" />
             <span className="palette-list__label">{agent.name}</span>

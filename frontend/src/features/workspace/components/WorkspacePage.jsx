@@ -22,6 +22,7 @@ import {
   getInitialAvailableAgents,
   hasPendingAgent,
   insertEvaluationAgentAtEdge,
+  reorderAvailableAgents,
   sortAvailableAgents,
 } from "../model/workspaceSessionModel";
 import { readAgentDragPayload } from "../utils/dragPayload";
@@ -197,6 +198,19 @@ export function WorkspacePage() {
     handleMoveAgentToPalette(payload.agentId);
   }
 
+  function handleReorderPaletteAgent(agentId, targetAgentId, placement) {
+    runLayoutTransition(() => {
+      updateSelectedSession((session) => {
+        const availableAgents = session.availableAgents ?? getInitialAvailableAgents(session, data.palette.agents);
+
+        return {
+          ...session,
+          availableAgents: reorderAvailableAgents(availableAgents, agentId, targetAgentId, placement),
+        };
+      });
+    });
+  }
+
   function handleSend({ context, text }) {
     const nextText = text.trim();
     const composerRequests = selectedSession.composerRequests ?? [];
@@ -287,6 +301,7 @@ export function WorkspacePage() {
         onAgentDragStart={handleAgentDragStart}
         onAgentDragEnd={handleAgentDragEnd}
         onDropAgentToPalette={handleDropAgentToPalette}
+        onReorderPaletteAgent={handleReorderPaletteAgent}
         isDropTargetVisible={dragSource === "evaluation"}
         isAddAgentDisabled={hasPendingAgent(selectedSession)}
         onAddAgent={handleAddAgent}

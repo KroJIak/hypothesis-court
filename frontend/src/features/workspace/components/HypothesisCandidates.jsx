@@ -11,10 +11,7 @@ export function HypothesisCandidates({ hypotheses }) {
         <BrainCircuit aria-hidden="true" strokeWidth={1.75} />
       </div>
 
-      <div
-        className="hypothesis-candidates__list"
-        style={{ "--hypothesis-count": hypotheses.length }}
-      >
+      <div className="hypothesis-candidates__list">
         {hypotheses.map((hypothesis) => (
           <article key={hypothesis.id} className="hypothesis-card">
             <h2 className="hypothesis-card__title">{hypothesis.title}</h2>
