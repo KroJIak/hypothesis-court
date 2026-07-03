@@ -29,7 +29,12 @@ import { readAgentDragPayload } from "../utils/dragPayload";
 import { runLayoutTransition } from "../utils/layoutTransition";
 import "../workspace.css";
 
-export function WorkspacePage() {
+export function WorkspacePage({
+  currentUser,
+  accountProfile,
+  onLogout,
+  onUpdateAccountProfile,
+}) {
   const { status, data } = useWorkspaceScene();
   const [selectedChatId, setSelectedChatId] = useState(null);
   const [draftMessage, setDraftMessage] = useState("");
@@ -258,10 +263,14 @@ export function WorkspacePage() {
     <main className={`workspace${isSidebarCollapsed ? " workspace--sidebar-collapsed" : ""}`}>
       <Sidebar
         shell={data.shell}
+        currentUser={currentUser}
+        accountProfile={accountProfile}
         sessions={sessions}
         selectedChatId={selectedSession.id}
         isCollapsed={isSidebarCollapsed}
         isNewChatDisabled={Boolean(pendingDraftSession)}
+        onLogout={onLogout}
+        onUpdateAccountProfile={onUpdateAccountProfile}
         onSelectChat={handleSelectChat}
         onCreateChat={handleCreateChat}
         onToggleSidebar={handleToggleSidebar}

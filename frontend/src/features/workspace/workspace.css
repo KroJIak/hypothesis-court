@@ -389,29 +389,14 @@
   display: block;
 }
 
-.workspace-sidebar--collapsed .account-button {
-  width: 36px;
-  height: 36px;
-}
-
 .account-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  width: 40px;
-  height: 40px;
   margin-top: 14px;
   border: 0;
-  border-radius: 999px;
-  background: #262626;
-  color: #ececec;
   cursor: pointer;
-}
-
-.account-button svg {
-  width: 22px;
-  height: 22px;
 }
 
 .workspace-main {
