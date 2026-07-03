@@ -9,8 +9,11 @@ tags:
 
 ## Домены системы
 
+- `nginx gateway`
+- `identity and access`
 - `frontend workspace`
 - `backend api`
+- `db-init`
 - `research orchestrator`
 - `document pipeline`
 - `retrieval and evidence layer`
@@ -24,11 +27,15 @@ tags:
 
 ```mermaid
 flowchart TD
-    U[User] --> FE[Frontend workspace]
-    FE --> API[FastAPI backend]
+    U[User] --> N[nginx gateway]
+    N --> FE[Frontend workspace]
+    N --> API[FastAPI backend]
+    API --> IAM[Identity and access]
     API --> ORCH[Research orchestrator]
     API --> DB[(PostgreSQL)]
     API --> STORE[(Document storage)]
+    DBI[db-init] --> DB
+    DBI --> API
     ORCH --> DOC[Document pipeline]
     ORCH --> RET[Retrieval and evidence]
     ORCH --> HYP[Hypothesis engine]
@@ -43,6 +50,14 @@ flowchart TD
 Основная логика живёт в явном Python-оркестраторе. Агентные роли выполняются как управляемые шаги пайплайна с заданными prompt- и schema-контрактами. Количество стартовых гипотез и round limit debate loop задаются через pipeline settings, а не через разрозненные prompt-хаки.
 
 ## Системные модули
+
+### Identity and access
+
+- login по `username` и `password`;
+- access и refresh tokens;
+- управление пользователями без публичной регистрации;
+- bootstrap суперпользователя из `.env`;
+- отзыв сессий и контроль `token_version`.
 
 ### Document pipeline
 
@@ -87,6 +102,8 @@ flowchart TD
 
 ```mermaid
 flowchart LR
+    A0[Superadmin env and seed packs] --> A1[db-init]
+    A1 --> A2[Users and auth tables]
     A[Source documents] --> B[Chunks and metadata]
     B --> C[Evidence items]
     C --> D[Initial hypothesis set]
@@ -99,4 +116,6 @@ flowchart LR
 
 - [[01-System-Overview]]
 - [[03-Backend]]
+- [[backend/02-Authentication-and-Tokens]]
+- [[database/01-Identity-and-Auth-Schema]]
 - [[05-Data-and-Retrieval]]

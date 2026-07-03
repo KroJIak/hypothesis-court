@@ -38,15 +38,27 @@ docs/
 │   ├── 01-System-Overview.md
 │   ├── 02-System-Architecture.md
 │   ├── 03-Backend.md
+│   ├── backend/
+│   │   ├── 00-INDEX.md
+│   │   ├── 01-Backend-Overview.md
+│   │   ├── 02-Authentication-and-Tokens.md
+│   │   ├── 03-Users-and-Admin.md
+│   │   └── 04-Db-Init-and-Seeds.md
+│   ├── database/
+│   │   ├── 00-INDEX.md
+│   │   ├── 01-Identity-and-Auth-Schema.md
+│   │   └── 02-Constraints-Indexes-and-Checks.md
 │   ├── 04-Frontend.md
 │   ├── 05-Data-and-Retrieval.md
 │   └── 06-Infrastructure.md
+├── internal/
+│   └── Tailings-Example/
 └── sources/
     ├── 00-INDEX.md
     └── Organizer-Materials/
         ├── 00-INDEX.md
         ├── Hypothesis-Factory/
-        └── Task-01/
+        └── Yandex-AI-Studio-API-Access.md
 ```
 
 ## Документационные слои
@@ -63,6 +75,8 @@ docs/
 - [[product/03-Hypothesis-Pipeline|Пайплайн гипотез]]
 - [[product/04-Agents-and-Judge|Агентная схема и судья]]
 - [[architecture/01-System-Overview|Системный обзор]]
+- [[architecture/backend/02-Authentication-and-Tokens|Аутентификация и токены]]
+- [[architecture/database/01-Identity-and-Auth-Schema|Схема identity и auth]]
 - [[architecture/05-Data-and-Retrieval|Данные, retrieval и evidence layer]]
 
 ## Навигационный принцип
