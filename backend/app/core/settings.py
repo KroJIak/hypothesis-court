@@ -71,6 +71,12 @@ class Settings:
     superadmin_last_name: str | None
     chat_max_pinned_sessions: int
     session_max_files: int
+    model_provider_base_url: str
+    model_provider_api_key: str | None
+    model_provider_model: str
+    embedding_base_url: str
+    embedding_api_key: str | None
+    embedding_model: str
     avatar_upload_max_bytes: int = 5 * 1024 * 1024
 
     @property
@@ -115,4 +121,10 @@ def get_settings() -> Settings:
             _get_env("SESSION_MAX_FILES", "100"),
             "SESSION_MAX_FILES",
         ),
+        model_provider_base_url=_get_env("MODEL_PROVIDER_BASE_URL"),
+        model_provider_api_key=os.getenv("MODEL_PROVIDER_API_KEY") or None,
+        model_provider_model=_get_env("MODEL_PROVIDER_MODEL"),
+        embedding_base_url=_get_env("EMBEDDING_BASE_URL", "https://api.openai.com/v1"),
+        embedding_api_key=os.getenv("EMBEDDING_API_KEY") or None,
+        embedding_model=_get_env("EMBEDDING_MODEL", "text-embedding-3-large"),
     )
