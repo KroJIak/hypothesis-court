@@ -1,12 +1,12 @@
 import {
+  Ban,
   BookOpenText,
-  Fence,
   FileText,
   Target,
 } from "lucide-react";
 
 const requestIconByContextValue = {
-  constraints: Fence,
+  constraints: Ban,
   context: BookOpenText,
   kpi: Target,
 };

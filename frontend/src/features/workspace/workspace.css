@@ -825,12 +825,12 @@
 }
 
 .evaluation-stage__empty {
-  grid-column: 3;
-  justify-self: start;
+  grid-column: 1 / -1;
+  justify-self: center;
   min-width: 205px;
   border-radius: 15px;
   background: rgba(255, 255, 255, 0.05);
-  color: #cfcfcf;
+  color: rgba(207, 207, 207, 0.62);
   padding: 15px 18px;
   text-align: center;
 }
