@@ -3,7 +3,15 @@ import { useAuthSession } from "./features/auth/hooks/useAuthSession";
 import { WorkspacePage } from "./features/workspace/components/WorkspacePage";
 
 export default function App() {
-  const { status, errorMessage, isSubmitting, authenticate } = useAuthSession();
+  const {
+    status,
+    session,
+    errorMessage,
+    isSubmitting,
+    authenticate,
+    signOut,
+    updateProfile,
+  } = useAuthSession();
 
   if (status === "loading") {
     return <AuthBootstrapScreen />;
@@ -19,5 +27,12 @@ export default function App() {
     );
   }
 
-  return <WorkspacePage />;
+  return (
+    <WorkspacePage
+      currentUser={session.user}
+      accountProfile={session.profile}
+      onLogout={signOut}
+      onUpdateAccountProfile={updateProfile}
+    />
+  );
 }

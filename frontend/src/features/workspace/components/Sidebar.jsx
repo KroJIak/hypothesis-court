@@ -1,6 +1,5 @@
 import { useState } from "react";
 import {
-  CircleUserRound,
   MessageSquare,
   PanelLeftClose,
   PanelLeftOpen,
@@ -9,15 +8,20 @@ import {
   Search,
 } from "lucide-react";
 
+import { SidebarAccountControl } from "../../account/components/SidebarAccountControl";
 import { COLLAPSED_RECENT_CHAT_LIMIT } from "../constants";
 import { matchesChatSearch } from "../model/workspaceSessionModel";
 
 export function Sidebar({
   shell,
+  currentUser,
+  accountProfile,
   sessions,
   selectedChatId,
   isCollapsed,
   isNewChatDisabled,
+  onLogout,
+  onUpdateAccountProfile,
   onSelectChat,
   onCreateChat,
   onToggleSidebar,
@@ -132,9 +136,13 @@ export function Sidebar({
         </div>
       )}
 
-      <button type="button" className="account-button" aria-label={shell.user.name}>
-        <CircleUserRound aria-hidden="true" strokeWidth={1.9} />
-      </button>
+      <SidebarAccountControl
+        user={currentUser}
+        profile={accountProfile}
+        isSidebarCollapsed={isCollapsed}
+        onLogout={onLogout}
+        onUpdateProfile={onUpdateAccountProfile}
+      />
     </aside>
   );
 }

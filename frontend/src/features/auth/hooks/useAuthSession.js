@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { login } from "../api/login";
+import { logout } from "../api/logout";
 import { readCurrentUser } from "../api/readCurrentUser";
 import {
   clearStoredAuthSession,
@@ -14,6 +15,13 @@ const initialState = {
   errorMessage: "",
   isSubmitting: false,
 };
+
+function ensureProfile(profile) {
+  return {
+    avatarDataUrl:
+      typeof profile?.avatarDataUrl === "string" ? profile.avatarDataUrl : null,
+  };
+}
 
 export function useAuthSession() {
   const [state, setState] = useState(initialState);
@@ -36,6 +44,7 @@ export function useAuthSession() {
       .then((user) => {
         writeStoredAuthSession({
           ...storedSession,
+          profile: ensureProfile(storedSession.profile),
           user,
         });
 
@@ -43,6 +52,7 @@ export function useAuthSession() {
           status: "authenticated",
           session: {
             ...storedSession,
+            profile: ensureProfile(storedSession.profile),
             user,
           },
           errorMessage: "",
@@ -75,6 +85,7 @@ export function useAuthSession() {
         accessToken: authResponse.access_token,
         refreshToken: authResponse.refresh_token,
         user: authResponse.user,
+        profile: ensureProfile(null),
       };
 
       writeStoredAuthSession(nextSession);
@@ -96,11 +107,56 @@ export function useAuthSession() {
     }
   }
 
+  async function signOut() {
+    const accessToken = state.session?.accessToken;
+
+    try {
+      if (accessToken) {
+        await logout(accessToken);
+      }
+    } catch {
+      // Local logout should still succeed even if the network call fails.
+    }
+
+    clearStoredAuthSession();
+    setState({
+      status: "guest",
+      session: null,
+      errorMessage: "",
+      isSubmitting: false,
+    });
+  }
+
+  function updateProfile(patch) {
+    setState((currentState) => {
+      if (!currentState.session) {
+        return currentState;
+      }
+
+      const nextSession = {
+        ...currentState.session,
+        profile: {
+          ...ensureProfile(currentState.session.profile),
+          ...patch,
+        },
+      };
+
+      writeStoredAuthSession(nextSession);
+
+      return {
+        ...currentState,
+        session: nextSession,
+      };
+    });
+  }
+
   return {
     status: state.status,
     session: state.session,
     errorMessage: state.errorMessage,
     isSubmitting: state.isSubmitting,
     authenticate,
+    signOut,
+    updateProfile,
   };
 }
