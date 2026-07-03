@@ -11,6 +11,8 @@ from app.services.openai_compatible_client import OpenAICompatibleClient
 
 OPENAI_PROVIDER = "openai"
 EMBEDDING_PROVIDER = "embedding"
+OPENAI_PROVIDER_TYPE = "openai"
+YANDEX_AI_STUDIO_PROVIDER_TYPE = "yandex_ai_studio"
 
 
 class ModelProviderSettingsService:
@@ -31,6 +33,7 @@ class ModelProviderSettingsService:
             return stored_settings
         return ModelProviderSettings(
             provider=OPENAI_PROVIDER,
+            provider_type=OPENAI_PROVIDER_TYPE,
             base_url=settings.model_provider_base_url,
             model=settings.model_provider_model,
             api_token=settings.model_provider_api_key,
@@ -42,6 +45,7 @@ class ModelProviderSettingsService:
             return stored_settings
         return ModelProviderSettings(
             provider=EMBEDDING_PROVIDER,
+            provider_type=OPENAI_PROVIDER_TYPE,
             base_url=settings.embedding_base_url,
             model=settings.embedding_model,
             api_token=settings.embedding_api_key,
@@ -52,12 +56,14 @@ class ModelProviderSettingsService:
         *,
         actor: User,
         provider: str,
+        provider_type: str,
         base_url: str,
         model: str | None,
         api_token: str | None,
     ) -> ModelProviderSettings:
         try:
             self._validate_provider(provider)
+            normalized_provider_type = self._normalize_provider_type(provider_type)
             normalized_base_url = self._normalize_base_url(base_url)
             normalized_model = self._normalize_model(model)
             normalized_api_token = self._normalize_api_token(api_token)
@@ -68,6 +74,7 @@ class ModelProviderSettingsService:
                     self._session,
                     ModelProviderSettings(
                         provider=provider,
+                        provider_type=normalized_provider_type,
                         base_url=normalized_base_url,
                         model=normalized_model,
                         api_token=normalized_api_token,
@@ -76,6 +83,7 @@ class ModelProviderSettingsService:
                     ),
                 )
             else:
+                settings.provider_type = normalized_provider_type
                 settings.base_url = normalized_base_url
                 settings.model = normalized_model
                 settings.updated_by_user_id = actor.id
@@ -92,11 +100,13 @@ class ModelProviderSettingsService:
         self,
         *,
         provider: str,
+        provider_type: str,
         base_url: str,
         api_token: str | None,
         settings: Settings,
     ) -> list[str]:
         self._validate_provider(provider)
+        self._normalize_provider_type(provider_type)
         normalized_base_url = self._normalize_base_url(base_url)
         resolved_api_token = self._resolve_api_token(provider=provider, api_token=api_token, settings=settings)
         return OpenAICompatibleClient(
@@ -108,12 +118,14 @@ class ModelProviderSettingsService:
         self,
         *,
         provider: str,
+        provider_type: str,
         base_url: str,
         model: str,
         api_token: str | None,
         settings: Settings,
     ) -> list[str]:
         self._validate_provider(provider)
+        self._normalize_provider_type(provider_type)
         normalized_base_url = self._normalize_base_url(base_url)
         normalized_model = self._normalize_model(model)
         resolved_api_token = self._resolve_api_token(provider=provider, api_token=api_token, settings=settings)
@@ -127,12 +139,14 @@ class ModelProviderSettingsService:
         if provider == EMBEDDING_PROVIDER:
             return ModelProviderSettings(
                 provider=EMBEDDING_PROVIDER,
+                provider_type=OPENAI_PROVIDER_TYPE,
                 base_url=settings.embedding_base_url,
                 model=settings.embedding_model,
                 api_token=settings.embedding_api_key,
             )
         return ModelProviderSettings(
             provider=OPENAI_PROVIDER,
+            provider_type=OPENAI_PROVIDER_TYPE,
             base_url=settings.model_provider_base_url,
             model=settings.model_provider_model,
             api_token=settings.model_provider_api_key,
@@ -157,6 +171,13 @@ class ModelProviderSettingsService:
     def _validate_provider(provider: str) -> None:
         if provider not in {OPENAI_PROVIDER, EMBEDDING_PROVIDER}:
             raise ValidationError("Unknown model provider.")
+
+    @staticmethod
+    def _normalize_provider_type(provider_type: str) -> str:
+        normalized = provider_type.strip()
+        if normalized not in {OPENAI_PROVIDER_TYPE, YANDEX_AI_STUDIO_PROVIDER_TYPE}:
+            raise ValidationError("Unknown provider type.")
+        return normalized
 
     @staticmethod
     def _normalize_base_url(base_url: str) -> str:

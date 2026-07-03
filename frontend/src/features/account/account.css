@@ -417,6 +417,16 @@
   font-size: 0.84rem;
 }
 
+.account-admin-provider-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.38fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.account-admin-field--provider-type {
+  min-width: 0;
+}
+
 .account-admin-field input,
 .account-admin-field select,
 .account-admin-table input,

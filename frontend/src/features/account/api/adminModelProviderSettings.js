@@ -5,8 +5,9 @@ function getProviderUrl(provider) {
   return `${getApiBaseUrl()}/admin/model-providers/${provider}`;
 }
 
-function buildProviderBody({ baseUrl, apiToken, model }) {
+function buildProviderBody({ providerType, baseUrl, apiToken, model }) {
   const body = {
+    provider_type: providerType,
     base_url: baseUrl,
   };
 
@@ -37,8 +38,8 @@ export async function getProviderSettings({ accessToken, provider }) {
   return response.json();
 }
 
-export async function updateProviderSettings({ accessToken, provider, baseUrl, apiToken, model }) {
-  const body = buildProviderBody({ baseUrl, apiToken, model });
+export async function updateProviderSettings({ accessToken, provider, providerType, baseUrl, apiToken, model }) {
+  const body = buildProviderBody({ providerType, baseUrl, apiToken, model });
 
   const response = await fetch(getProviderUrl(provider), {
     method: "PUT",
@@ -58,7 +59,7 @@ export async function updateProviderSettings({ accessToken, provider, baseUrl, a
   return response.json();
 }
 
-export async function listProviderModels({ accessToken, provider, baseUrl, apiToken }) {
+export async function listProviderModels({ accessToken, provider, providerType, baseUrl, apiToken }) {
   const response = await fetch(`${getProviderUrl(provider)}/models`, {
     method: "POST",
     headers: {
@@ -66,7 +67,7 @@ export async function listProviderModels({ accessToken, provider, baseUrl, apiTo
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(buildProviderBody({ baseUrl, apiToken })),
+    body: JSON.stringify(buildProviderBody({ providerType, baseUrl, apiToken })),
   });
 
   if (!response.ok) {
@@ -77,7 +78,7 @@ export async function listProviderModels({ accessToken, provider, baseUrl, apiTo
   return response.json();
 }
 
-export async function testProviderConnection({ accessToken, provider, baseUrl, apiToken, model }) {
+export async function testProviderConnection({ accessToken, provider, providerType, baseUrl, apiToken, model }) {
   const response = await fetch(`${getProviderUrl(provider)}/test`, {
     method: "POST",
     headers: {
@@ -85,7 +86,7 @@ export async function testProviderConnection({ accessToken, provider, baseUrl, a
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(buildProviderBody({ baseUrl, apiToken, model })),
+    body: JSON.stringify(buildProviderBody({ providerType, baseUrl, apiToken, model })),
   });
 
   if (!response.ok) {

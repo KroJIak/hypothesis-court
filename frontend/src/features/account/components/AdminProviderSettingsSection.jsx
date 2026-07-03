@@ -8,6 +8,11 @@ import {
   updateProviderSettings,
 } from "../api/adminModelProviderSettings";
 
+const PROVIDER_TYPE_OPTIONS = [
+  { value: "openai", label: "OpenAI" },
+  { value: "yandex_ai_studio", label: "Yandex AI Studio" },
+];
+
 function mergeModelOptions(...modelGroups) {
   return [...new Set(modelGroups.flat().filter(Boolean))];
 }
@@ -18,6 +23,7 @@ export function AdminProviderSettingsSection({
   title,
   providerLabel,
 }) {
+  const [providerType, setProviderType] = useState("openai");
   const [baseUrl, setBaseUrl] = useState("");
   const [apiToken, setApiToken] = useState("");
   const [model, setModel] = useState("");
@@ -45,6 +51,7 @@ export function AdminProviderSettingsSection({
         }
 
         const nextModel = settings?.model ?? "";
+        setProviderType(settings?.provider_type ?? "openai");
         setBaseUrl(settings?.base_url ?? "");
         setModel(nextModel);
         setApiToken(settings?.api_token ?? "");
@@ -74,6 +81,7 @@ export function AdminProviderSettingsSection({
     const payload = await listProviderModels({
       accessToken,
       provider,
+      providerType,
       baseUrl,
       apiToken: apiToken?.trim() || null,
     });
@@ -95,6 +103,7 @@ export function AdminProviderSettingsSection({
       const settings = await updateProviderSettings({
         accessToken,
         provider,
+        providerType,
         baseUrl,
         model: nextModel,
         apiToken: nextApiToken,
@@ -122,6 +131,7 @@ export function AdminProviderSettingsSection({
         ? (await testProviderConnection({
             accessToken,
             provider,
+            providerType,
             baseUrl,
             model: nextModel,
             apiToken: apiToken?.trim() || null,
@@ -149,6 +159,14 @@ export function AdminProviderSettingsSection({
     }
   }
 
+  function handleProviderTypeChange(event) {
+    setProviderType(event.target.value);
+    setModel("");
+    setAvailableModels([]);
+    setErrorMessage("");
+    setSuccessMessage("");
+  }
+
   return (
     <section className="account-admin-section">
       <div className="account-admin-section__header">
@@ -157,17 +175,30 @@ export function AdminProviderSettingsSection({
       </div>
 
       <form className="account-admin-form" onSubmit={handleSubmit}>
-        <label className="account-admin-field">
-          <span>Base URL</span>
-          <input
-            type="url"
-            value={baseUrl}
-            placeholder="https://api.openai.com/v1"
-            disabled={isLoading}
-            onChange={(event) => setBaseUrl(event.target.value)}
-            required
-          />
-        </label>
+        <div className="account-admin-provider-row">
+          <label className="account-admin-field account-admin-field--provider-type">
+            <span>Провайдер</span>
+            <select value={providerType} disabled={isLoading} onChange={handleProviderTypeChange}>
+              {PROVIDER_TYPE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="account-admin-field">
+            <span>Base URL</span>
+            <input
+              type="url"
+              value={baseUrl}
+              placeholder="https://api.openai.com/v1"
+              disabled={isLoading}
+              onChange={(event) => setBaseUrl(event.target.value)}
+              required
+            />
+          </label>
+        </div>
 
         <label className="account-admin-field">
           <span>Модель</span>

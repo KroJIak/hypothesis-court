@@ -33,6 +33,7 @@ def _get_model_provider_settings_service(session: Session) -> ModelProviderSetti
 def _to_response(settings, *, has_api_token: bool | None = None) -> ModelProviderSettingsResponse:
     return ModelProviderSettingsResponse(
         provider=settings.provider,
+        provider_type=settings.provider_type,
         base_url=settings.base_url,
         model=settings.model,
         api_token=settings.api_token,
@@ -75,6 +76,7 @@ def _update_provider_settings_response(
     settings = service.upsert_provider_settings(
         actor=principal.user,
         provider=provider,
+        provider_type=payload.provider_type,
         base_url=payload.base_url,
         model=payload.model,
         api_token=payload.api_token,
@@ -155,6 +157,7 @@ def _list_provider_models_response(
     service = _get_model_provider_settings_service(session)
     models = service.list_provider_models(
         provider=provider,
+        provider_type=payload.provider_type,
         base_url=payload.base_url,
         api_token=payload.api_token,
         settings=settings,
@@ -172,6 +175,7 @@ def _test_provider_connection_response(
     service = _get_model_provider_settings_service(session)
     models = service.test_provider_connection(
         provider=provider,
+        provider_type=payload.provider_type,
         base_url=payload.base_url,
         model=payload.model,
         api_token=payload.api_token,
