@@ -1,8 +1,13 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Play } from "lucide-react";
 
 import { AgentCard } from "./AgentCard";
 import { getElementCenter } from "../utils/geometry";
+import { clampNumber } from "../utils/format";
+
+const PLAY_TOOLTIP_EDGE_OFFSET = 16;
+const PLAY_TOOLTIP_GAP = 8;
 
 export function DebateStage({
   debate,
@@ -14,7 +19,10 @@ export function DebateStage({
   const topLeftAvatarRef = useRef(null);
   const topRightAvatarRef = useRef(null);
   const bottomAvatarRef = useRef(null);
+  const playButtonRef = useRef(null);
   const [connectionLayer, setConnectionLayer] = useState({ width: 0, height: 0, paths: [] });
+  const [isPlayTooltipVisible, setIsPlayTooltipVisible] = useState(false);
+  const [playTooltipStyle, setPlayTooltipStyle] = useState({ left: "0px", top: "0px" });
   const rolesByPlacement = useMemo(() => {
     return debate.roles.reduce((accumulator, role) => {
       accumulator[role.placement] = role;
@@ -37,6 +45,40 @@ export function DebateStage({
 
     return "connection-path connection-path--active";
   }
+
+  const updatePlayTooltipPosition = useCallback(() => {
+    const buttonElement = playButtonRef.current;
+
+    if (!buttonElement) {
+      return;
+    }
+
+    const buttonRect = buttonElement.getBoundingClientRect();
+    const tooltipLeft = clampNumber(
+      buttonRect.left + buttonRect.width / 2,
+      PLAY_TOOLTIP_EDGE_OFFSET,
+      window.innerWidth - PLAY_TOOLTIP_EDGE_OFFSET,
+    );
+    const tooltipTop = clampNumber(
+      buttonRect.bottom + PLAY_TOOLTIP_GAP,
+      PLAY_TOOLTIP_EDGE_OFFSET,
+      window.innerHeight - PLAY_TOOLTIP_EDGE_OFFSET,
+    );
+
+    setPlayTooltipStyle({
+      left: `${tooltipLeft}px`,
+      top: `${tooltipTop}px`,
+    });
+  }, []);
+
+  const showPlayTooltip = useCallback(() => {
+    setIsPlayTooltipVisible(true);
+    window.requestAnimationFrame(updatePlayTooltipPosition);
+  }, [updatePlayTooltipPosition]);
+
+  const hidePlayTooltip = useCallback(() => {
+    setIsPlayTooltipVisible(false);
+  }, []);
 
   useLayoutEffect(() => {
     const updateConnections = () => {
@@ -121,10 +163,26 @@ export function DebateStage({
         <AgentCard {...rolesByPlacement["top-left"]} hideStatus={hideAgentStatus} avatarRef={topLeftAvatarRef} />
       </div>
       <div className="debate-stage__triangle debate-stage__triangle--center">
-        <button type="button" className="play-button" aria-label={debate.playLabel}>
+        <button
+          ref={playButtonRef}
+          type="button"
+          className="play-button"
+          aria-label={debate.playLabel}
+          onMouseEnter={showPlayTooltip}
+          onMouseLeave={hidePlayTooltip}
+          onFocus={showPlayTooltip}
+          onBlur={hidePlayTooltip}
+        >
           <span className="play-button__icon"><Play aria-hidden="true" strokeWidth={2.1} /></span>
-          <span className="play-button__tooltip">{debate.playLabel}</span>
         </button>
+        {isPlayTooltipVisible && typeof document !== "undefined"
+          ? createPortal(
+              <span className="play-button__tooltip" style={playTooltipStyle}>
+                {debate.playLabel}
+              </span>,
+              document.body,
+            )
+          : null}
       </div>
       <div className="debate-stage__triangle debate-stage__triangle--right">
         <AgentCard {...rolesByPlacement["top-right"]} hideStatus={hideAgentStatus} avatarRef={topRightAvatarRef} />
