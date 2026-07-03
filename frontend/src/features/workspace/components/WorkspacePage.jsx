@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   CircleUserRound,
   FileText,
@@ -65,11 +65,13 @@ function Sidebar({ shell, sessions, selectedChatId, onSelectChat, onCreateChat }
   );
 }
 
-function AgentCard({ name, status, variant, compact = false }) {
+function AgentCard({ name, status, variant, compact = false, avatarRef = null }) {
   return (
     <div className={`scene-agent${compact ? " scene-agent--compact" : ""}`}>
       <span className="scene-agent__name">{name}</span>
-      <AgentAvatar variant={variant} size={compact ? "compact" : "regular"} />
+      <span className="scene-agent__avatar-anchor" ref={avatarRef}>
+        <AgentAvatar variant={variant} size={compact ? "compact" : "regular"} />
+      </span>
       {status ? (
         <span className="scene-agent__status">
           {capitalizeFirst(status)}
@@ -80,7 +82,12 @@ function AgentCard({ name, status, variant, compact = false }) {
   );
 }
 
-function DebateStage({ debate }) {
+function DebateStage({ debate, manufacturerAvatarRef }) {
+  const stageRef = useRef(null);
+  const topLeftAvatarRef = useRef(null);
+  const topRightAvatarRef = useRef(null);
+  const bottomAvatarRef = useRef(null);
+  const [connectionLayer, setConnectionLayer] = useState({ width: 0, height: 0, paths: [] });
   const rolesByPlacement = useMemo(() => {
     return debate.roles.reduce((accumulator, role) => {
       accumulator[role.placement] = role;
@@ -88,15 +95,79 @@ function DebateStage({ debate }) {
     }, {});
   }, [debate.roles]);
 
+  const setBottomAvatarRef = useCallback((node) => {
+    bottomAvatarRef.current = node;
+
+    if (manufacturerAvatarRef) {
+      manufacturerAvatarRef.current = node;
+    }
+  }, [manufacturerAvatarRef]);
+
+  useLayoutEffect(() => {
+    const updateConnections = () => {
+      const stageElement = stageRef.current;
+      const topLeftAvatar = topLeftAvatarRef.current;
+      const topRightAvatar = topRightAvatarRef.current;
+      const bottomAvatar = bottomAvatarRef.current;
+
+      if (!stageElement || !topLeftAvatar || !topRightAvatar || !bottomAvatar) {
+        setConnectionLayer({ width: 0, height: 0, paths: [] });
+        return;
+      }
+
+      const stageRect = stageElement.getBoundingClientRect();
+      const topLeft = getElementCenter(topLeftAvatar, stageRect);
+      const topRight = getElementCenter(topRightAvatar, stageRect);
+      const bottom = getElementCenter(bottomAvatar, stageRect);
+
+      setConnectionLayer({
+        width: stageRect.width,
+        height: stageElement.scrollHeight,
+        paths: [
+          { id: "top-left-top-right", d: `M${topLeft.x.toFixed(1)} ${topLeft.y.toFixed(1)}L${topRight.x.toFixed(1)} ${topRight.y.toFixed(1)}` },
+          { id: "top-left-bottom", d: `M${topLeft.x.toFixed(1)} ${topLeft.y.toFixed(1)}L${bottom.x.toFixed(1)} ${bottom.y.toFixed(1)}` },
+          { id: "top-right-bottom", d: `M${topRight.x.toFixed(1)} ${topRight.y.toFixed(1)}L${bottom.x.toFixed(1)} ${bottom.y.toFixed(1)}` },
+        ],
+      });
+    };
+
+    updateConnections();
+
+    const animationFrame = window.requestAnimationFrame(updateConnections);
+    const resizeObserver = new ResizeObserver(updateConnections);
+    const observedElements = [
+      stageRef.current,
+      topLeftAvatarRef.current,
+      topRightAvatarRef.current,
+      bottomAvatarRef.current,
+    ].filter(Boolean);
+
+    observedElements.forEach((element) => resizeObserver.observe(element));
+    window.addEventListener("resize", updateConnections);
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", updateConnections);
+    };
+  }, []);
+
   return (
-    <section className="debate-stage" aria-label="Дискуссия агентов">
-      <svg className="debate-stage__links" viewBox="0 0 460 398" preserveAspectRatio="none" aria-hidden="true">
-        <path d="M74 87L386 87" />
-        <path d="M74 87L230 315" />
-        <path d="M386 87L230 315" />
-      </svg>
+    <section className="debate-stage" ref={stageRef} aria-label="Дискуссия агентов">
+      {connectionLayer.paths.length > 0 ? (
+        <svg
+          className="debate-stage__links"
+          style={{ width: `${connectionLayer.width}px`, height: `${connectionLayer.height}px` }}
+          viewBox={`0 0 ${connectionLayer.width} ${connectionLayer.height}`}
+          aria-hidden="true"
+        >
+          {connectionLayer.paths.map((path) => (
+            <path key={path.id} d={path.d} />
+          ))}
+        </svg>
+      ) : null}
       <div className="debate-stage__triangle debate-stage__triangle--left">
-        <AgentCard {...rolesByPlacement["top-left"]} />
+        <AgentCard {...rolesByPlacement["top-left"]} avatarRef={topLeftAvatarRef} />
       </div>
       <div className="debate-stage__triangle debate-stage__triangle--center">
         <button type="button" className="play-button" aria-label={debate.playLabel}>
@@ -104,42 +175,148 @@ function DebateStage({ debate }) {
         </button>
       </div>
       <div className="debate-stage__triangle debate-stage__triangle--right">
-        <AgentCard {...rolesByPlacement["top-right"]} />
+        <AgentCard {...rolesByPlacement["top-right"]} avatarRef={topRightAvatarRef} />
       </div>
       <div className="debate-stage__triangle debate-stage__triangle--bottom">
-        <AgentCard {...rolesByPlacement["bottom-center"]} />
+        <AgentCard {...rolesByPlacement["bottom-center"]} avatarRef={setBottomAvatarRef} />
       </div>
     </section>
   );
 }
 
-function EvaluationStage({ evaluation }) {
+function EvaluationStage({ evaluation, onAgentAvatarRef, judgeAvatarRef }) {
   return (
     <section className="evaluation-stage" aria-label="Оценка гипотезы">
-      <svg className="evaluation-stage__lines" viewBox="0 0 1000 390" preserveAspectRatio="none" aria-hidden="true">
-        <path d="M70 58H930" />
-        <path d="M500 58L150 180" />
-        <path d="M500 58L385 180" />
-        <path d="M500 58L615 180" />
-        <path d="M500 58L850 180" />
-        <path d="M150 235L500 350" />
-        <path d="M385 235L500 350" />
-        <path d="M615 235L500 350" />
-        <path d="M850 235L500 350" />
-      </svg>
-
       <div className="evaluation-stage__agents">
         {evaluation.agents.map((agent) => (
           <div key={agent.id} className={`evaluation-stage__slot evaluation-stage__slot--${agent.placement}`}>
-            <AgentCard {...agent} compact />
+            <AgentCard {...agent} compact avatarRef={(node) => onAgentAvatarRef(agent.id, node)} />
           </div>
         ))}
       </div>
 
       <div className="evaluation-stage__judge">
-        <AgentCard {...evaluation.judge} compact />
+        <AgentCard {...evaluation.judge} compact avatarRef={judgeAvatarRef} />
       </div>
     </section>
+  );
+}
+
+function getElementCenter(element, rootRect) {
+  const elementRect = element.getBoundingClientRect();
+
+  return {
+    x: elementRect.left + elementRect.width / 2 - rootRect.left,
+    y: elementRect.top + elementRect.height / 2 - rootRect.top,
+  };
+}
+
+function WorkspaceScene({ session }) {
+  const sceneRef = useRef(null);
+  const manufacturerAvatarRef = useRef(null);
+  const judgeAvatarRef = useRef(null);
+  const evaluationAvatarRefs = useRef(new Map());
+  const [connectionLayer, setConnectionLayer] = useState({ width: 0, height: 0, paths: [] });
+
+  const setEvaluationAvatarRef = useCallback((agentId, node) => {
+    if (node) {
+      evaluationAvatarRefs.current.set(agentId, node);
+      return;
+    }
+
+    evaluationAvatarRefs.current.delete(agentId);
+  }, []);
+
+  useLayoutEffect(() => {
+    const updateConnections = () => {
+      const sceneElement = sceneRef.current;
+      const manufacturerAvatar = manufacturerAvatarRef.current;
+
+      if (!sceneElement || !manufacturerAvatar) {
+        setConnectionLayer({ width: 0, height: 0, paths: [] });
+        return;
+      }
+
+      const sceneRect = sceneElement.getBoundingClientRect();
+      const manufacturerSource = getElementCenter(manufacturerAvatar, sceneRect);
+      const judgeAvatar = judgeAvatarRef.current;
+      const judgeTarget = judgeAvatar ? getElementCenter(judgeAvatar, sceneRect) : null;
+      const paths = session.evaluation.agents
+        .flatMap((agent) => {
+          const targetElement = evaluationAvatarRefs.current.get(agent.id);
+
+          if (!targetElement) {
+            return [];
+          }
+
+          const agentCenter = getElementCenter(targetElement, sceneRect);
+          const agentConnections = [
+            {
+              id: `manufacturer-${agent.id}`,
+              d: `M${manufacturerSource.x.toFixed(1)} ${manufacturerSource.y.toFixed(1)}L${agentCenter.x.toFixed(1)} ${agentCenter.y.toFixed(1)}`,
+            },
+          ];
+
+          if (judgeTarget) {
+            agentConnections.push({
+              id: `${agent.id}-judge`,
+              d: `M${agentCenter.x.toFixed(1)} ${agentCenter.y.toFixed(1)}L${judgeTarget.x.toFixed(1)} ${judgeTarget.y.toFixed(1)}`,
+            });
+          }
+
+          return agentConnections;
+        });
+
+      setConnectionLayer({
+        width: sceneRect.width,
+        height: sceneElement.scrollHeight,
+        paths,
+      });
+    };
+
+    updateConnections();
+
+    const animationFrame = window.requestAnimationFrame(updateConnections);
+    const resizeObserver = new ResizeObserver(updateConnections);
+    const observedElements = [
+      sceneRef.current,
+      manufacturerAvatarRef.current,
+      judgeAvatarRef.current,
+      ...session.evaluation.agents.map((agent) => evaluationAvatarRefs.current.get(agent.id)),
+    ].filter(Boolean);
+
+    observedElements.forEach((element) => resizeObserver.observe(element));
+    window.addEventListener("resize", updateConnections);
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", updateConnections);
+    };
+  }, [session.evaluation.agents]);
+
+  return (
+    <div className="workspace-scene" ref={sceneRef}>
+      {connectionLayer.paths.length > 0 ? (
+        <svg
+          className="workspace-scene__connection-layer"
+          style={{ width: `${connectionLayer.width}px`, height: `${connectionLayer.height}px` }}
+          viewBox={`0 0 ${connectionLayer.width} ${connectionLayer.height}`}
+          aria-hidden="true"
+        >
+          {connectionLayer.paths.map((path) => (
+            <path key={path.id} d={path.d} />
+          ))}
+        </svg>
+      ) : null}
+
+      <DebateStage debate={session.debate} manufacturerAvatarRef={manufacturerAvatarRef} />
+      <EvaluationStage
+        evaluation={session.evaluation}
+        onAgentAvatarRef={setEvaluationAvatarRef}
+        judgeAvatarRef={judgeAvatarRef}
+      />
+    </div>
   );
 }
 
@@ -319,8 +496,7 @@ export function WorkspacePage() {
         <div className="workspace-main__question">{selectedSession.query}</div>
 
         <div className="workspace-main__scene">
-          <DebateStage debate={selectedSession.debate} />
-          <EvaluationStage evaluation={selectedSession.evaluation} />
+          <WorkspaceScene session={selectedSession} />
         </div>
 
         <div className="workspace-main__answer">

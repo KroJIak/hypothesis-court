@@ -33,7 +33,7 @@
 .agent-palette {
   align-items: center;
   border-left: 1px solid rgba(255, 255, 255, 0.16);
-  gap: 10px;
+  gap: 6px;
 }
 
 .brand-lockup {
@@ -151,8 +151,8 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
-  padding: 24px 22px 20px;
-  gap: 18px;
+  padding: 18px 22px 16px;
+  gap: 12px;
 }
 
 .workspace-main__question {
@@ -161,7 +161,7 @@
   border-radius: 22px;
   background: #202020;
   color: #fbfbfb;
-  padding: 16px 22px;
+  padding: 12px 18px;
   font-size: clamp(1.18rem, 1.2vw, 1.48rem);
   line-height: 1.32;
 }
@@ -171,14 +171,37 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 4px 8px 0;
+  padding: 0 8px;
+}
+
+.workspace-scene {
+  position: relative;
+}
+
+.workspace-scene__connection-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.workspace-scene__connection-layer path {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.5);
+  stroke-linecap: round;
+  stroke-width: 1.6;
 }
 
 .debate-stage {
   position: relative;
-  width: min(460px, 100%);
-  min-height: 398px;
-  margin: 0 auto 18px;
+  width: min(420px, 100%);
+  min-height: 264px;
+  margin: 0 auto 4px;
+  z-index: 1;
 }
 
 .debate-stage__triangle {
@@ -211,24 +234,24 @@
 }
 
 .debate-stage__triangle--left {
-  left: 18px;
+  left: 52px;
   top: 0;
 }
 
 .debate-stage__triangle--center {
   left: 50%;
-  top: 108px;
+  top: 82px;
   transform: translateX(-50%);
 }
 
 .debate-stage__triangle--right {
-  right: 18px;
+  right: 52px;
   top: 0;
 }
 
 .debate-stage__triangle--bottom {
   left: 50%;
-  top: 228px;
+  top: 140px;
   transform: translateX(-50%);
 }
 
@@ -250,16 +273,16 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 84px;
-  height: 84px;
-  border-radius: 24px;
+  width: 62px;
+  height: 62px;
+  border-radius: 20px;
   background: #272727;
   color: #ffffff;
 }
 
 .play-button__icon svg {
-  width: 34px;
-  height: 34px;
+  width: 28px;
+  height: 28px;
 }
 
 .scene-agent {
@@ -272,6 +295,10 @@
 
 .scene-agent--compact {
   gap: 4px;
+}
+
+.scene-agent__avatar-anchor {
+  display: flex;
 }
 
 .scene-agent__name {
@@ -294,6 +321,9 @@
 }
 
 .agent-avatar {
+  --avatar-accessory-offset-y: 12px;
+  --avatar-accessory-size: 38px;
+  --avatar-accessory-icon-size: 25px;
   color: #f1f1f1;
 }
 
@@ -317,57 +347,47 @@
 .agent-avatar__accessory {
   position: absolute;
   left: 50%;
-  top: calc(67% + 12px);
+  top: calc(67% + var(--avatar-accessory-offset-y));
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: var(--avatar-accessory-size);
+  height: var(--avatar-accessory-size);
   color: #efefef;
   transform: translate(-50%, -50%);
 }
 
 .agent-avatar__accessory-icon {
-  width: 22px;
-  height: 22px;
+  width: var(--avatar-accessory-icon-size);
+  height: var(--avatar-accessory-icon-size);
 }
 
 .agent-avatar--regular {
-  width: 112px;
-  height: 112px;
+  width: 88px;
+  height: 88px;
 }
 
 .agent-avatar--compact {
-  width: 104px;
-  height: 104px;
+  --avatar-accessory-offset-y: 2px;
+  --avatar-accessory-size: 36px;
+  --avatar-accessory-icon-size: 24px;
+  width: 76px;
+  height: 76px;
 }
 
 .evaluation-stage {
   position: relative;
   width: min(980px, 100%);
-  margin: 6px auto 0;
-  padding: 10px 0 230px;
-}
-
-.evaluation-stage__lines {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-
-.evaluation-stage__lines path {
-  fill: none;
-  stroke: rgba(255, 255, 255, 0.58);
-  stroke-width: 1.7;
-  stroke-linecap: round;
+  margin: 0 auto;
+  padding: 4px 0 142px;
+  z-index: 1;
 }
 
 .evaluation-stage__agents {
   position: relative;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
+  gap: 8px;
   align-items: start;
 }
 
@@ -379,8 +399,8 @@
 }
 
 .palette-add-button {
-  width: 104px;
-  height: 104px;
+  width: 88px;
+  height: 88px;
   border: 0;
   border-radius: 22px;
   background: #242424;
@@ -389,8 +409,8 @@
 }
 
 .palette-add-button svg {
-  width: 42px;
-  height: 42px;
+  width: 36px;
+  height: 36px;
   margin: auto;
 }
 
@@ -405,7 +425,7 @@
   flex: 1;
   flex-direction: column;
   align-items: center;
-  gap: 14px;
+  gap: 8px;
   width: 100%;
   overflow-y: auto;
 }
@@ -414,7 +434,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
 }
 
 .palette-list__label {
@@ -427,7 +447,7 @@
   margin-right: auto;
   border-radius: 24px;
   background: #1f1f1f;
-  padding: 18px 22px;
+  padding: 14px 18px;
   line-height: 1.42;
 }
 
