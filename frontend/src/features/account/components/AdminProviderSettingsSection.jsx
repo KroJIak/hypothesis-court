@@ -114,14 +114,17 @@ export function AdminProviderSettingsSection({
     setSuccessMessage("");
 
     try {
-      const payload = await testProviderConnection({
-        accessToken,
-        provider,
-        baseUrl,
-        model,
-        apiToken: apiToken.trim() || null,
-      });
-      setAvailableModels(mergeModelOptions(payload.models ?? [], [model]));
+      const nextModels = model.trim()
+        ? (await testProviderConnection({
+            accessToken,
+            provider,
+            baseUrl,
+            model,
+            apiToken: apiToken.trim() || null,
+          })).models ?? []
+        : await refreshModels();
+
+      setAvailableModels(mergeModelOptions(nextModels, [model]));
       setSuccessMessage("Подключение работает.");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Не удалось проверить подключение.");
@@ -169,8 +172,10 @@ export function AdminProviderSettingsSection({
             disabled={isLoading}
             onFocus={handleModelSelectFocus}
             onChange={(event) => setModel(event.target.value)}
-            required
           >
+            <option value="">
+              {modelOptions.length === 0 ? "Сначала проверьте подключение" : "Не выбрана"}
+            </option>
             {modelOptions.map((modelOption) => (
               <option key={modelOption} value={modelOption}>
                 {modelOption}
@@ -200,14 +205,11 @@ export function AdminProviderSettingsSection({
           </span>
         </label>
 
-        {errorMessage ? <div className="account-admin-error">{errorMessage}</div> : null}
-        {successMessage ? <div className="account-admin-success">{successMessage}</div> : null}
-
         <div className="account-admin-actions">
           <button
             type="button"
             className="account-admin-test-button"
-            disabled={isLoading || isTesting || !baseUrl.trim() || !model.trim()}
+            disabled={isLoading || isTesting || !baseUrl.trim()}
             aria-label="Проверить подключение"
             onClick={handleTestConnection}
           >
@@ -216,6 +218,8 @@ export function AdminProviderSettingsSection({
           <button type="submit" className="account-admin-button" disabled={isLoading || isSaving}>
             {isSaving ? "Сохранение..." : "Сохранить"}
           </button>
+          {errorMessage ? <div className="account-admin-inline-message account-admin-inline-message--error">{errorMessage}</div> : null}
+          {successMessage ? <div className="account-admin-inline-message account-admin-inline-message--success">{successMessage}</div> : null}
         </div>
       </form>
     </section>

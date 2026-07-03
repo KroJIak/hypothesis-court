@@ -10,7 +10,7 @@ function buildProviderBody({ baseUrl, apiToken, model }) {
     base_url: baseUrl,
   };
 
-  if (model !== undefined) {
+  if (model) {
     body.model = model;
   }
 

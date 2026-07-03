@@ -53,7 +53,7 @@ class ModelProviderSettingsService:
         actor: User,
         provider: str,
         base_url: str,
-        model: str,
+        model: str | None,
         api_token: str | None,
     ) -> ModelProviderSettings:
         try:
@@ -167,10 +167,12 @@ class ModelProviderSettingsService:
         return normalized
 
     @staticmethod
-    def _normalize_model(model: str) -> str:
+    def _normalize_model(model: str | None) -> str | None:
+        if model is None:
+            return None
         normalized = model.strip()
         if not normalized:
-            raise ValidationError("Model must not be empty.")
+            return None
         if len(normalized) > 255:
             raise ValidationError("Model must contain at most 255 characters.")
         return normalized

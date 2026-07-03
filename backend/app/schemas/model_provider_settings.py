@@ -13,7 +13,7 @@ class ModelProviderSettingsResponse(BaseModel):
 
 class ModelProviderSettingsUpdateRequest(BaseModel):
     base_url: str
-    model: str
+    model: str | None = None
     api_token: str | None = None
 
 
