@@ -102,10 +102,14 @@ export function AgentCard({
             document.body,
           )
         : null}
-      {status && !hideStatus ? (
-        <span className="scene-agent__status">
-          {capitalizeFirst(status)}
-          <span className="scene-agent__status-tail" aria-hidden="true">...</span>
+      {!hideStatus ? (
+        <span className="scene-agent__status-slot" aria-hidden={!status}>
+          {status ? (
+            <span className="scene-agent__status">
+              {capitalizeFirst(status)}
+              <span className="scene-agent__status-tail" aria-hidden="true">...</span>
+            </span>
+          ) : null}
         </span>
       ) : null}
     </div>

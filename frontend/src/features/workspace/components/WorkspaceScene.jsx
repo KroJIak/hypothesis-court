@@ -152,7 +152,7 @@ export function WorkspaceScene({ session, onAgentDragStart, onAgentDragEnd, onDr
   }, [session.evaluation.agents]);
 
   return (
-    <div className="workspace-scene" ref={sceneRef}>
+    <div className={`workspace-scene${hasHypotheses ? "" : " workspace-scene--empty"}`} ref={sceneRef}>
       {connectionLayer.paths.length > 0 ? (
         <svg
           className="workspace-scene__connection-layer"

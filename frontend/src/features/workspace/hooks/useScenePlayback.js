@@ -119,6 +119,9 @@ function createEvaluationJudgeSteps(agentIds, hypothesisIndex) {
         "manufacturer-judge",
         ...agentIds.map((agentId) => `manufacturer-${agentId}`),
       ].map((id) => ({ id, direction: "forward" })),
+      debateRoleStatuses: {
+        manufacturer: STATUS_ANSWERS,
+      },
       evaluationAgentStatuses: createAgentStatusMap(agentIds, STATUS_LISTENS),
       judgeStatus: STATUS_LISTENS,
       durationMs: EVALUATION_BROADCAST_MS,

@@ -94,30 +94,33 @@ export function RequestSummaryRail({ requests }) {
   }
 
   return (
-    <div
-      className="request-summary-rail"
-      aria-label="Параметры запущенного исследования"
-      onScroll={handleRailScroll}
-    >
-      {requests.map((request) => {
-        const RequestIcon = getRequestIcon(request.context.value);
+    <div className="request-summary-group">
+      <p className="request-summary-group__label">Вводные условия</p>
+      <div
+        className="request-summary-rail"
+        aria-label="Параметры запущенного исследования"
+        onScroll={handleRailScroll}
+      >
+        {requests.map((request) => {
+          const RequestIcon = getRequestIcon(request.context.value);
 
-        return (
-          <button
-            ref={(node) => setRequestButtonRef(request.id, node)}
-            key={request.id}
-            type="button"
-            className="request-summary-card"
-            aria-label={`${request.context.label}: ${request.text}`}
-            onMouseEnter={(event) => showTooltip(request.id, event.currentTarget)}
-            onMouseLeave={hideTooltip}
-            onFocus={(event) => showTooltip(request.id, event.currentTarget)}
-            onBlur={hideTooltip}
-          >
-            <RequestIcon aria-hidden="true" strokeWidth={1.8} />
-          </button>
-        );
-      })}
+          return (
+            <button
+              ref={(node) => setRequestButtonRef(request.id, node)}
+              key={request.id}
+              type="button"
+              className="request-summary-card"
+              aria-label={`${request.context.label}: ${request.text}`}
+              onMouseEnter={(event) => showTooltip(request.id, event.currentTarget)}
+              onMouseLeave={hideTooltip}
+              onFocus={(event) => showTooltip(request.id, event.currentTarget)}
+              onBlur={hideTooltip}
+            >
+              <RequestIcon aria-hidden="true" strokeWidth={1.8} />
+            </button>
+          );
+        })}
+      </div>
       {activeRequest && typeof document !== "undefined"
         ? createPortal(
             <span className="request-summary-card__tooltip" role="tooltip" style={tooltipStyle}>
