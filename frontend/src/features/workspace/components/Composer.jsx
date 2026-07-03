@@ -12,6 +12,7 @@ import {
   SendHorizontal,
   ChevronDown,
   Trash2,
+  X,
 } from "lucide-react";
 
 import {
@@ -51,29 +52,41 @@ function AttachmentChip({
   setAttachmentButtonRef,
   showAttachmentTooltip,
   hideAttachmentTooltip,
+  onRemoveAttachment,
 }) {
   const AttachmentIcon = getAttachmentIcon(attachment.kind);
   const attachmentTypeLabel = getAttachmentTypeLabel(attachment);
 
   return (
-    <button
+    <div
       ref={(node) => setAttachmentButtonRef(attachment.id, node)}
-      type="button"
       className="attachment-chip"
-      aria-label={attachment.tooltip}
       onMouseEnter={(event) => showAttachmentTooltip(attachment.id, event.currentTarget)}
       onMouseLeave={hideAttachmentTooltip}
       onFocus={(event) => showAttachmentTooltip(attachment.id, event.currentTarget)}
       onBlur={hideAttachmentTooltip}
     >
       <ProcessingStatusBadge status={attachment.processingStatus} />
-      <span className="attachment-chip__icon">
-        <AttachmentIcon aria-hidden="true" strokeWidth={1.9} />
-      </span>
-      <span className="attachment-chip__type" aria-hidden="true">
-        {attachmentTypeLabel}
-      </span>
-    </button>
+      <button type="button" className="attachment-chip__preview" aria-label={attachment.tooltip}>
+        <span className="attachment-chip__icon">
+          <AttachmentIcon aria-hidden="true" strokeWidth={1.9} />
+        </span>
+        <span className="attachment-chip__type" aria-hidden="true">
+          {attachmentTypeLabel}
+        </span>
+      </button>
+      <button
+        type="button"
+        className="attachment-chip__remove"
+        aria-label={`Удалить вложение ${attachment.tooltip}`}
+        onClick={() => {
+          hideAttachmentTooltip();
+          onRemoveAttachment?.(attachment.id);
+        }}
+      >
+        <X aria-hidden="true" strokeWidth={2.1} />
+      </button>
+    </div>
   );
 }
 
@@ -85,6 +98,7 @@ export function Composer({
   isAttachmentUploading = false,
   onAttachFiles,
   onDraftMessageChange,
+  onRemoveAttachment,
   onRemoveComposerRequest,
   onSend,
 }) {
@@ -236,6 +250,7 @@ export function Composer({
               setAttachmentButtonRef={setAttachmentButtonRef}
               showAttachmentTooltip={showAttachmentTooltip}
               hideAttachmentTooltip={hideAttachmentTooltip}
+              onRemoveAttachment={onRemoveAttachment}
             />
           ))}
         </div>

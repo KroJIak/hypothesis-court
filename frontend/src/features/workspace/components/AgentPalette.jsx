@@ -55,6 +55,7 @@ export function AgentPalette({
       onDrop={onDropAgentToPalette}
       aria-label="Доступные агенты"
     >
+      <h2 className="agent-palette__title">Агенты</h2>
       <button
         type="button"
         className="palette-add-button"

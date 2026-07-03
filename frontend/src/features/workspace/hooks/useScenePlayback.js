@@ -24,6 +24,8 @@ const STATUS_THINKS = "размышляет";
 const STATUS_WAITS = "ожидает";
 const STATUS_EVALUATES = "оценивает";
 const STATUS_VERDICT = "выносит вердикт";
+const PLAYBACK_TICK_MS = 180;
+const playbackTimelines = new Map();
 
 const debateSpeakerSteps = [
   {
@@ -199,6 +201,69 @@ const initialPlaybackState = {
   stepIndex: null,
 };
 
+function createPlaybackSignature(session) {
+  const hypothesisIds = (session.hypotheses ?? []).map((hypothesis) => hypothesis.id).join(",");
+
+  return hypothesisIds;
+}
+
+function getOrCreatePlaybackTimeline(session) {
+  if (!session.hypotheses || session.hypotheses.length === 0) {
+    playbackTimelines.delete(session.id);
+    return null;
+  }
+
+  const signature = createPlaybackSignature(session);
+  const existingTimeline = playbackTimelines.get(session.id);
+
+  if (existingTimeline?.signature === signature) {
+    return existingTimeline;
+  }
+
+  const nextTimeline = {
+    signature,
+    startedAt: Date.now(),
+  };
+
+  playbackTimelines.set(session.id, nextTimeline);
+
+  return nextTimeline;
+}
+
+function getPlaybackStateAtTime(steps, timeline, hypothesisCount, now) {
+  if (!timeline || steps.length === 0) {
+    return initialPlaybackState;
+  }
+
+  const elapsedMs = Math.max(0, now - timeline.startedAt);
+  let elapsedStepMs = 0;
+  let completedHypothesisCount = 0;
+
+  for (let stepIndex = 0; stepIndex < steps.length; stepIndex += 1) {
+    const step = steps[stepIndex];
+
+    if (elapsedMs < elapsedStepMs + step.durationMs) {
+      return {
+        completedHypothesisCount,
+        isAnswerVisible: false,
+        stepIndex,
+      };
+    }
+
+    elapsedStepMs += step.durationMs;
+
+    if (step.completedHypothesisIndex !== undefined) {
+      completedHypothesisCount = Math.max(completedHypothesisCount, step.completedHypothesisIndex + 1);
+    }
+  }
+
+  return {
+    completedHypothesisCount: hypothesisCount,
+    isAnswerVisible: true,
+    stepIndex: null,
+  };
+}
+
 function createActiveConnectionMap(connections = []) {
   return new Map(connections.map((connection) => [connection.id, connection.direction]));
 }
@@ -271,72 +336,46 @@ function getHypothesesWithPlaybackStatus(hypotheses, playbackState, currentStep)
 
     return {
       ...hypothesis,
-      processingStatus: PROCESSING_STATUS_QUEUED,
+      processingStatus: PROCESSING_STATUS_PROCESSING,
     };
   });
 }
 
 export function useScenePlayback(session) {
   const steps = useMemo(() => createScenePlaybackSteps(session), [session]);
-  const [playbackState, setPlaybackState] = useState(initialPlaybackState);
+  const playbackTimeline = useMemo(() => getOrCreatePlaybackTimeline(session), [session]);
+  const [playbackNow, setPlaybackNow] = useState(() => Date.now());
+  const playbackState = getPlaybackStateAtTime(
+    steps,
+    playbackTimeline,
+    session.hypotheses?.length ?? 0,
+    playbackNow,
+  );
   const currentStep = playbackState.stepIndex === null ? null : steps[playbackState.stepIndex] ?? null;
   const isRunning = currentStep !== null;
 
   useEffect(() => {
-    if (!session.hypotheses || session.hypotheses.length === 0) {
-      setPlaybackState(initialPlaybackState);
+    setPlaybackNow(Date.now());
+
+    if (!playbackTimeline) {
       return;
     }
 
-    setPlaybackState({
-      completedHypothesisCount: 0,
-      isAnswerVisible: false,
-      stepIndex: 0,
-    });
-  }, [session.id, session.hypotheses]);
+    const intervalId = window.setInterval(() => {
+      setPlaybackNow(Date.now());
+    }, PLAYBACK_TICK_MS);
 
-  useEffect(() => {
-    if (!currentStep) {
-      return undefined;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      setPlaybackState((state) => {
-        const nextStepIndex = (state.stepIndex ?? 0) + 1;
-        const nextStep = steps[nextStepIndex];
-
-        if (!nextStep) {
-          return {
-            completedHypothesisCount: session.hypotheses?.length ?? state.completedHypothesisCount,
-            isAnswerVisible: true,
-            stepIndex: null,
-          };
-        }
-
-        return {
-          completedHypothesisCount: currentStep.completedHypothesisIndex === undefined
-            ? state.completedHypothesisCount
-            : Math.max(state.completedHypothesisCount, currentStep.completedHypothesisIndex + 1),
-          isAnswerVisible: state.isAnswerVisible,
-          stepIndex: nextStepIndex,
-        };
-      });
-    }, currentStep.durationMs);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [currentStep, session.hypotheses?.length, steps]);
+    return () => window.clearInterval(intervalId);
+  }, [playbackTimeline]);
 
   const startPlayback = useCallback(() => {
     if (!session.hypotheses || session.hypotheses.length === 0) {
       return;
     }
 
-    setPlaybackState({
-      completedHypothesisCount: 0,
-      isAnswerVisible: false,
-      stepIndex: 0,
-    });
-  }, [session.hypotheses]);
+    getOrCreatePlaybackTimeline(session);
+    setPlaybackNow(Date.now());
+  }, [session]);
 
   return {
     activeDebateConnectionDirections: createActiveConnectionMap(currentStep?.activeDebateConnections),

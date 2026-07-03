@@ -62,6 +62,7 @@ export function WorkspacePage({
   const [chatHistoryError, setChatHistoryError] = useState("");
   const [isCreatingChat, setIsCreatingChat] = useState(false);
   const [isUploadingSessionFile, setIsUploadingSessionFile] = useState(false);
+  const [removedAttachmentIdsBySession, setRemovedAttachmentIdsBySession] = useState({});
   const deferredChatSearchQuery = useDeferredValue(chatSearchQuery);
 
   useEffect(() => {
@@ -113,12 +114,14 @@ export function WorkspacePage({
       signal: controller.signal,
     })
       .then((payload) => {
+        const removedAttachmentIds = removedAttachmentIdsBySession[selectedChatId] ?? [];
+
         setSessions((currentSessions) =>
           currentSessions.map((session) =>
             session.id === selectedChatId
               ? {
                   ...session,
-                  attachments: payload.items,
+                  attachments: payload.items.filter((attachment) => !removedAttachmentIds.includes(attachment.id)),
                   maxFiles: payload.maxFiles,
                 }
               : session,
@@ -135,7 +138,7 @@ export function WorkspacePage({
       });
 
     return () => controller.abort();
-  }, [accessToken, selectedChatId, status]);
+  }, [accessToken, removedAttachmentIdsBySession, selectedChatId, status]);
 
   if (status === "loading") {
     return <WorkspaceSkeleton />;
@@ -303,6 +306,17 @@ export function WorkspacePage({
     } finally {
       setIsUploadingSessionFile(false);
     }
+  }
+
+  function handleRemoveAttachment(attachmentId) {
+    setRemovedAttachmentIdsBySession((currentValue) => ({
+      ...currentValue,
+      [selectedSession.id]: [...(currentValue[selectedSession.id] ?? []), attachmentId],
+    }));
+    updateSelectedSession((session) => ({
+      ...session,
+      attachments: (session.attachments ?? []).filter((attachment) => attachment.id !== attachmentId),
+    }));
   }
 
   function handleAddAgent() {
@@ -537,6 +551,7 @@ export function WorkspacePage({
           isAttachmentUploading={isUploadingSessionFile}
           onDraftMessageChange={setDraftMessage}
           onAttachFiles={handleAttachFiles}
+          onRemoveAttachment={handleRemoveAttachment}
           onRemoveComposerRequest={handleRemoveComposerRequest}
           onSend={handleSend}
         />
