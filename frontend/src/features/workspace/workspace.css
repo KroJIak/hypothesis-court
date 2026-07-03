@@ -1583,6 +1583,22 @@
   background: #1f1f1f;
   color: #e7e7e7;
   cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.attachment-attach-button:hover:not(:disabled),
+.attachment-attach-button:focus-visible:not(:disabled) {
+  background: #2a2a2a;
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.attachment-attach-button:disabled {
+  cursor: default;
+  opacity: 0.64;
 }
 
 .attachment-attach-button svg {

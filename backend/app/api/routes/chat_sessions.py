@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.api.deps.auth import get_current_user
@@ -8,14 +8,18 @@ from app.core.settings import Settings, get_settings
 from app.db.session import get_db_session
 from app.models.user import User
 from app.repositories.chat_session_repository import ChatSessionRepository
+from app.repositories.session_file_repository import SessionFileRepository
 from app.schemas.chat_session import (
     ChatSessionCreateRequest,
     ChatSessionRenameRequest,
     ChatSessionResponse,
     ChatSessionsListResponse,
 )
+from app.schemas.session_file import SessionFileResponse, SessionFilesListResponse
 from app.services.chat_session_service import ChatSessionService
 from app.services.exceptions import ServiceError
+from app.services.session_file_service import SessionFileService
+from app.services.session_file_storage import SessionFileStorage
 
 router = APIRouter(prefix="/chat-sessions", tags=["chat-sessions"])
 
@@ -24,6 +28,14 @@ def _get_chat_session_service(session: Session) -> ChatSessionService:
     return ChatSessionService(
         session=session,
         chat_session_repository=ChatSessionRepository(),
+    )
+
+
+def _get_session_file_service(session: Session) -> SessionFileService:
+    return SessionFileService(
+        session=session,
+        chat_session_repository=ChatSessionRepository(),
+        session_file_repository=SessionFileRepository(),
     )
 
 
@@ -133,6 +145,48 @@ def start_chat_session(
     except ServiceError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     return ChatSessionResponse.model_validate(chat_session)
+
+
+@router.get("/{chat_session_id}/files", response_model=SessionFilesListResponse)
+def list_session_files(
+    chat_session_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> SessionFilesListResponse:
+    service = _get_session_file_service(session)
+    try:
+        files = service.list_files(user=current_user, chat_session_id=chat_session_id)
+    except ServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    return SessionFilesListResponse(
+        items=[SessionFileResponse.model_validate(item) for item in files],
+        total=len(files),
+        max_files=settings.session_max_files,
+    )
+
+
+@router.post("/{chat_session_id}/files", response_model=SessionFileResponse, status_code=status.HTTP_201_CREATED)
+async def upload_session_file(
+    chat_session_id: uuid.UUID,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> SessionFileResponse:
+    service = _get_session_file_service(session)
+    storage = SessionFileStorage(uploads_dir=settings.uploads_dir)
+    try:
+        session_file = await service.upload_file(
+            user=current_user,
+            chat_session_id=chat_session_id,
+            file=file,
+            storage=storage,
+            max_files=settings.session_max_files,
+        )
+    except ServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    return SessionFileResponse.model_validate(session_file)
 
 
 @router.delete("/{chat_session_id}", status_code=status.HTTP_204_NO_CONTENT)
