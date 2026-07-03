@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   PROCESSING_STATUS_PROCESSING,
   PROCESSING_STATUS_PROCESSED,
-  PROCESSING_STATUS_QUEUED,
 } from "../constants";
 
 const DEBATE_CYCLE_COUNT = 3;
@@ -248,7 +247,14 @@ function getHypothesesWithPlaybackStatus(hypotheses, playbackState, currentStep)
     return [];
   }
 
-  return hypotheses.map((hypothesis, index) => {
+  const visibleHypothesisCount = currentStep?.hypothesisIndex === undefined
+    ? Math.min(hypotheses.length, playbackState.completedHypothesisCount)
+    : Math.min(hypotheses.length, currentStep.hypothesisIndex + 1);
+  const visibleHypotheses = playbackState.isAnswerVisible
+    ? hypotheses
+    : hypotheses.slice(0, visibleHypothesisCount);
+
+  return visibleHypotheses.map((hypothesis, index) => {
     if (playbackState.isAnswerVisible || index < playbackState.completedHypothesisCount) {
       return {
         ...hypothesis,
