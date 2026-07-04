@@ -8,7 +8,7 @@ export function mapWorkspaceScene(dto) {
       currentChatId: dto.shell.currentChatId,
       user: dto.shell.user,
     },
-    sessions: dto.sessions.map((session) => ({
+    sessions: (dto.sessions ?? []).map((session) => ({
       id: session.id,
       title: session.title,
       query: session.query,
@@ -27,7 +27,7 @@ export function mapWorkspaceScene(dto) {
         description: hypothesis.description,
         processingStatus: hypothesis.processingStatus,
       })),
-      attachments: session.attachments.map((attachment) => ({
+      attachments: (session.attachments ?? []).map((attachment) => ({
         id: attachment.id,
         kind: attachment.kind,
         shortLabel: attachment.kind.toUpperCase(),

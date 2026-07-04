@@ -13,7 +13,10 @@ function mapSessionFile(dto) {
     fileName: dto.original_filename,
     sizeBytes: dto.size_bytes,
     downloadUrl: dto.download_url,
-    processingStatus: normalizeAttachmentProcessingStatus("processed"),
+    processingStatus: normalizeAttachmentProcessingStatus(dto.processing_status),
+    processingError: dto.processing_error ?? null,
+    textExtractedAt: dto.text_extracted_at ?? null,
+    createdAt: dto.created_at,
   };
 }
 
@@ -59,4 +62,18 @@ export async function uploadSessionFile({ accessToken, chatSessionId, file }) {
   }
 
   return mapSessionFile(await response.json());
+}
+
+export async function deleteSessionFile({ accessToken, chatSessionId, sessionFileId }) {
+  const response = await fetch(`${getApiBaseUrl()}/chat-sessions/${chatSessionId}/files/${sessionFileId}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    const detail = await readWorkspaceApiError(response, "Не удалось удалить файл");
+    throw new Error(detail);
+  }
 }

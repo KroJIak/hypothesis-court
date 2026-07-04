@@ -1,10 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import {
-  PROCESSING_STATUS_PROCESSING,
-  PROCESSING_STATUS_PROCESSED,
-} from "../constants";
-
 const DEBATE_CYCLE_COUNT = 3;
 const DEBATE_STEP_MS = 1200;
 const EVALUATION_BROADCAST_MS = 1500;
@@ -330,26 +325,7 @@ function getHypothesesWithPlaybackStatus(hypotheses, playbackState, currentStep)
     ? hypotheses
     : hypotheses.slice(0, visibleHypothesisCount);
 
-  return visibleHypotheses.map((hypothesis, index) => {
-    if (playbackState.isAnswerVisible || index < playbackState.completedHypothesisCount) {
-      return {
-        ...hypothesis,
-        processingStatus: PROCESSING_STATUS_PROCESSED,
-      };
-    }
-
-    if (index === currentStep?.hypothesisIndex) {
-      return {
-        ...hypothesis,
-        processingStatus: PROCESSING_STATUS_PROCESSING,
-      };
-    }
-
-    return {
-      ...hypothesis,
-      processingStatus: PROCESSING_STATUS_PROCESSING,
-    };
-  });
+  return visibleHypotheses;
 }
 
 export function useScenePlayback(session) {

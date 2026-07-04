@@ -26,13 +26,22 @@ import {
   listChatSessions,
   pinChatSession,
   renameChatSession,
-  startChatSession,
   unpinChatSession,
 } from "../api/chatSessions";
 import {
+  deleteSessionFile,
   listSessionFiles,
   uploadSessionFile,
 } from "../api/sessionFiles";
+import {
+  cancelResearchRun,
+  createResearchRun,
+  editResearchRun,
+  getResearchGraph,
+  getResearchRun,
+  listResearchRuns,
+  regenerateResearchRun,
+} from "../api/researchRuns";
 import {
   AGENT_DRAG_MIME_TYPE,
   EVALUATION_SIDE_RIGHT,
@@ -42,12 +51,11 @@ import { resetScenePlayback } from "../hooks/useScenePlayback";
 import { resetJudgeVerdict } from "./JudgeVerdict";
 import {
   createEvaluationAgent,
-  createAnswerFromRequests,
   createChatTitleFromRequests,
-  createConsultationAnswer,
   createComposerRequest,
-  createHypothesesFromRequests,
   applyChatSessionMetadata,
+  applyResearchRunToSession,
+  applyResearchRunsToSession,
   createWorkspaceSessionFromChatSession,
   formatComposerRequest,
   getInitialAvailableAgents,
@@ -60,8 +68,6 @@ import "../workspace.css";
 
 const WORKSPACE_NOTIFICATION_TTL_MS = 4200;
 const WORKSPACE_NOTIFICATION_LIMIT = 5;
-const RUN_MODEL_FALLBACK = "LLM модель";
-
 function getEmptyPaletteAgents(data) {
   return data.palette.agents.filter((agent) => agent.isEmpty);
 }
@@ -114,28 +120,15 @@ function applySelectedAgentsToSession(session, selectedAgents, userAgents, data)
   };
 }
 
-function createRunVersionId() {
-  return typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-    ? crypto.randomUUID()
-    : `run-version-${Date.now()}-${Math.random()}`;
-}
-
-function createRunVersionFromRequests(session, requests) {
-  const title = createChatTitleFromRequests(requests);
-  const hypotheses = createHypothesesFromRequests(requests);
-  const answer = createAnswerFromRequests(requests);
+function refreshAvailableAgentsForSession(session, userAgents, data) {
+  const selectedAgentIds = new Set((session.evaluation?.agents ?? []).map((agent) => agent.id));
 
   return {
-    id: createRunVersionId(),
-    title,
-    requests,
-    query: requests.map(formatComposerRequest).join("\n"),
-    answer,
-    hypotheses,
-    consultationMessages: [],
-    modelName: session.modelName ?? RUN_MODEL_FALLBACK,
-    createdAt: new Date().toISOString(),
-    completedAt: null,
+    ...session,
+    availableAgents: sortAvailableAgents([
+      ...userAgents.filter((agent) => !selectedAgentIds.has(agent.id)),
+      ...getEmptyPaletteAgents(data),
+    ]),
   };
 }
 
@@ -148,6 +141,10 @@ function applyRunVersion(session, version, { isComplete = true } = {}) {
     launchedRequests: version.requests,
     hypotheses: version.hypotheses,
     consultationMessages: version.consultationMessages ?? [],
+    evidence: version.evidence ?? session.evidence ?? [],
+    verdict: version.verdict ?? session.verdict ?? null,
+    knowledgeGraph: session.knowledgeGraphRunId === version.id ? session.knowledgeGraph : null,
+    knowledgeGraphRunId: session.knowledgeGraphRunId === version.id ? session.knowledgeGraphRunId : null,
     composerRequests: [],
     isStarted: true,
     isPendingDraft: false,
@@ -204,7 +201,6 @@ export function WorkspacePage({
   const [workspaceNotifications, setWorkspaceNotifications] = useState([]);
   const [isCreatingChat, setIsCreatingChat] = useState(false);
   const [isUploadingSessionFile, setIsUploadingSessionFile] = useState(false);
-  const [removedAttachmentIdsBySession, setRemovedAttachmentIdsBySession] = useState({});
   const [userAgents, setUserAgents] = useState([]);
   const [isAgentGenerationAvailable, setIsAgentGenerationAvailable] = useState(false);
   const [activePendingAgentId, setActivePendingAgentId] = useState(null);
@@ -213,6 +209,9 @@ export function WorkspacePage({
   const sceneScrollRef = useRef(null);
   const addAgentFrameRef = useRef(null);
   const notificationTimeoutsRef = useRef(new Map());
+  const selectedAgentsByChatRef = useRef(new Map());
+  const runDetailRequestsRef = useRef(new Map());
+  const graphRequestsRef = useRef(new Map());
   const deferredChatSearchQuery = useDeferredValue(chatSearchQuery);
   const selectedSession = sessions.find((session) => session.id === selectedChatId) ?? sessions[0] ?? null;
   const isAgentEditingLocked = selectedSession
@@ -275,27 +274,67 @@ export function WorkspacePage({
     const controller = new AbortController();
 
     Promise.all([
-      listChatSessions({
-        accessToken,
-        search: deferredChatSearchQuery,
-        signal: controller.signal,
-      }),
       listAgents({ accessToken, signal: controller.signal }),
       getAgentGenerationStatus({ accessToken, signal: controller.signal }),
     ])
-      .then(([payload, agents, generationAvailable]) => {
-        const paletteAgents = getPaletteAgents(agents, data);
-        const nextSessions = payload.items.map((chatSession) =>
-          createWorkspaceSessionFromChatSession(chatSession, data.sessions, paletteAgents),
-        );
-
+      .then(([agents, generationAvailable]) => {
         setUserAgents(agents);
         setIsAgentGenerationAvailable(generationAvailable);
+      })
+      .catch((error) => {
+        if (error?.name === "AbortError") {
+          return;
+        }
+
+        showWorkspaceError(error, "Не удалось загрузить агентов");
+      });
+
+    return () => controller.abort();
+  }, [accessToken, data, showWorkspaceError, status]);
+
+  useEffect(() => {
+    if (status !== "success" || !data) {
+      return;
+    }
+
+    setSessions((currentSessions) =>
+      currentSessions.map((session) =>
+        refreshAvailableAgentsForSession(session, userAgents, data),
+      ),
+    );
+  }, [data, status, userAgents]);
+
+  useEffect(() => {
+    if (status !== "success" || !data) {
+      return;
+    }
+
+    const controller = new AbortController();
+
+    listChatSessions({
+      accessToken,
+      search: deferredChatSearchQuery,
+      signal: controller.signal,
+    })
+      .then((payload) => {
+        const paletteAgents = getPaletteAgents([], data);
+        const nextSessions = payload.items.map((chatSession) =>
+          createWorkspaceSessionFromChatSession(chatSession, paletteAgents),
+        );
+
         setSessions((currentSessions) =>
           nextSessions.map((nextSession) => {
             const currentSession = currentSessions.find((session) => session.id === nextSession.id);
 
-            return currentSession?.isStarted === nextSession.isStarted ? currentSession : nextSession;
+            if (!currentSession) {
+              return nextSession;
+            }
+
+            return refreshAvailableAgentsForSession(
+              applyChatSessionMetadata(currentSession, nextSession),
+              [],
+              data,
+            );
           }),
         );
         setSelectedChatId((currentChatId) =>
@@ -333,14 +372,12 @@ export function WorkspacePage({
       signal: controller.signal,
     })
       .then((payload) => {
-        const removedAttachmentIds = removedAttachmentIdsBySession[selectedChatId] ?? [];
-
         setSessions((currentSessions) =>
           currentSessions.map((session) =>
             session.id === selectedChatId
               ? {
                   ...session,
-                  attachments: payload.items.filter((attachment) => !removedAttachmentIds.includes(attachment.id)),
+                  attachments: payload.items,
                   maxFiles: payload.maxFiles,
                 }
               : session,
@@ -356,7 +393,7 @@ export function WorkspacePage({
       });
 
     return () => controller.abort();
-  }, [accessToken, removedAttachmentIdsBySession, selectedChatId, showWorkspaceError, status]);
+  }, [accessToken, selectedChatId, showWorkspaceError, status]);
 
   useEffect(() => {
     if (status !== "success" || !selectedChatId || !data) {
@@ -371,10 +408,11 @@ export function WorkspacePage({
       signal: controller.signal,
     })
       .then((selectedAgents) => {
+        selectedAgentsByChatRef.current.set(selectedChatId, selectedAgents);
         setSessions((currentSessions) =>
           currentSessions.map((session) =>
             session.id === selectedChatId
-              ? applySelectedAgentsToSession(session, selectedAgents, userAgents, data)
+              ? applySelectedAgentsToSession(session, selectedAgents, [], data)
               : session,
           ),
         );
@@ -388,7 +426,59 @@ export function WorkspacePage({
       });
 
     return () => controller.abort();
-  }, [accessToken, data, selectedChatId, showWorkspaceError, status, userAgents]);
+  }, [accessToken, data, selectedChatId, showWorkspaceError, status]);
+
+  useEffect(() => {
+    if (status !== "success" || !selectedChatId) {
+      return undefined;
+    }
+
+    const controller = new AbortController();
+
+    listResearchRuns({
+      accessToken,
+      chatSessionId: selectedChatId,
+      signal: controller.signal,
+    })
+      .then(async (payload) => {
+        setSessions((currentSessions) =>
+          currentSessions.map((session) =>
+            session.id === selectedChatId
+              ? applyResearchRunsToSession(session, payload.items, payload.activeRunId)
+              : session,
+          ),
+        );
+
+        const runToLoadId = payload.activeRunId ?? payload.items.at(-1)?.id ?? null;
+        if (!runToLoadId) {
+          return;
+        }
+
+        const loadedRun = await getResearchRun({
+          accessToken,
+          chatSessionId: selectedChatId,
+          runId: runToLoadId,
+          signal: controller.signal,
+        });
+
+        setSessions((currentSessions) =>
+          currentSessions.map((session) =>
+            session.id === selectedChatId
+              ? applyResearchRunToSession(session, loadedRun)
+              : session,
+          ),
+        );
+      })
+      .catch((error) => {
+        if (error?.name === "AbortError") {
+          return;
+        }
+
+        showWorkspaceError(error, "Не удалось загрузить версии запуска");
+      });
+
+    return () => controller.abort();
+  }, [accessToken, selectedChatId, showWorkspaceError, status]);
 
   useLayoutEffect(() => {
     const sceneElement = sceneScrollRef.current;
@@ -449,6 +539,27 @@ export function WorkspacePage({
     );
   }
 
+  async function loadResearchRunDetail(chatSessionId, runId) {
+    const requestKey = `${chatSessionId}:${runId}`;
+    const existingRequest = runDetailRequestsRef.current.get(requestKey);
+
+    if (existingRequest) {
+      return existingRequest;
+    }
+
+    const request = getResearchRun({
+      accessToken,
+      chatSessionId,
+      runId,
+    }).finally(() => {
+      runDetailRequestsRef.current.delete(requestKey);
+    });
+
+    runDetailRequestsRef.current.set(requestKey, request);
+
+    return request;
+  }
+
   function handleSelectChat(chatId) {
     setSelectedChatId(chatId);
     setDraftMessage("");
@@ -469,11 +580,7 @@ export function WorkspacePage({
         accessToken,
         title: data.shell.navigation.newChatLabel,
       });
-      const nextSession = createWorkspaceSessionFromChatSession(
-        chatSession,
-        data.sessions,
-        getPaletteAgents(userAgents, data),
-      );
+      const nextSession = createWorkspaceSessionFromChatSession(chatSession, getPaletteAgents(userAgents, data));
       setChatSearchQuery("");
       setSessions((currentSessions) => [
         nextSession,
@@ -589,19 +696,24 @@ export function WorkspacePage({
     }
   }
 
-  function handleRemoveAttachment(attachmentId) {
+  async function handleRemoveAttachment(attachmentId) {
     if (isProcessRunning) {
       return;
     }
 
-    setRemovedAttachmentIdsBySession((currentValue) => ({
-      ...currentValue,
-      [selectedSession.id]: [...(currentValue[selectedSession.id] ?? []), attachmentId],
-    }));
-    updateSelectedSession((session) => ({
-      ...session,
-      attachments: (session.attachments ?? []).filter((attachment) => attachment.id !== attachmentId),
-    }));
+    try {
+      await deleteSessionFile({
+        accessToken,
+        chatSessionId: selectedSession.id,
+        sessionFileId: attachmentId,
+      });
+      updateSelectedSession((session) => ({
+        ...session,
+        attachments: (session.attachments ?? []).filter((attachment) => attachment.id !== attachmentId),
+      }));
+    } catch (error) {
+      showWorkspaceError(error, "Не удалось удалить файл");
+    }
   }
 
   async function handleAddAgent() {
@@ -890,17 +1002,7 @@ export function WorkspacePage({
         return;
       }
 
-      updateSelectedSession((session) => ({
-        ...session,
-        consultationMessages: [
-          ...(session.consultationMessages ?? []),
-          {
-            id: `consultation-${Date.now()}`,
-            question: nextText,
-            answer: createConsultationAnswer(nextText, session),
-          },
-        ],
-      }));
+      showWorkspaceNotification("Чат завершён. Для нового варианта используйте редактирование или перегенерацию", "info");
       setDraftMessage("");
       return;
     }
@@ -930,45 +1032,67 @@ export function WorkspacePage({
       return;
     }
 
-    const nextVersion = createRunVersionFromRequests(selectedSession, composerRequests);
-    const nextVersions = [
-      ...(selectedSession.runVersions ?? []),
-      nextVersion,
-    ];
+    const optimisticTitle = createChatTitleFromRequests(composerRequests);
 
     updateSelectedSession((session) => ({
       ...session,
-      title: nextVersion.title,
+      title: optimisticTitle,
       isStarted: true,
       isPendingDraft: false,
       isEditingRunVersion: false,
-      query: nextVersion.query,
+      query: composerRequests.map(formatComposerRequest).join("\n"),
       launchedRequests: composerRequests,
-      hypotheses: nextVersion.hypotheses,
-      answer: nextVersion.answer,
+      hypotheses: [],
+      answer: "",
       isVerdictComplete: false,
       consultationMessages: [],
       composerRequests: [],
-      runVersions: nextVersions,
-      activeRunVersionId: nextVersion.id,
     }));
     resetJudgeVerdict(selectedSession.id);
-    void handleRenameChat(selectedSession.id, nextVersion.title);
-    void startChatSession({ accessToken, chatSessionId: selectedSession.id })
-      .then((chatSession) => {
+    setDraftMessage("");
+
+    const runRequest = selectedSession.isEditingRunVersion && activeVersion
+      ? editResearchRun({
+          accessToken,
+          chatSessionId: selectedSession.id,
+          runId: activeVersion.id,
+          requests: composerRequests,
+        })
+      : createResearchRun({
+          accessToken,
+          chatSessionId: selectedSession.id,
+          requests: composerRequests,
+        });
+
+    runRequest
+      .then((run) => {
+        resetJudgeVerdict(selectedSession.id);
         setSessions((currentSessions) =>
           currentSessions.map((session) =>
-            session.id === selectedSession.id && (session.launchedRequests ?? []).length > 0
-              ? applyChatSessionMetadata(session, chatSession)
+            session.id === selectedSession.id
+              ? applyResearchRunToSession(session, run)
               : session,
           ),
         );
       })
       .catch((error) => {
-        showWorkspaceError(error, "Не удалось запустить чат");
+        showWorkspaceError(error, "Не удалось выполнить исследовательский запуск");
+        setSessions((currentSessions) =>
+          currentSessions.map((session) =>
+            session.id === selectedSession.id
+              ? {
+                  ...session,
+                  isStarted: false,
+                  launchedRequests: [],
+                  hypotheses: [],
+                  answer: "",
+                  isVerdictComplete: false,
+                  composerRequests,
+                }
+              : session,
+          ),
+        );
       });
-
-    setDraftMessage("");
   }
 
   function handleStopProcess() {
@@ -989,6 +1113,16 @@ export function WorkspacePage({
       isVerdictComplete: false,
       consultationMessages: [],
     }));
+
+    if (selectedSession.activeResearchRunId) {
+      void cancelResearchRun({
+        accessToken,
+        chatSessionId: selectedSession.id,
+        runId: selectedSession.activeResearchRunId,
+      }).catch((error) => {
+        showWorkspaceError(error, "Не удалось остановить запуск");
+      });
+    }
   }
 
   function handleVerdictComplete() {
@@ -1018,15 +1152,55 @@ export function WorkspacePage({
     setActiveAgentHistoryTarget(null);
   }
 
-  function handleOpenKnowledgeGraph(target = {}) {
-    setActiveKnowledgeGraphTarget(target);
+  async function handleOpenKnowledgeGraph(target = {}) {
+    if (!selectedSession?.activeResearchRunId) {
+      setActiveKnowledgeGraphTarget(target);
+      return;
+    }
+
+    if (selectedSession.knowledgeGraphRunId === selectedSession.activeResearchRunId && selectedSession.knowledgeGraph) {
+      setActiveKnowledgeGraphTarget(target);
+      return;
+    }
+
+    const requestKey = `${selectedSession.id}:${selectedSession.activeResearchRunId}`;
+    const existingRequest = graphRequestsRef.current.get(requestKey);
+    const request = existingRequest ?? getResearchGraph({
+      accessToken,
+      chatSessionId: selectedSession.id,
+      runId: selectedSession.activeResearchRunId,
+    }).finally(() => {
+      graphRequestsRef.current.delete(requestKey);
+    });
+
+    if (!existingRequest) {
+      graphRequestsRef.current.set(requestKey, request);
+    }
+
+    try {
+      const knowledgeGraph = await request;
+      setSessions((currentSessions) =>
+        currentSessions.map((session) =>
+          session.id === selectedSession.id
+            ? {
+                ...session,
+                knowledgeGraph,
+                knowledgeGraphRunId: selectedSession.activeResearchRunId,
+              }
+            : session,
+        ),
+      );
+      setActiveKnowledgeGraphTarget(target);
+    } catch (error) {
+      showWorkspaceError(error, "Не удалось загрузить граф знаний");
+    }
   }
 
   function handleCloseKnowledgeGraph() {
     setActiveKnowledgeGraphTarget(null);
   }
 
-  function handleSwitchRunVersion(nextIndex) {
+  async function handleSwitchRunVersion(nextIndex) {
     if (!selectedSession || isProcessRunning || selectedSession.isEditingRunVersion) {
       return;
     }
@@ -1038,7 +1212,23 @@ export function WorkspacePage({
     }
 
     resetScenePlayback(selectedSession.id);
-    updateSelectedSession((session) => applyRunVersion(session, nextVersion, { isComplete: true }));
+    if (nextVersion.isDetailLoaded) {
+      updateSelectedSession((session) => applyRunVersion(session, nextVersion, { isComplete: true }));
+      return;
+    }
+
+    try {
+      const loadedRun = await loadResearchRunDetail(selectedSession.id, nextVersion.id);
+      setSessions((currentSessions) =>
+        currentSessions.map((session) =>
+          session.id === selectedSession.id
+            ? applyResearchRunToSession(session, loadedRun)
+            : session,
+        ),
+      );
+    } catch (error) {
+      showWorkspaceError(error, "Не удалось загрузить версию запуска");
+    }
   }
 
   function handleEditRunVersion() {
@@ -1090,19 +1280,35 @@ export function WorkspacePage({
       return;
     }
 
-    const nextVersion = createRunVersionFromRequests(selectedSession, activeVersion.requests);
-    const nextVersions = [
-      ...(selectedSession.runVersions ?? []),
-      nextVersion,
-    ];
-
     resetScenePlayback(selectedSession.id);
     resetJudgeVerdict(selectedSession.id);
     updateSelectedSession((session) => ({
-      ...applyRunVersion(session, nextVersion, { isComplete: false }),
-      runVersions: nextVersions,
-      activeRunVersionId: nextVersion.id,
+      ...session,
+      isStarted: true,
+      isVerdictComplete: false,
+      hypotheses: [],
+      answer: "",
+      launchedRequests: activeVersion.requests,
     }));
+
+    regenerateResearchRun({
+      accessToken,
+      chatSessionId: selectedSession.id,
+      runId: activeVersion.id,
+    })
+      .then((run) => {
+        resetJudgeVerdict(selectedSession.id);
+        setSessions((currentSessions) =>
+          currentSessions.map((session) =>
+            session.id === selectedSession.id
+              ? applyResearchRunToSession(session, run)
+              : session,
+          ),
+        );
+      })
+      .catch((error) => {
+        showWorkspaceError(error, "Не удалось перегенерировать запуск");
+      });
   }
 
   function handleRemoveComposerRequest(requestId) {
@@ -1193,7 +1399,6 @@ export function WorkspacePage({
 
         <Composer
           composer={data.composer}
-          sessionId={selectedSession.id}
           attachments={selectedSession.attachments ?? []}
           composerRequests={selectedSession.composerRequests ?? []}
           draftMessage={draftMessage}

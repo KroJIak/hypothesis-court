@@ -6,11 +6,8 @@ import { AgentAvatar } from "./AgentAvatar";
 import { getGraphNodeIdForSource } from "../model/knowledgeGraphModel";
 import { clampNumber } from "../utils/format";
 
-const DEBATE_ROLE_ORDER = ["defender", "attacker", "manufacturer"];
-const DEBATE_CYCLE_COUNT = 3;
 const SOURCE_TOOLTIP_GAP = 10;
 const SOURCE_TOOLTIP_EDGE_OFFSET = 14;
-const SOURCE_QUOTE_FALLBACK = "фрагмент связан с доказательством в графе";
 
 function getAgentDisplayName(agent) {
   return agent?.name || "Агент";
@@ -21,9 +18,9 @@ function createSourceQuote(excerpt) {
 
   if (words.length < 8) {
     return {
-      quote: SOURCE_QUOTE_FALLBACK,
-      contextBefore: "Цитата:",
-      contextAfter: excerpt,
+      quote: excerpt,
+      contextBefore: "",
+      contextAfter: "",
     };
   }
 
@@ -34,136 +31,112 @@ function createSourceQuote(excerpt) {
   };
 }
 
-function getPrimarySource(session, salt = 0) {
-  const attachments = session.attachments ?? [];
+function getPrimarySource(session, hypothesis) {
+  const evidenceById = new Map((session.evidence ?? []).map((evidence) => [evidence.id, evidence]));
+  const primaryEvidence = (hypothesis.evidenceLinks ?? [])
+    .map((link) => evidenceById.get(link.evidenceId))
+    .find(Boolean);
 
-  if (attachments.length === 0) {
-    const excerpt = "Фрагмент появится здесь после подключения источников к графу знаний.";
-
-    return {
-      nodeId: "source-fallback-1",
-      title: "Материалы дела",
-      excerpt,
-      ...createSourceQuote(excerpt),
-    };
+  if (!primaryEvidence) {
+    return null;
   }
 
-  const attachment = attachments[salt % attachments.length];
-  const excerpt = attachment.summary ?? "Выдержка из файла будет подставляться из API вместе с привязкой к графу.";
+  const excerpt = primaryEvidence.quote || primaryEvidence.summary || primaryEvidence.title;
 
   return {
-    attachmentId: attachment.id,
-    nodeId: `source-${attachment.id}`,
-    title: attachment.fileName ?? attachment.name ?? "Файл",
+    evidenceId: primaryEvidence.id,
+    attachmentId: primaryEvidence.sessionFileId,
+    nodeId: `evidence:${primaryEvidence.id}`,
+    title: primaryEvidence.title,
     excerpt,
     ...createSourceQuote(excerpt),
   };
 }
 
-function createDebateMessages(session, hypothesis) {
-  const rolesById = new Map((session.debate?.roles ?? []).map((role) => [role.id, role]));
-  const messages = [{
-    id: `${hypothesis.id}-system`,
-    type: "message",
-    side: "center",
-    agent: {
-      id: "system",
-      name: "Системный агент",
-      variant: "systems",
-    },
-    text: `${hypothesis.title}: ${hypothesis.description}`,
-    source: getPrimarySource(session),
-  }];
+function getDebateAgent(session, roleId) {
+  return (session.debate?.roles ?? []).find((role) => role.id === roleId) ?? {
+    id: roleId,
+    name: roleId,
+    variant: roleId,
+  };
+}
 
-  Array.from({ length: DEBATE_CYCLE_COUNT }, (_, cycleIndex) => {
-    if (cycleIndex > 0) {
+function createDebateMessages(session, targetAgent, hypothesis) {
+  const source = getPrimarySource(session, hypothesis);
+  const visibleRoleId = targetAgent?.id;
+  const messages = [];
+  let currentRound = null;
+
+  (hypothesis.debateMessages ?? [])
+    .filter((message) => !visibleRoleId || message.role === visibleRoleId)
+    .sort((firstMessage, secondMessage) =>
+      firstMessage.roundNumber - secondMessage.roundNumber
+      || new Date(firstMessage.createdAt).getTime() - new Date(secondMessage.createdAt).getTime(),
+    )
+    .forEach((message) => {
+      if (message.roundNumber !== currentRound) {
+        currentRound = message.roundNumber;
+        messages.push({
+          id: `${hypothesis.id}-round-${currentRound}`,
+          type: "divider",
+          label: `${currentRound} цикл`,
+        });
+      }
       messages.push({
-        id: `${hypothesis.id}-cycle-${cycleIndex + 1}`,
-        type: "divider",
-        label: `${cycleIndex + 1} цикл`,
-      });
-    }
-
-    DEBATE_ROLE_ORDER.forEach((roleId, roleIndex) => {
-      const role = rolesById.get(roleId);
-
-      messages.push({
-        id: `${hypothesis.id}-${roleId}-${cycleIndex + 1}`,
+        id: message.id,
         type: "message",
         side: "left",
-        agent: role,
-        text: createDebateMessageText(roleId, hypothesis, cycleIndex),
-        source: getPrimarySource(session, cycleIndex + roleIndex),
+        agent: getDebateAgent(session, message.role),
+        text: message.content,
+        source,
       });
     });
-  });
 
   return messages;
 }
 
-function createDebateMessageText(roleId, hypothesis, cycleIndex) {
-  const cycleLead = cycleIndex === 0
-    ? "первично"
-    : cycleIndex === 1
-      ? "после встречной проверки"
-      : "финально";
-
-  if (roleId === "defender") {
-    return `Я ${cycleLead} защищаю гипотезу: в ней есть проверяемое ядро и понятный критерий остановки. Сильная сторона - возможность быстро подтвердить эффект на малом масштабе.`;
-  }
-
-  if (roleId === "attacker") {
-    return `Я ${cycleLead} атакую гипотезу: главный риск в том, что эффект может исчезнуть при переносе в реальные ограничения процесса. Нужно проверить слабое место отдельно.`;
-  }
-
-  return `Я ${cycleLead} собираю позицию: ${hypothesis.title.toLowerCase()} можно передавать дальше, если удержать KPI, ограничение ресурсов и источник данных в одном сценарии.`;
-}
-
 function createEvaluationMessages(session, targetAgent, hypothesis) {
-  const manufacturer = (session.debate?.roles ?? []).find((role) => role.id === "manufacturer");
+  const source = getPrimarySource(session, hypothesis);
 
-  return [
-    {
-      id: `${hypothesis.id}-manufacturer-to-${targetAgent.id}`,
-      type: "message",
-      side: "right",
-      agent: manufacturer,
-      text: `Передаю гипотезу на оценку: ${hypothesis.description}`,
-      source: getPrimarySource(session),
-    },
-    {
-      id: `${hypothesis.id}-${targetAgent.id}-answer`,
+  return (hypothesis.evaluations ?? [])
+    .filter((evaluation) =>
+      evaluation.userAgentId === targetAgent?.id
+      || evaluation.evaluatorKey === targetAgent?.id,
+    )
+    .map((evaluation) => ({
+      id: evaluation.id,
       type: "message",
       side: "left",
-      agent: targetAgent,
-      text: `Проверяю гипотезу в своей зоне ответственности. Предварительно вижу один сильный аргумент и один риск, который нужно вынести в граф связей.`,
-      source: getPrimarySource(session, 1),
-    },
-  ];
+      agent: targetAgent ?? {
+        id: evaluation.evaluatorKey,
+        name: evaluation.evaluatorName,
+        variant: evaluation.evaluatorKey,
+      },
+      text: [
+        evaluation.verdict,
+        evaluation.rationale,
+        evaluation.riskNotes ? `Риски: ${evaluation.riskNotes}` : "",
+      ].filter(Boolean).join(" "),
+      source,
+    }));
 }
 
 function createJudgeMessages(session, hypothesis) {
-  const manufacturer = (session.debate?.roles ?? []).find((role) => role.id === "manufacturer");
-  const evaluationAgents = session.evaluation?.agents ?? [];
+  if (!session.verdict) {
+    return [];
+  }
 
-  return [
-    {
-      id: `${hypothesis.id}-manufacturer-to-judge`,
-      type: "message",
-      side: "right",
-      agent: manufacturer,
-      text: `Передаю судье собранную позицию по гипотезе: ${hypothesis.title}. Вердикт не дублирую здесь, он остаётся в основном чате.`,
-      source: getPrimarySource(session),
-    },
-    ...evaluationAgents.map((agent, index) => ({
-      id: `${hypothesis.id}-${agent.id}-to-judge`,
-      type: "message",
-      side: "left",
-      agent,
-      text: `Моя оценка: гипотеза допустима к следующему шагу только при отдельной проверке риска и подтверждении источников.`,
-      source: getPrimarySource(session, index + 1),
-    })),
-  ];
+  return [{
+    id: `${hypothesis.id}-judge-verdict`,
+    type: "message",
+    side: "left",
+    agent: session.evaluation?.judge,
+    text: [
+      session.verdict.summary,
+      session.verdict.recommendation,
+    ].filter(Boolean).join(" "),
+    source: getPrimarySource(session, hypothesis),
+  }];
 }
 
 function createHistoryTabs(session, target) {
@@ -178,7 +151,7 @@ function createHistoryTabs(session, target) {
 
 function createHistoryMessages(session, target, hypothesis) {
   if (target.type === "debate") {
-    return createDebateMessages(session, hypothesis);
+    return createDebateMessages(session, target.agent, hypothesis);
   }
 
   if (target.type === "judge") {

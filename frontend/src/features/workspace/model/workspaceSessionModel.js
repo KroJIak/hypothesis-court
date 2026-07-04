@@ -3,7 +3,44 @@ import {
   EVALUATION_SIDE_LEFT,
   EVALUATION_SIDE_RIGHT,
 } from "../constants";
-import { getSequentialProcessingStatus } from "../utils/processingStatus";
+
+const SYSTEM_DEBATE_ROLES = [
+  {
+    id: "defender",
+    name: "Защищающий",
+    status: "",
+    variant: "defender",
+    placement: "top-left",
+  },
+  {
+    id: "attacker",
+    name: "Атакующий",
+    status: "",
+    variant: "attacker",
+    placement: "top-right",
+  },
+  {
+    id: "manufacturer",
+    name: "Производственник",
+    status: "",
+    variant: "manufacturer",
+    placement: "bottom-center",
+  },
+];
+
+const SYSTEM_JUDGE = {
+  id: "judge",
+  name: "Судья",
+  status: "",
+  variant: "judge",
+};
+
+const CONTEXT_LABELS_BY_KIND = {
+  constraints: "Ограничения",
+  context: "Контекст",
+  custom: "Дополнительно",
+  kpi: "KPI",
+};
 
 export function sortAvailableAgents(agents) {
   return [...agents].sort((firstAgent, secondAgent) => {
@@ -32,7 +69,7 @@ export function getInitialAvailableAgents(session, paletteAgents) {
 }
 
 export function createWorkspaceSession(session, paletteAgents) {
-  const runVersions = session.runVersions ?? createInitialRunVersions(session);
+  const runVersions = session.runVersions ?? [];
 
   return {
     ...session,
@@ -43,27 +80,6 @@ export function createWorkspaceSession(session, paletteAgents) {
     activeRunVersionId: session.activeRunVersionId ?? runVersions.at(-1)?.id ?? null,
     availableAgents: getInitialAvailableAgents(session, paletteAgents),
   };
-}
-
-function createInitialRunVersions(session) {
-  if (!session.answer || (session.launchedRequests ?? []).length === 0) {
-    return [];
-  }
-
-  const createdAt = session.updatedAt ?? session.createdAt ?? new Date().toISOString();
-
-  return [{
-    id: `${session.id}-run-1`,
-    title: session.title,
-    requests: session.launchedRequests ?? [],
-    query: session.query ?? "",
-    answer: session.answer,
-    hypotheses: session.hypotheses ?? [],
-    consultationMessages: session.consultationMessages ?? [],
-    modelName: session.modelName ?? "LLM модель",
-    createdAt,
-    completedAt: session.isVerdictComplete ? createdAt : null,
-  }];
 }
 
 export function applyChatSessionMetadata(session, chatSession) {
@@ -79,46 +95,35 @@ export function applyChatSessionMetadata(session, chatSession) {
   };
 }
 
-export function createWorkspaceSessionFromChatSession(chatSession, templateSessions, paletteAgents) {
-  const templateSession = getTemplateSession(chatSession.id, templateSessions);
-  const session = chatSession.isStarted
-    ? templateSession
-    : createUnstartedSessionTemplate(templateSession, paletteAgents);
-
-  return createWorkspaceSession(
-    {
-      ...applyChatSessionMetadata(session, chatSession),
-      attachments: [],
-    },
-    paletteAgents,
-  );
-}
-
-function createUnstartedSessionTemplate(templateSession, paletteAgents) {
-  return {
-    ...templateSession,
+export function createWorkspaceSessionFromChatSession(chatSession, paletteAgents) {
+  return createWorkspaceSession({
+    id: chatSession.id,
+    title: chatSession.title,
+    isStarted: chatSession.isStarted,
+    isPinned: chatSession.isPinned,
+    pinnedAt: chatSession.pinnedAt,
+    createdAt: chatSession.createdAt,
+    updatedAt: chatSession.updatedAt,
     query: "Новая гипотеза появится здесь после отправки запроса.",
     answer: "",
     attachments: [],
     composerRequests: [],
     launchedRequests: [],
     hypotheses: [],
+    activeResearchRunId: null,
+    activeRunVersionId: null,
+    runVersions: [],
     availableAgents: sortAvailableAgents(paletteAgents.filter((agent) => !agent.isEmpty)),
+    debate: {
+      playLabel: "Запустить обсуждение",
+      roles: SYSTEM_DEBATE_ROLES,
+    },
     evaluation: {
-      ...templateSession.evaluation,
       layoutBias: undefined,
       agents: [],
+      judge: SYSTEM_JUDGE,
     },
-  };
-}
-
-function getTemplateSession(chatSessionId, templateSessions) {
-  if (templateSessions.length === 0) {
-    throw new Error("At least one workspace session template is required.");
-  }
-
-  const hash = [...chatSessionId].reduce((sum, character) => sum + character.charCodeAt(0), 0);
-  return templateSessions[hash % templateSessions.length];
+  }, paletteAgents);
 }
 
 export function createEvaluationAgent(agent) {
@@ -145,43 +150,6 @@ export function formatComposerRequest(request) {
   return `${request.context.label} ${request.text}`;
 }
 
-export function createHypothesesFromRequests(requests, count = 3) {
-  const requestSummary = requests
-    .slice(0, 2)
-    .map((request) => request.text)
-    .join("; ");
-  const hypothesisSeeds = [
-    "Сузить проверку до режима, где целевой KPI достигается без расширения производственного окна.",
-    "Сравнить базовый маршрут с более дешёвой заменой критического этапа и оценить потерю качества.",
-    "Проверить, не скрывается ли основной эффект в комбинации ограничений, а не в отдельном параметре.",
-    "Выделить короткий пилот, который подтвердит реализуемость до вложений в масштабирование.",
-    "Отдельно протестировать слабое место, которое может обнулить выигрыш при переносе в производство.",
-  ];
-
-  return hypothesisSeeds.slice(0, count).map((description, index) => ({
-    id: `generated-hypothesis-${index + 1}`,
-    title: `Гипотеза ${index + 1}`,
-    description: requestSummary ? `${description} Исходный фокус: ${requestSummary}.` : description,
-    processingStatus: getSequentialProcessingStatus(index, count),
-  }));
-}
-
-export function createAnswerFromRequests(requests) {
-  const requestSummary = requests
-    .slice(0, 3)
-    .map((request) => `${request.context.label}: ${request.text}`)
-    .join(" ");
-
-  return [
-    "Вердикт: гипотезы прошли полный цикл дебатов и оценки, поэтому запускать следующий шаг можно только как ограниченную проверку с заранее заданными критериями остановки.",
-    requestSummary
-      ? `Ключевые вводные учтены: ${requestSummary}.`
-      : "Ключевые вводные пока заданы кратко, поэтому решение стоит считать предварительным.",
-    "Самая сильная часть кейса - возможность быстро проверить эффект без перестройки всего процесса. Самый слабый участок - риск, что лабораторный выигрыш исчезнет при переносе в повторяемый производственный режим.",
-    "Рекомендация: собрать короткий пилот, закрепить измеримый KPI, отдельно проверить ограничения и вернуться к расширенному обсуждению только после фактических данных.",
-  ].join(" ");
-}
-
 export function createChatTitleFromRequests(requests) {
   const titleSource = (requests.find((request) => request.context.value === "context") ?? requests[0])?.text ?? "";
   const normalizedTitle = titleSource
@@ -198,17 +166,167 @@ export function createChatTitleFromRequests(requests) {
   return normalizedTitle.length > 54 ? `${normalizedTitle.slice(0, 51).trim()}...` : normalizedTitle;
 }
 
-export function createConsultationAnswer(question, session) {
-  const hypothesisCount = session.hypotheses?.length ?? 0;
-  const focus = hypothesisCount > 0
-    ? `Опираюсь на ${hypothesisCount} выдвинутые гипотезы и уже вынесенный вердикт.`
-    : "Опираюсь на текущие вводные и предварительный вердикт.";
+export function createComposerRequestsFromResearchInputs(inputs) {
+  return [...(inputs ?? [])]
+    .sort((firstInput, secondInput) => firstInput.position - secondInput.position)
+    .map((input) => ({
+      id: input.id,
+      context: {
+        value: input.kind,
+        label: input.label || CONTEXT_LABELS_BY_KIND[input.kind] || "Дополнительно",
+      },
+      text: input.text,
+    }));
+}
+
+function createHypothesisDescription(hypothesis) {
+  return [
+    hypothesis.statement,
+    hypothesis.mechanism ? `Механизм: ${hypothesis.mechanism}` : "",
+    hypothesis.kpiAlignment ? `KPI: ${hypothesis.kpiAlignment}` : "",
+    hypothesis.feasibility ? `Реализуемость: ${hypothesis.feasibility}` : "",
+    hypothesis.riskProfile ? `Риски: ${hypothesis.riskProfile}` : "",
+  ].filter(Boolean).join(" ");
+}
+
+function createVerdictAnswer(verdict) {
+  if (!verdict) {
+    return "";
+  }
+
+  const checks = (verdict.nextChecks ?? [])
+    .filter(Boolean)
+    .map((check) => `Проверить: ${check}`)
+    .join(" ");
 
   return [
-    focus,
-    `По вопросу: "${question.trim()}"`,
-    "Короткий ответ: уточните, какая гипотеза важнее для следующего действия, и проверяйте её через самый дешёвый измеримый эксперимент. Если вопрос касается риска, сначала смотрите на ограничения и данные, которые могут быстро опровергнуть гипотезу.",
-  ].join(" ");
+    verdict.summary,
+    verdict.recommendation,
+    checks,
+  ].filter(Boolean).join(" ");
+}
+
+export function createRunVersionFromResearchRunSummary(run) {
+  return {
+    id: run.id,
+    title: run.title,
+    requests: [],
+    query: "",
+    answer: "",
+    hypotheses: [],
+    consultationMessages: [],
+    modelName: run.modelName ?? "LLM модель",
+    createdAt: run.createdAt,
+    completedAt: run.completedAt,
+    status: run.status,
+    errorMessage: run.errorMessage,
+    evidence: [],
+    verdict: null,
+    isDetailLoaded: false,
+  };
+}
+
+export function createRunVersionFromResearchRun(run) {
+  const requests = createComposerRequestsFromResearchInputs(run.inputs);
+  const hypotheses = (run.hypotheses ?? [])
+    .sort((firstHypothesis, secondHypothesis) => firstHypothesis.position - secondHypothesis.position)
+    .map((hypothesis) => ({
+      ...hypothesis,
+      description: createHypothesisDescription(hypothesis),
+    }));
+  const answer = createVerdictAnswer(run.verdict);
+
+  return {
+    id: run.id,
+    title: run.title,
+    requests,
+    query: requests.map(formatComposerRequest).join("\n"),
+    answer,
+    hypotheses,
+    consultationMessages: [],
+    modelName: run.modelName ?? "LLM модель",
+    createdAt: run.createdAt,
+    completedAt: run.completedAt,
+    status: run.status,
+    errorMessage: run.errorMessage,
+    evidence: run.evidence ?? [],
+    verdict: run.verdict,
+    isDetailLoaded: true,
+  };
+}
+
+export function applyResearchRunsToSession(session, runSummaries, activeRunId = null) {
+  const loadedVersionsById = new Map((session.runVersions ?? [])
+    .filter((version) => version.isDetailLoaded)
+    .map((version) => [version.id, version]));
+  const runVersions = runSummaries.map((run) =>
+    loadedVersionsById.get(run.id) ?? createRunVersionFromResearchRunSummary(run),
+  );
+  const activeVersion = runVersions.find((version) => version.id === activeRunId)
+    ?? runVersions.at(-1)
+    ?? null;
+
+  if (!activeVersion) {
+    return {
+      ...session,
+      runVersions: [],
+      activeRunVersionId: null,
+      activeResearchRunId: null,
+    };
+  }
+
+  const hasActiveDetail = Boolean(activeVersion.isDetailLoaded);
+
+  return {
+    ...session,
+    title: activeVersion.title || session.title,
+    query: hasActiveDetail ? activeVersion.query : session.query,
+    answer: hasActiveDetail ? activeVersion.answer : session.answer,
+    launchedRequests: hasActiveDetail ? activeVersion.requests : session.launchedRequests,
+    hypotheses: hasActiveDetail ? activeVersion.hypotheses : session.hypotheses,
+    consultationMessages: hasActiveDetail ? activeVersion.consultationMessages : session.consultationMessages,
+    runVersions,
+    activeRunVersionId: activeVersion.id,
+    activeResearchRunId: activeVersion.id,
+    evidence: hasActiveDetail ? activeVersion.evidence : session.evidence,
+    verdict: hasActiveDetail ? activeVersion.verdict : session.verdict,
+    knowledgeGraph: session.knowledgeGraphRunId === activeVersion.id ? session.knowledgeGraph : null,
+    knowledgeGraphRunId: session.knowledgeGraphRunId === activeVersion.id ? session.knowledgeGraphRunId : null,
+    isStarted: true,
+    isVerdictComplete: activeVersion.status === "completed",
+    isPendingDraft: false,
+    isEditingRunVersion: false,
+    composerRequests: [],
+  };
+}
+
+export function applyResearchRunToSession(session, run) {
+  const nextVersion = createRunVersionFromResearchRun(run);
+  const otherVersions = (session.runVersions ?? []).filter((version) => version.id !== nextVersion.id);
+
+  return {
+    ...session,
+    title: nextVersion.title || session.title,
+    query: nextVersion.query,
+    answer: nextVersion.answer,
+    launchedRequests: nextVersion.requests,
+    hypotheses: nextVersion.hypotheses,
+    consultationMessages: [],
+    composerRequests: [],
+    runVersions: [...otherVersions, nextVersion].sort((firstVersion, secondVersion) =>
+      new Date(firstVersion.createdAt).getTime() - new Date(secondVersion.createdAt).getTime(),
+    ),
+    activeRunVersionId: nextVersion.id,
+    activeResearchRunId: nextVersion.id,
+    evidence: nextVersion.evidence,
+    verdict: nextVersion.verdict,
+    knowledgeGraph: session.activeResearchRunId === nextVersion.id ? session.knowledgeGraph : null,
+    knowledgeGraphRunId: session.activeResearchRunId === nextVersion.id ? session.knowledgeGraphRunId : null,
+    isStarted: true,
+    isPendingDraft: false,
+    isEditingRunVersion: false,
+    isVerdictComplete: nextVersion.status === "completed",
+  };
 }
 
 export function hasPendingAgent(session) {

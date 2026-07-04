@@ -118,23 +118,6 @@ export async function unpinChatSession({ accessToken, chatSessionId }) {
   return mapChatSession(await response.json());
 }
 
-export async function startChatSession({ accessToken, chatSessionId }) {
-  const response = await fetch(`${getApiBaseUrl()}/chat-sessions/${chatSessionId}/start`, {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
-
-  if (!response.ok) {
-    const detail = await readWorkspaceApiError(response, "Не удалось запустить чат");
-    throw new Error(detail);
-  }
-
-  return mapChatSession(await response.json());
-}
-
 export async function deleteChatSession({ accessToken, chatSessionId }) {
   const response = await fetch(`${getApiBaseUrl()}/chat-sessions/${chatSessionId}`, {
     method: "DELETE",
