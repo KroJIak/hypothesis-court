@@ -1,13 +1,15 @@
 import uuid
 
-from sqlalchemy import Select, func, or_, select
+from sqlalchemy import Select, exists, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.chat_session import ChatSession
+from app.models.chat_session_agent import ChatSessionAgent
 from app.models.evidence_item import EvidenceItem
 from app.models.hypothesis_candidate import HypothesisCandidate
 from app.models.research_input_item import ResearchInputItem
 from app.models.research_run import ResearchRun
+from app.models.session_file import SessionFile
 
 
 class ChatSessionRepository:
@@ -28,13 +30,20 @@ class ChatSessionRepository:
             stmt = stmt.with_for_update()
         return session.execute(stmt).scalar_one_or_none()
 
-    def get_unstarted_for_user(self, session: Session, *, user_id: uuid.UUID) -> ChatSession | None:
+    def get_empty_unstarted_for_user(self, session: Session, *, user_id: uuid.UUID) -> ChatSession | None:
+        selected_agent_exists = exists().where(ChatSessionAgent.chat_session_id == ChatSession.id)
+        session_file_exists = exists().where(
+            SessionFile.chat_session_id == ChatSession.id,
+            SessionFile.deleted_at.is_(None),
+        )
         stmt = (
             select(ChatSession)
             .where(
                 ChatSession.user_id == user_id,
                 ChatSession.deleted_at.is_(None),
                 ChatSession.is_started.is_(False),
+                ~selected_agent_exists,
+                ~session_file_exists,
             )
             .order_by(ChatSession.created_at.desc())
             .limit(1)

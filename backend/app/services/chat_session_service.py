@@ -37,7 +37,7 @@ class ChatSessionService:
 
     def create_session(self, *, user: User, title: str) -> tuple[ChatSession, bool]:
         try:
-            unstarted_session = self._chat_sessions.get_unstarted_for_user(self._session, user_id=user.id)
+            unstarted_session = self._chat_sessions.get_empty_unstarted_for_user(self._session, user_id=user.id)
             if unstarted_session is not None:
                 return unstarted_session, False
 
