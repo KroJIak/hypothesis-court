@@ -260,8 +260,9 @@ class ResearchLlmOrchestrator:
         )
 
     def _complete_json(self, *, instruction: str, payload: dict[str, object], temperature: float) -> dict[str, Any]:
-        client, model = self._provider_settings_service.get_model_client(self._settings)
-        content = client.create_chat_completion(
+        client, model, api_mode = self._provider_settings_service.get_model_client(self._settings)
+        content = client.create_text_completion(
+            api_mode=api_mode,
             model=model,
             temperature=temperature,
             messages=[

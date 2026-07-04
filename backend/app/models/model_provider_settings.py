@@ -13,6 +13,7 @@ class ModelProviderSettings(Base):
     __table_args__ = (
         CheckConstraint("char_length(btrim(provider)) > 0", name="provider_not_blank"),
         CheckConstraint("provider_type in ('openai', 'yandex_ai_studio')", name="provider_type_supported"),
+        CheckConstraint("api_mode in ('chat_completions', 'responses')", name="api_mode_supported"),
         CheckConstraint("char_length(btrim(base_url)) > 0", name="base_url_not_blank"),
         CheckConstraint(
             "model is null or char_length(btrim(model)) > 0",
@@ -30,6 +31,12 @@ class ModelProviderSettings(Base):
 
     provider: Mapped[str] = mapped_column(String(32), primary_key=True)
     provider_type: Mapped[str] = mapped_column(String(32), nullable=False, default="openai", server_default="openai")
+    api_mode: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="chat_completions",
+        server_default="chat_completions",
+    )
     base_url: Mapped[str] = mapped_column(String(2048), nullable=False)
     project_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     model: Mapped[str | None] = mapped_column(String(255), nullable=True)

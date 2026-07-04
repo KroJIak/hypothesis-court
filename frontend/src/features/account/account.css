@@ -429,6 +429,10 @@
   min-width: 0;
 }
 
+.account-admin-field--api-mode {
+  grid-column: 1;
+}
+
 .account-admin-field--base-url {
   grid-column: 2;
 }
@@ -447,6 +451,7 @@
 
 .account-admin-field input,
 .account-admin-field select,
+.account-admin-api-mode-select__trigger,
 .account-admin-table input,
 .account-admin-table select {
   width: 100%;
@@ -460,6 +465,65 @@
   font-size: 0.9rem;
   outline: none;
   padding: 0 11px;
+}
+
+.account-admin-api-mode-select {
+  position: relative;
+  display: block;
+  min-width: 0;
+}
+
+.account-admin-api-mode-select__trigger {
+  text-align: left;
+  cursor: pointer;
+}
+
+.account-admin-api-mode-select__trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.account-admin-api-mode-select__menu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  left: 0;
+  display: grid;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  background: #171717;
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.32);
+}
+
+.account-admin-api-mode-select__option {
+  min-height: 36px;
+  border: 0;
+  background: transparent;
+  color: #f1f1f1;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.88rem;
+  text-align: left;
+  padding: 0 11px;
+}
+
+.account-admin-api-mode-select__option:hover,
+.account-admin-api-mode-select__option:focus-visible,
+.account-admin-api-mode-select__option[aria-selected="true"] {
+  background: rgba(255, 255, 255, 0.07);
+  outline: none;
+}
+
+.account-admin-api-mode-select__hint {
+  display: block;
+  padding: 9px 11px 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  color: #bdbdbd;
+  font-size: 0.78rem;
+  line-height: 1.35;
 }
 
 .account-admin-password-input {

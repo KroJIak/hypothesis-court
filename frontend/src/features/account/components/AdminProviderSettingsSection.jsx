@@ -7,10 +7,24 @@ import {
   testProviderConnection,
   updateProviderSettings,
 } from "../api/adminModelProviderSettings";
+import { AdminApiModeSelect } from "./AdminApiModeSelect";
 
 const PROVIDER_TYPE_OPTIONS = [
   { value: "openai", label: "OpenAI" },
   { value: "yandex_ai_studio", label: "Yandex AI Studio" },
+];
+
+const API_MODE_OPTIONS = [
+  {
+    value: "chat_completions",
+    label: "Chat Completions",
+    hint: "Самый совместимый вариант для большинства провайдеров и прокси.",
+  },
+  {
+    value: "responses",
+    label: "Responses API",
+    hint: "Современный вариант OpenAI для сложных сценариев, если провайдер его поддерживает.",
+  },
 ];
 
 function mergeModelOptions(...modelGroups) {
@@ -22,8 +36,10 @@ export function AdminProviderSettingsSection({
   provider,
   title,
   providerLabel,
+  supportsApiMode = false,
 }) {
   const [providerType, setProviderType] = useState("openai");
+  const [apiMode, setApiMode] = useState("chat_completions");
   const [baseUrl, setBaseUrl] = useState("");
   const [projectId, setProjectId] = useState("");
   const [apiToken, setApiToken] = useState("");
@@ -41,6 +57,8 @@ export function AdminProviderSettingsSection({
     [availableModels, model],
   );
   const isYandexProvider = providerType === "yandex_ai_studio";
+  const canChooseApiMode = supportsApiMode && !isYandexProvider;
+  const effectiveApiMode = canChooseApiMode ? apiMode : "chat_completions";
   const canUseProvider = Boolean(baseUrl.trim()) && (!isYandexProvider || Boolean(projectId.trim()));
 
   useEffect(() => {
@@ -55,6 +73,7 @@ export function AdminProviderSettingsSection({
 
         const nextModel = settings?.model ?? "";
         setProviderType(settings?.provider_type ?? "openai");
+        setApiMode(settings?.api_mode ?? "chat_completions");
         setBaseUrl(settings?.base_url ?? "");
         setProjectId(settings?.project_id ?? "");
         setModel(nextModel);
@@ -110,6 +129,7 @@ export function AdminProviderSettingsSection({
         accessToken,
         provider,
         providerType,
+        apiMode: effectiveApiMode,
         baseUrl,
         projectId: nextProjectId || null,
         model: nextModel,
@@ -139,6 +159,7 @@ export function AdminProviderSettingsSection({
             accessToken,
             provider,
             providerType,
+            apiMode: effectiveApiMode,
             baseUrl,
             projectId: isYandexProvider ? projectId?.trim() || null : null,
             model: nextModel,
@@ -172,6 +193,7 @@ export function AdminProviderSettingsSection({
 
   function handleProviderTypeChange(event) {
     setProviderType(event.target.value);
+    setApiMode("chat_completions");
     setBaseUrl("");
     setProjectId("");
     setModel("");
@@ -212,6 +234,18 @@ export function AdminProviderSettingsSection({
             />
           </label>
         </div>
+
+        {supportsApiMode ? (
+          <label className="account-admin-field account-admin-field--api-mode">
+            <span>Режим API</span>
+            <AdminApiModeSelect
+              value={effectiveApiMode}
+              disabled={isLoading || !canChooseApiMode}
+              options={API_MODE_OPTIONS}
+              onChange={setApiMode}
+            />
+          </label>
+        ) : null}
 
         {isYandexProvider ? (
           <label className="account-admin-field account-admin-field--project-id">

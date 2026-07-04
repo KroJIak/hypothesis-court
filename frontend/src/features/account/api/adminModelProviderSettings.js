@@ -5,11 +5,15 @@ function getProviderUrl(provider) {
   return `${getApiBaseUrl()}/admin/model-providers/${provider}`;
 }
 
-function buildProviderBody({ providerType, baseUrl, projectId, apiToken, model }) {
+function buildProviderBody({ providerType, apiMode, baseUrl, projectId, apiToken, model }) {
   const body = {
     provider_type: providerType,
     base_url: baseUrl,
   };
+
+  if (apiMode) {
+    body.api_mode = apiMode;
+  }
 
   if (projectId) {
     body.project_id = projectId;
@@ -46,12 +50,13 @@ export async function updateProviderSettings({
   accessToken,
   provider,
   providerType,
+  apiMode,
   baseUrl,
   projectId,
   apiToken,
   model,
 }) {
-  const body = buildProviderBody({ providerType, baseUrl, projectId, apiToken, model });
+  const body = buildProviderBody({ providerType, apiMode, baseUrl, projectId, apiToken, model });
 
   const response = await fetch(getProviderUrl(provider), {
     method: "PUT",
@@ -94,6 +99,7 @@ export async function testProviderConnection({
   accessToken,
   provider,
   providerType,
+  apiMode,
   baseUrl,
   projectId,
   apiToken,
@@ -106,7 +112,7 @@ export async function testProviderConnection({
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(buildProviderBody({ providerType, baseUrl, projectId, apiToken, model })),
+    body: JSON.stringify(buildProviderBody({ providerType, apiMode, baseUrl, projectId, apiToken, model })),
   });
 
   if (!response.ok) {

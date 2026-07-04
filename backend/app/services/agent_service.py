@@ -59,7 +59,7 @@ class AgentService:
         try:
             active_agent_count = self._agents.count_active_agents_for_user(self._session, user_id=user.id)
             if active_agent_count >= max_agents:
-                raise ValidationError(f"Only {max_agents} agents can be created.")
+                raise ValidationError(f"Можно создать не больше {max_agents} агентов")
             normalized_icon_key = self._normalize_icon_key(icon_key)
             if normalized_icon_key is not None:
                 self._ensure_icon_exists(normalized_icon_key)
@@ -126,11 +126,12 @@ class AgentService:
                 session=self._session,
                 settings_repository=self._model_provider_settings,
             )
-            client, model = provider_service.get_model_client(settings)
+            client, model, api_mode = provider_service.get_model_client(settings)
             icons = self._agents.list_icons(self._session)
             generated = self._generate_agent_payload(
                 client=client,
                 model=model,
+                api_mode=api_mode,
                 name=normalized_name,
                 current_system_prompt=system_prompt,
                 icons=icons,
@@ -242,12 +243,14 @@ class AgentService:
         *,
         client,
         model: str,
+        api_mode: str,
         name: str,
         current_system_prompt: str | None,
         icons: list[AgentIcon],
     ) -> dict[str, str]:
         icon_options = "\n".join(f"- {icon.icon_key}: {icon.label}" for icon in icons)
-        content = client.create_chat_completion(
+        content = client.create_text_completion(
+            api_mode=api_mode,
             model=model,
             messages=[
                 {"role": "system", "content": AGENT_SYSTEM_PROMPT_GENERATION_PROMPT},
@@ -267,11 +270,11 @@ class AgentService:
         try:
             payload = json.loads(content)
         except json.JSONDecodeError as exc:
-            raise ValidationError("Provider returned invalid agent configuration.") from exc
+            raise ValidationError("Провайдер вернул некорректную настройку агента") from exc
         if not isinstance(payload, dict) or not isinstance(payload.get("system_prompt"), str):
-            raise ValidationError("Provider returned invalid agent configuration.")
+            raise ValidationError("Провайдер вернул некорректную настройку агента")
         if not isinstance(payload.get("icon_key"), str):
-            raise ValidationError("Provider returned invalid agent configuration.")
+            raise ValidationError("Провайдер вернул некорректную настройку агента")
         return payload
 
     @staticmethod

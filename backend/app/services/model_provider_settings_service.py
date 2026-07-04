@@ -7,7 +7,11 @@ from app.models.model_provider_settings import ModelProviderSettings
 from app.models.user import User
 from app.repositories.model_provider_settings_repository import ModelProviderSettingsRepository
 from app.services.exceptions import ValidationError
-from app.services.openai_compatible_client import OpenAICompatibleClient
+from app.services.openai_compatible_client import (
+    CHAT_COMPLETIONS_API_MODE,
+    RESPONSES_API_MODE,
+    OpenAICompatibleClient,
+)
 
 OPENAI_PROVIDER = "openai"
 EMBEDDING_PROVIDER = "embedding"
@@ -17,6 +21,7 @@ OPENAI_API_TOKEN_PREFIX = "Bearer"
 OPENAI_PROJECT_HEADER_NAME = "OpenAI-Project"
 YANDEX_API_TOKEN_PREFIX = "Api-Key"
 YANDEX_PROJECT_HEADER_NAME = "x-project"
+SUPPORTED_API_MODES = {CHAT_COMPLETIONS_API_MODE, RESPONSES_API_MODE}
 
 
 class ModelProviderSettingsService:
@@ -41,6 +46,7 @@ class ModelProviderSettingsService:
             base_url=settings.model_provider_base_url,
             project_id=settings.model_provider_folder_id,
             model=settings.model_provider_model,
+            api_mode=self._normalize_api_mode(settings.model_provider_api_mode),
             api_token=settings.model_provider_api_key,
         )
 
@@ -54,6 +60,7 @@ class ModelProviderSettingsService:
             base_url=settings.embedding_base_url,
             project_id=settings.embedding_folder_id,
             model=settings.embedding_model,
+            api_mode=CHAT_COMPLETIONS_API_MODE,
             api_token=settings.embedding_api_key,
         )
 
@@ -66,6 +73,7 @@ class ModelProviderSettingsService:
         base_url: str,
         project_id: str | None,
         model: str | None,
+        api_mode: str | None,
         api_token: str | None,
     ) -> ModelProviderSettings:
         try:
@@ -77,6 +85,11 @@ class ModelProviderSettingsService:
                 provider_type=normalized_provider_type,
             )
             normalized_model = self._normalize_model(model)
+            normalized_api_mode = self._normalize_api_mode(api_mode)
+            self._validate_api_mode_for_provider(
+                provider_type=normalized_provider_type,
+                api_mode=normalized_api_mode,
+            )
             normalized_api_token = self._normalize_api_token(api_token)
             settings = self._settings.get_by_provider(self._session, provider)
 
@@ -89,6 +102,7 @@ class ModelProviderSettingsService:
                         base_url=normalized_base_url,
                         project_id=normalized_project_id,
                         model=normalized_model,
+                        api_mode=normalized_api_mode,
                         api_token=normalized_api_token,
                         created_by_user_id=actor.id,
                         updated_by_user_id=actor.id,
@@ -99,6 +113,7 @@ class ModelProviderSettingsService:
                 settings.base_url = normalized_base_url
                 settings.project_id = normalized_project_id
                 settings.model = normalized_model
+                settings.api_mode = normalized_api_mode
                 settings.updated_by_user_id = actor.id
                 if normalized_api_token is not None:
                     settings.api_token = normalized_api_token
@@ -139,6 +154,7 @@ class ModelProviderSettingsService:
         *,
         provider: str,
         provider_type: str,
+        api_mode: str,
         base_url: str,
         project_id: str | None,
         model: str,
@@ -153,13 +169,21 @@ class ModelProviderSettingsService:
             provider_type=normalized_provider_type,
         )
         normalized_model = self._normalize_model(model)
+        normalized_api_mode = self._normalize_api_mode(api_mode)
+        self._validate_api_mode_for_provider(
+            provider_type=normalized_provider_type,
+            api_mode=normalized_api_mode,
+        )
         resolved_api_token = self._resolve_api_token(provider=provider, api_token=api_token, settings=settings)
-        return self._create_provider_client(
+        client = self._create_provider_client(
             provider_type=normalized_provider_type,
             base_url=normalized_base_url,
             api_token=resolved_api_token,
             project_id=normalized_project_id,
-        ).assert_model_available(normalized_model)
+        )
+        if provider == OPENAI_PROVIDER:
+            return client.assert_text_generation_available(model=normalized_model, api_mode=normalized_api_mode)
+        return client.assert_model_available(normalized_model)
 
     def get_default_settings(self, provider: str, settings: Settings) -> ModelProviderSettings:
         self._validate_provider(provider)
@@ -170,6 +194,7 @@ class ModelProviderSettingsService:
                 base_url=settings.embedding_base_url,
                 project_id=settings.embedding_folder_id,
                 model=settings.embedding_model,
+                api_mode=CHAT_COMPLETIONS_API_MODE,
                 api_token=settings.embedding_api_key,
             )
         return ModelProviderSettings(
@@ -178,10 +203,11 @@ class ModelProviderSettingsService:
             base_url=settings.model_provider_base_url,
             project_id=settings.model_provider_folder_id,
             model=settings.model_provider_model,
+            api_mode=self._normalize_api_mode(settings.model_provider_api_mode),
             api_token=settings.model_provider_api_key,
         )
 
-    def get_model_client(self, settings: Settings) -> tuple[OpenAICompatibleClient, str]:
+    def get_model_client(self, settings: Settings) -> tuple[OpenAICompatibleClient, str, str]:
         provider_settings = self.get_model_settings(settings)
         if provider_settings is None:
             raise ValidationError("LLM-провайдер не настроен")
@@ -197,6 +223,7 @@ class ModelProviderSettingsService:
                 project_id=provider_settings.project_id,
             ),
             model,
+            self._normalize_api_mode(provider_settings.api_mode),
         )
 
     def get_embedding_client(self, settings: Settings) -> tuple[OpenAICompatibleClient, str]:
@@ -245,6 +272,18 @@ class ModelProviderSettingsService:
         return normalized
 
     @staticmethod
+    def _normalize_api_mode(api_mode: str | None) -> str:
+        normalized = (api_mode or CHAT_COMPLETIONS_API_MODE).strip()
+        if normalized not in SUPPORTED_API_MODES:
+            raise ValidationError("Неизвестный режим API провайдера")
+        return normalized
+
+    @staticmethod
+    def _validate_api_mode_for_provider(*, provider_type: str, api_mode: str) -> None:
+        if provider_type == YANDEX_AI_STUDIO_PROVIDER_TYPE and api_mode != CHAT_COMPLETIONS_API_MODE:
+            raise ValidationError("Yandex AI Studio работает через Chat Completions")
+
+    @staticmethod
     def _get_provider_type(folder_id: str | None) -> str:
         return YANDEX_AI_STUDIO_PROVIDER_TYPE if folder_id else OPENAI_PROVIDER_TYPE
 
@@ -264,7 +303,7 @@ class ModelProviderSettingsService:
         if not normalized:
             return None
         if len(normalized) > 255:
-            raise ValidationError("Model must contain at most 255 characters.")
+            raise ValidationError("Модель должна быть не длиннее 255 символов")
         return normalized
 
     @staticmethod

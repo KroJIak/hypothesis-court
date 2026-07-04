@@ -6,6 +6,7 @@ from pydantic import BaseModel
 class ModelProviderSettingsResponse(BaseModel):
     provider: str
     provider_type: str
+    api_mode: str
     base_url: str
     project_id: str | None = None
     model: str | None
@@ -16,6 +17,7 @@ class ModelProviderSettingsResponse(BaseModel):
 
 class ModelProviderSettingsUpdateRequest(BaseModel):
     provider_type: str = "openai"
+    api_mode: str = "chat_completions"
     base_url: str
     project_id: str | None = None
     model: str | None = None
@@ -24,6 +26,7 @@ class ModelProviderSettingsUpdateRequest(BaseModel):
 
 class ModelProviderConnectionTestRequest(BaseModel):
     provider_type: str = "openai"
+    api_mode: str = "chat_completions"
     base_url: str
     project_id: str | None = None
     model: str
