@@ -26,9 +26,14 @@ const MIN_CAMERA_SCALE = 0.54;
 const MAX_CAMERA_SCALE = 2.6;
 const CAMERA_ZOOM_INTENSITY = 0.0012;
 const NODE_REPEL_RADIUS = 76;
-const NODE_REPEL_STEP = 28;
+const NODE_REPEL_STEP = 18;
 const NODE_DRAG_LIMIT = 520;
-const ZONE_NODE_PADDING = 72;
+const ZONE_NODE_PADDING = 42;
+const ZONE_AVOID_RADIUS = 96;
+const ZONE_AVOID_STEP = 68;
+const ZONE_MIN_WIDTH = 142;
+const ZONE_MIN_HEIGHT = 96;
+const ZONE_GAP = 22;
 
 const INITIAL_CAMERA = {
   x: 0,
@@ -75,6 +80,46 @@ function createSmoothZonePath(bounds) {
     `C ${left - width * 0.04} ${bottom - height * 0.34}, ${left - width * 0.04} ${top + height * 0.28}, ${left + width * 0.16} ${top + height * 0.04}`,
     "Z",
   ].join(" ");
+}
+
+function expandBounds(bounds, amount) {
+  return {
+    x: bounds.x - amount,
+    y: bounds.y - amount,
+    width: bounds.width + amount * 2,
+    height: bounds.height + amount * 2,
+  };
+}
+
+function getBoundsCenter(bounds) {
+  return {
+    x: bounds.x + bounds.width / 2,
+    y: bounds.y + bounds.height / 2,
+  };
+}
+
+function getDistanceToBounds(point, bounds) {
+  const nearestX = clampNumber(point.x, bounds.x, bounds.x + bounds.width);
+  const nearestY = clampNumber(point.y, bounds.y, bounds.y + bounds.height);
+
+  return Math.hypot(point.x - nearestX, point.y - nearestY);
+}
+
+function doBoundsOverlap(firstBounds, secondBounds, gap = 0) {
+  return !(
+    firstBounds.x + firstBounds.width + gap < secondBounds.x
+    || secondBounds.x + secondBounds.width + gap < firstBounds.x
+    || firstBounds.y + firstBounds.height + gap < secondBounds.y
+    || secondBounds.y + secondBounds.height + gap < firstBounds.y
+  );
+}
+
+function addOffsetToBounds(bounds, offset) {
+  return {
+    ...bounds,
+    x: bounds.x + offset.x,
+    y: bounds.y + offset.y,
+  };
 }
 
 function createEdgePath(fromNode, toNode) {
@@ -207,19 +252,119 @@ function repelNearbyNodes(nodes, draggedNodeId, draggedPosition, currentPosition
 function createZoneBounds(zoneId, nodes) {
   const layout = ZONE_LAYOUTS[zoneId];
   const zoneNodes = nodes.filter((node) => node.zone === zoneId);
+
+  if (zoneNodes.length === 0) {
+    return {
+      x: layout.x,
+      y: layout.y,
+      width: layout.width,
+      height: layout.height,
+    };
+  }
+
   const nodeXs = zoneNodes.map((node) => node.x);
   const nodeYs = zoneNodes.map((node) => node.y);
-  const minX = Math.min(layout.x, ...nodeXs) - ZONE_NODE_PADDING;
-  const minY = Math.min(layout.y, ...nodeYs) - ZONE_NODE_PADDING;
-  const maxX = Math.max(layout.x + layout.width, ...nodeXs) + ZONE_NODE_PADDING;
-  const maxY = Math.max(layout.y + layout.height, ...nodeYs) + ZONE_NODE_PADDING;
+  const rawMinX = Math.min(...nodeXs) - ZONE_NODE_PADDING;
+  const rawMinY = Math.min(...nodeYs) - ZONE_NODE_PADDING;
+  const rawMaxX = Math.max(...nodeXs) + ZONE_NODE_PADDING;
+  const rawMaxY = Math.max(...nodeYs) + ZONE_NODE_PADDING;
+  const rawWidth = rawMaxX - rawMinX;
+  const rawHeight = rawMaxY - rawMinY;
+  const width = Math.max(rawWidth, ZONE_MIN_WIDTH);
+  const height = Math.max(rawHeight, ZONE_MIN_HEIGHT);
+  const centerX = (rawMinX + rawMaxX) / 2;
+  const centerY = (rawMinY + rawMaxY) / 2;
 
   return {
-    x: minX,
-    y: minY,
-    width: maxX - minX,
-    height: maxY - minY,
+    x: centerX - width / 2,
+    y: centerY - height / 2,
+    width,
+    height,
   };
+}
+
+function getZoneAvoidanceOffsets(zoneBounds, draggedNode) {
+  const offsets = new Map();
+
+  if (!draggedNode) {
+    return offsets;
+  }
+
+  zoneBounds.forEach((zone) => {
+    if (!zone.bounds || zone.id === draggedNode.zone) {
+      return;
+    }
+
+    const expandedBounds = expandBounds(zone.bounds, ZONE_AVOID_RADIUS);
+    const distance = getDistanceToBounds(draggedNode, expandedBounds);
+
+    if (distance > ZONE_AVOID_RADIUS) {
+      return;
+    }
+
+    const center = getBoundsCenter(zone.bounds);
+    const dx = center.x - draggedNode.x;
+    const dy = center.y - draggedNode.y;
+    const length = Math.hypot(dx, dy) || 1;
+    const strength = 1 - distance / ZONE_AVOID_RADIUS;
+
+    offsets.set(zone.id, {
+      x: (dx / length) * ZONE_AVOID_STEP * strength,
+      y: (dy / length) * ZONE_AVOID_STEP * strength,
+    });
+  });
+
+  return offsets;
+}
+
+function resolveZoneOverlaps(zoneBounds, initialOffsets) {
+  const offsets = new Map(initialOffsets);
+
+  zoneBounds.forEach((zone) => {
+    if (!offsets.has(zone.id)) {
+      offsets.set(zone.id, { x: 0, y: 0 });
+    }
+  });
+
+  for (let iteration = 0; iteration < 4; iteration += 1) {
+    for (let firstIndex = 0; firstIndex < zoneBounds.length; firstIndex += 1) {
+      for (let secondIndex = firstIndex + 1; secondIndex < zoneBounds.length; secondIndex += 1) {
+        const firstZone = zoneBounds[firstIndex];
+        const secondZone = zoneBounds[secondIndex];
+
+        if (!firstZone.bounds || !secondZone.bounds) {
+          continue;
+        }
+
+        const firstOffset = offsets.get(firstZone.id) ?? { x: 0, y: 0 };
+        const secondOffset = offsets.get(secondZone.id) ?? { x: 0, y: 0 };
+        const firstBounds = addOffsetToBounds(firstZone.bounds, firstOffset);
+        const secondBounds = addOffsetToBounds(secondZone.bounds, secondOffset);
+
+        if (!doBoundsOverlap(firstBounds, secondBounds, ZONE_GAP)) {
+          continue;
+        }
+
+        const firstCenter = getBoundsCenter(firstBounds);
+        const secondCenter = getBoundsCenter(secondBounds);
+        const dx = firstCenter.x - secondCenter.x;
+        const dy = firstCenter.y - secondCenter.y;
+        const length = Math.hypot(dx, dy) || 1;
+        const push = 12;
+
+        offsets.set(firstZone.id, {
+          x: firstOffset.x + (dx / length) * push,
+          y: firstOffset.y + (dy / length) * push,
+        });
+        offsets.set(secondZone.id, {
+          x: secondOffset.x - (dx / length) * push,
+          y: secondOffset.y - (dy / length) * push,
+        });
+      }
+    }
+  }
+
+  return offsets;
 }
 
 function SourceQuote({ source }) {
@@ -273,6 +418,11 @@ export function KnowledgeGraphModal({
 }) {
   const svgRef = useRef(null);
   const dragStateRef = useRef(null);
+  const cameraRef = useRef(INITIAL_CAMERA);
+  const cameraFrameRef = useRef(null);
+  const pendingCameraRef = useRef(null);
+  const nodePositionsFrameRef = useRef(null);
+  const pendingNodePositionsRef = useRef(null);
   const [activeItem, setActiveItem] = useState(null);
   const [camera, setCamera] = useState(INITIAL_CAMERA);
   const [nodePositions, setNodePositions] = useState({});
@@ -303,7 +453,29 @@ export function KnowledgeGraphModal({
         y: savedPosition?.y ?? basePosition.y,
       };
     });
-    const nodeById = new Map(nodes.map((node) => [node.id, node]));
+    const initialZoneBounds = graph.zones.map((zone) => ({
+      ...zone,
+      bounds: ZONE_LAYOUTS[zone.id] ? createZoneBounds(zone.id, nodes) : null,
+    }));
+    const draggedNode = draggedNodeId ? nodes.find((node) => node.id === draggedNodeId) : null;
+    const zoneOffsets = resolveZoneOverlaps(
+      initialZoneBounds,
+      getZoneAvoidanceOffsets(initialZoneBounds, draggedNode),
+    );
+    const visualNodes = nodes.map((node) => {
+      if (node.id === draggedNodeId) {
+        return node;
+      }
+
+      const offset = zoneOffsets.get(node.zone) ?? { x: 0, y: 0 };
+
+      return {
+        ...node,
+        x: node.x + offset.x,
+        y: node.y + offset.y,
+      };
+    });
+    const nodeById = new Map(visualNodes.map((node) => [node.id, node]));
     const edges = graph.edges
       .map((edge) => {
         const fromNode = nodeById.get(edge.from);
@@ -319,30 +491,87 @@ export function KnowledgeGraphModal({
         };
       })
       .filter(Boolean);
-    const zoneBounds = graph.zones.map((zone) => ({
+    const zoneBounds = initialZoneBounds.map((zone) => ({
       ...zone,
-      bounds: ZONE_LAYOUTS[zone.id] ? createZoneBounds(zone.id, nodes) : null,
+      bounds: zone.bounds
+        ? addOffsetToBounds(zone.bounds, zoneOffsets.get(zone.id) ?? { x: 0, y: 0 })
+        : null,
     }));
 
     return {
       ...graph,
-      nodes,
+      nodes: visualNodes,
+      actualNodes: nodes,
       edges,
       nodeById,
       zoneBounds,
     };
-  }, [graph, nodePositions]);
+  }, [draggedNodeId, graph, nodePositions]);
   const connectedIds = useMemo(
     () => getConnectedIds(positionedGraph, activeItem),
     [activeItem, positionedGraph],
   );
 
   useEffect(() => {
+    cameraRef.current = INITIAL_CAMERA;
     setCamera(INITIAL_CAMERA);
     setNodePositions({});
     setDraggedNodeId(null);
     setActiveItem(null);
   }, [session.id]);
+
+  useEffect(() => {
+    cameraRef.current = camera;
+  }, [camera]);
+
+  useEffect(() => () => {
+    if (cameraFrameRef.current) {
+      window.cancelAnimationFrame(cameraFrameRef.current);
+    }
+
+    if (nodePositionsFrameRef.current) {
+      window.cancelAnimationFrame(nodePositionsFrameRef.current);
+    }
+  }, []);
+
+  const scheduleCameraUpdate = useCallback((nextCamera) => {
+    pendingCameraRef.current = nextCamera;
+
+    if (cameraFrameRef.current) {
+      return;
+    }
+
+    cameraFrameRef.current = window.requestAnimationFrame(() => {
+      cameraFrameRef.current = null;
+      const pendingCamera = pendingCameraRef.current;
+      pendingCameraRef.current = null;
+
+      if (!pendingCamera) {
+        return;
+      }
+
+      cameraRef.current = pendingCamera;
+      setCamera(pendingCamera);
+    });
+  }, []);
+
+  const scheduleNodePositionsUpdate = useCallback((nextPositions) => {
+    pendingNodePositionsRef.current = nextPositions;
+
+    if (nodePositionsFrameRef.current) {
+      return;
+    }
+
+    nodePositionsFrameRef.current = window.requestAnimationFrame(() => {
+      nodePositionsFrameRef.current = null;
+      const pendingPositions = pendingNodePositionsRef.current;
+      pendingNodePositionsRef.current = null;
+
+      if (pendingPositions) {
+        setNodePositions(pendingPositions);
+      }
+    });
+  }, []);
 
   useEffect(() => {
     function handleKeyDown(event) {
@@ -407,25 +636,24 @@ export function KnowledgeGraphModal({
 
     const svgPoint = getSvgPoint(event, svgElement);
 
-    setCamera((currentCamera) => {
-      const scale = clampNumber(nextScale, MIN_CAMERA_SCALE, MAX_CAMERA_SCALE);
-      const worldX = (svgPoint.x - currentCamera.x) / currentCamera.scale;
-      const worldY = (svgPoint.y - currentCamera.y) / currentCamera.scale;
+    const currentCamera = cameraRef.current;
+    const scale = clampNumber(nextScale, MIN_CAMERA_SCALE, MAX_CAMERA_SCALE);
+    const worldX = (svgPoint.x - currentCamera.x) / currentCamera.scale;
+    const worldY = (svgPoint.y - currentCamera.y) / currentCamera.scale;
 
-      return {
-        scale,
-        x: svgPoint.x - worldX * scale,
-        y: svgPoint.y - worldY * scale,
-      };
+    scheduleCameraUpdate({
+      scale,
+      x: svgPoint.x - worldX * scale,
+      y: svgPoint.y - worldY * scale,
     });
-  }, []);
+  }, [scheduleCameraUpdate]);
 
   const handleGraphWheel = useCallback((event) => {
     event.preventDefault();
-    const nextScale = camera.scale * Math.exp(-event.deltaY * CAMERA_ZOOM_INTENSITY);
+    const nextScale = cameraRef.current.scale * Math.exp(-event.deltaY * CAMERA_ZOOM_INTENSITY);
 
     zoomCameraAt(event, nextScale);
-  }, [camera.scale, zoomCameraAt]);
+  }, [zoomCameraAt]);
 
   const handleGraphPointerDown = useCallback((event) => {
     if (event.button !== 0 || !svgRef.current) {
@@ -439,12 +667,12 @@ export function KnowledgeGraphModal({
       pointerId: event.pointerId,
       startX: svgPoint.x,
       startY: svgPoint.y,
-      camera,
+      camera: cameraRef.current,
     };
     setIsCameraDragging(true);
     setActiveItem(null);
     event.currentTarget.setPointerCapture(event.pointerId);
-  }, [camera]);
+  }, []);
 
   const handleNodePointerDown = useCallback((event, node) => {
     if (event.button !== 0 || !svgRef.current) {
@@ -452,7 +680,7 @@ export function KnowledgeGraphModal({
     }
 
     event.stopPropagation();
-    const worldPoint = getWorldPoint(event, svgRef.current, camera);
+    const worldPoint = getWorldPoint(event, svgRef.current, cameraRef.current);
 
     dragStateRef.current = {
       type: "node",
@@ -464,7 +692,7 @@ export function KnowledgeGraphModal({
     setDraggedNodeId(node.id);
     setActiveItem(null);
     event.currentTarget.setPointerCapture(event.pointerId);
-  }, [camera]);
+  }, []);
 
   const handleGraphPointerMove = useCallback((event) => {
     const dragState = dragStateRef.current;
@@ -477,24 +705,32 @@ export function KnowledgeGraphModal({
     if (dragState.type === "camera") {
       const svgPoint = getSvgPoint(event, svgElement);
 
-      setCamera({
+      const nextCamera = {
         ...dragState.camera,
         x: dragState.camera.x + svgPoint.x - dragState.startX,
         y: dragState.camera.y + svgPoint.y - dragState.startY,
-      });
+      };
+
+      scheduleCameraUpdate(nextCamera);
       return;
     }
 
-    const worldPoint = getWorldPoint(event, svgElement, camera);
+    const worldPoint = getWorldPoint(event, svgElement, cameraRef.current);
     const draggedPosition = {
       x: clampGraphCoordinate(worldPoint.x + dragState.offsetX, GRAPH_WIDTH),
       y: clampGraphCoordinate(worldPoint.y + dragState.offsetY, GRAPH_HEIGHT),
     };
 
-    setNodePositions((currentPositions) =>
-      repelNearbyNodes(positionedGraph.nodes, dragState.nodeId, draggedPosition, currentPositions),
+    const currentPositions = pendingNodePositionsRef.current ?? nodePositions;
+    const nextPositions = repelNearbyNodes(
+      positionedGraph.actualNodes ?? positionedGraph.nodes,
+      dragState.nodeId,
+      draggedPosition,
+      currentPositions,
     );
-  }, [camera, positionedGraph.nodes]);
+
+    scheduleNodePositionsUpdate(nextPositions);
+  }, [nodePositions, positionedGraph.actualNodes, positionedGraph.nodes, scheduleCameraUpdate, scheduleNodePositionsUpdate]);
 
   const handleGraphPointerUp = useCallback((event) => {
     const dragState = dragStateRef.current;
@@ -507,21 +743,21 @@ export function KnowledgeGraphModal({
   }, []);
 
   const handleControlZoom = useCallback((scaleMultiplier) => {
-    setCamera((currentCamera) => {
-      const nextScale = clampNumber(currentCamera.scale * scaleMultiplier, MIN_CAMERA_SCALE, MAX_CAMERA_SCALE);
-      const center = { x: GRAPH_WIDTH / 2, y: GRAPH_HEIGHT / 2 };
-      const worldX = (center.x - currentCamera.x) / currentCamera.scale;
-      const worldY = (center.y - currentCamera.y) / currentCamera.scale;
+    const currentCamera = cameraRef.current;
+    const nextScale = clampNumber(currentCamera.scale * scaleMultiplier, MIN_CAMERA_SCALE, MAX_CAMERA_SCALE);
+    const center = { x: GRAPH_WIDTH / 2, y: GRAPH_HEIGHT / 2 };
+    const worldX = (center.x - currentCamera.x) / currentCamera.scale;
+    const worldY = (center.y - currentCamera.y) / currentCamera.scale;
 
-      return {
-        scale: nextScale,
-        x: center.x - worldX * nextScale,
-        y: center.y - worldY * nextScale,
-      };
+    scheduleCameraUpdate({
+      scale: nextScale,
+      x: center.x - worldX * nextScale,
+      y: center.y - worldY * nextScale,
     });
-  }, []);
+  }, [scheduleCameraUpdate]);
 
   const handleResetView = useCallback(() => {
+    cameraRef.current = INITIAL_CAMERA;
     setCamera(INITIAL_CAMERA);
   }, []);
 
