@@ -126,6 +126,7 @@ export function Composer({
     COMPOSER_CONTEXT_OPTIONS.find((option) => option.value === composerContext) ?? COMPOSER_CONTEXT_OPTIONS[0];
   const hasDraftMessage = draftMessage.trim().length > 0;
   const isStartMode = !hasDraftMessage && composerRequests.length > 0;
+  const isSubmitDisabled = isAttachmentUploading;
 
   useEffect(() => {
     if (!requestStackRef.current) {
@@ -236,11 +237,15 @@ export function Composer({
 
   const handleSubmit = useCallback((event) => {
     event.preventDefault();
+    if (isSubmitDisabled) {
+      return;
+    }
+
     onSend({
       context: selectedContext,
       text: draftMessage,
     });
-  }, [draftMessage, onSend, selectedContext]);
+  }, [draftMessage, isSubmitDisabled, onSend, selectedContext]);
 
   const handleInputKeyDown = useCallback((event) => {
     if (event.key !== "Enter" || event.shiftKey) {
@@ -393,6 +398,7 @@ export function Composer({
                   ? "composer-action composer-action--primary composer-action--start"
                   : "composer-action composer-action--primary"
               }
+              disabled={isSubmitDisabled}
               aria-label={isStartMode ? "Старт" : composer.sendLabel}
             >
               {isStartMode ? (

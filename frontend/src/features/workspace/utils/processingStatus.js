@@ -14,8 +14,8 @@ import {
 
 const attachmentProcessingMetaByStatus = {
   [DOCUMENT_PROCESSING_STATUS_UPLOADED]: {
-    badgeStatus: PROCESSING_STATUS_PROCESSING,
-    label: "Ожидает обработки",
+    badgeStatus: PROCESSING_STATUS_PROCESSED,
+    label: "Файл загружен",
   },
   [DOCUMENT_PROCESSING_STATUS_PROCESSING]: {
     badgeStatus: PROCESSING_STATUS_PROCESSING,
