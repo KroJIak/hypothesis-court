@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   FileArchive,
@@ -19,9 +19,23 @@ import {
   ATTACHMENT_TOOLTIP_EDGE_OFFSET,
   ATTACHMENT_TOOLTIP_GAP,
   COMPOSER_CONTEXT_OPTIONS,
+  PROCESSING_STATUS_PROCESSING,
+  PROCESSING_STATUS_PROCESSED,
 } from "../constants";
 import { clampNumber } from "../utils/format";
 import { ProcessingStatusBadge } from "./ProcessingStatusBadge";
+
+const ATTACHMENT_STAGE_TICK_MS = 240;
+const ATTACHMENT_STAGE_MS = 900;
+const ATTACHMENT_STAGE_STAGGER_MS = 420;
+const attachmentProcessingTimelines = new Map();
+
+const ATTACHMENT_PROCESSING_STAGES = [
+  { value: "parsing", label: "Разбор файла", status: PROCESSING_STATUS_PROCESSING },
+  { value: "chunked", label: "Фрагментация", status: PROCESSING_STATUS_PROCESSING },
+  { value: "indexed", label: "Индексация", status: PROCESSING_STATUS_PROCESSING },
+  { value: "done", label: "Готово", status: PROCESSING_STATUS_PROCESSED },
+];
 
 const attachmentIconByKind = {
   csv: FileSpreadsheet,
@@ -47,8 +61,90 @@ function getAttachmentTypeLabel(attachment) {
   return (attachment.shortLabel ?? attachment.kind ?? "file").toLocaleUpperCase();
 }
 
+function createAttachmentProcessingSignature(attachments) {
+  return attachments.map((attachment) => attachment.id).join(",");
+}
+
+function getOrCreateAttachmentProcessingTimeline(sessionId, attachments) {
+  if (!sessionId) {
+    return null;
+  }
+
+  const signature = createAttachmentProcessingSignature(attachments);
+  const existingTimeline = attachmentProcessingTimelines.get(sessionId);
+
+  if (existingTimeline?.signature === signature) {
+    return existingTimeline;
+  }
+
+  const nextTimeline = {
+    signature,
+    startedAt: Date.now(),
+  };
+
+  attachmentProcessingTimelines.set(sessionId, nextTimeline);
+
+  return nextTimeline;
+}
+
+function getAttachmentSizeRank(attachment, index) {
+  return Number.isFinite(attachment.sizeKb) ? attachment.sizeKb : index;
+}
+
+function getAttachmentProcessingOrder(attachments) {
+  return new Map(
+    attachments
+      .map((attachment, index) => ({
+        id: attachment.id,
+        originalIndex: index,
+        sizeRank: getAttachmentSizeRank(attachment, index),
+      }))
+      .sort((firstAttachment, secondAttachment) => {
+        if (secondAttachment.sizeRank !== firstAttachment.sizeRank) {
+          return secondAttachment.sizeRank - firstAttachment.sizeRank;
+        }
+
+        return firstAttachment.originalIndex - secondAttachment.originalIndex;
+      })
+      .map((attachment, processingIndex) => [attachment.id, processingIndex]),
+  );
+}
+
+function getAttachmentProcessingStage(processingIndex, elapsedMs) {
+  const attachmentElapsedMs = Math.max(0, elapsedMs - (processingIndex * ATTACHMENT_STAGE_STAGGER_MS));
+  const stageIndex = Math.min(
+    ATTACHMENT_PROCESSING_STAGES.length - 1,
+    Math.floor(attachmentElapsedMs / ATTACHMENT_STAGE_MS),
+  );
+
+  return ATTACHMENT_PROCESSING_STAGES[stageIndex] ?? ATTACHMENT_PROCESSING_STAGES[0];
+}
+
+function getAttachmentViewModels(attachments, isProcessRunning, timeline, now) {
+  if (!isProcessRunning || !timeline || attachments.length === 0) {
+    return attachments;
+  }
+
+  const elapsedMs = Math.max(0, now - timeline.startedAt);
+  const processingOrder = getAttachmentProcessingOrder(attachments);
+
+  return attachments.map((attachment, index) => {
+    const processingIndex = processingOrder.get(attachment.id) ?? index;
+    const stage = getAttachmentProcessingStage(processingIndex, elapsedMs);
+
+    return {
+      ...attachment,
+      processingStatus: stage.status,
+      processingStage: stage.value,
+      processingStageLabel: stage.label,
+      tooltip: `${attachment.tooltip} · ${stage.label}`,
+    };
+  });
+}
+
 function AttachmentChip({
   attachment,
+  canRemoveAttachment,
   setAttachmentButtonRef,
   showAttachmentTooltip,
   hideAttachmentTooltip,
@@ -75,28 +171,32 @@ function AttachmentChip({
           {attachmentTypeLabel}
         </span>
       </button>
-      <button
-        type="button"
-        className="attachment-chip__remove"
-        aria-label={`Удалить вложение ${attachment.tooltip}`}
-        onClick={() => {
-          hideAttachmentTooltip();
-          onRemoveAttachment?.(attachment.id);
-        }}
-      >
-        <X aria-hidden="true" strokeWidth={2.1} />
-      </button>
+      {canRemoveAttachment ? (
+        <button
+          type="button"
+          className="attachment-chip__remove"
+          aria-label={`Удалить вложение ${attachment.tooltip}`}
+          onClick={() => {
+            hideAttachmentTooltip();
+            onRemoveAttachment?.(attachment.id);
+          }}
+        >
+          <X aria-hidden="true" strokeWidth={2.1} />
+        </button>
+      ) : null}
     </div>
   );
 }
 
 export function Composer({
   composer,
+  sessionId,
   attachments,
   composerRequests,
   draftMessage,
   isAttachmentUploading = false,
   isProcessRunning = false,
+  canEditAttachments = true,
   onAttachFiles,
   onDraftMessageChange,
   onRemoveAttachment,
@@ -111,7 +211,23 @@ export function Composer({
   const [attachmentTooltipStyle, setAttachmentTooltipStyle] = useState({ left: "0px", top: "0px" });
   const [composerContext, setComposerContext] = useState(COMPOSER_CONTEXT_OPTIONS[0].value);
   const [isContextMenuOpen, setIsContextMenuOpen] = useState(false);
-  const activeAttachment = attachments.find((attachment) => attachment.id === activeAttachmentId) ?? null;
+  const [attachmentNow, setAttachmentNow] = useState(() => Date.now());
+  const attachmentTimeline = useMemo(() => {
+    if (!isProcessRunning) {
+      if (sessionId) {
+        attachmentProcessingTimelines.delete(sessionId);
+      }
+
+      return null;
+    }
+
+    return getOrCreateAttachmentProcessingTimeline(sessionId, attachments);
+  }, [attachments, isProcessRunning, sessionId]);
+  const attachmentViewModels = useMemo(
+    () => getAttachmentViewModels(attachments, isProcessRunning, attachmentTimeline, attachmentNow),
+    [attachmentNow, attachmentTimeline, attachments, isProcessRunning],
+  );
+  const activeAttachment = attachmentViewModels.find((attachment) => attachment.id === activeAttachmentId) ?? null;
   const selectedContext =
     COMPOSER_CONTEXT_OPTIONS.find((option) => option.value === composerContext) ?? COMPOSER_CONTEXT_OPTIONS[0];
   const hasDraftMessage = draftMessage.trim().length > 0;
@@ -124,6 +240,20 @@ export function Composer({
 
     requestStackRef.current.scrollTop = requestStackRef.current.scrollHeight;
   }, [composerRequests.length]);
+
+  useEffect(() => {
+    setAttachmentNow(Date.now());
+
+    if (!isProcessRunning || attachments.length === 0) {
+      return undefined;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setAttachmentNow(Date.now());
+    }, ATTACHMENT_STAGE_TICK_MS);
+
+    return () => window.clearInterval(intervalId);
+  }, [attachments.length, isProcessRunning]);
 
   const setAttachmentButtonRef = useCallback((attachmentId, node) => {
     if (node) {
@@ -206,12 +336,12 @@ export function Composer({
   }, []);
 
   const handleOpenAttachmentPicker = useCallback(() => {
-    if (isAttachmentUploading) {
+    if (isAttachmentUploading || !canEditAttachments) {
       return;
     }
 
     attachmentInputRef.current?.click();
-  }, [isAttachmentUploading]);
+  }, [canEditAttachments, isAttachmentUploading]);
 
   const handleAttachmentInputChange = useCallback((event) => {
     const files = Array.from(event.target.files ?? []);
@@ -242,13 +372,14 @@ export function Composer({
   }, []);
 
   return (
-    <div className="composer-shell">
+    <div className={isProcessRunning ? "composer-shell composer-shell--running" : "composer-shell"}>
       <div className="attachment-dock">
         <div className="attachment-rail" aria-label="Вложения" onScroll={handleAttachmentRailScroll}>
-          {attachments.map((attachment) => (
+          {attachmentViewModels.map((attachment) => (
             <AttachmentChip
               key={attachment.id}
               attachment={attachment}
+              canRemoveAttachment={canEditAttachments}
               setAttachmentButtonRef={setAttachmentButtonRef}
               showAttachmentTooltip={showAttachmentTooltip}
               hideAttachmentTooltip={hideAttachmentTooltip}
@@ -263,15 +394,17 @@ export function Composer({
           multiple
           onChange={handleAttachmentInputChange}
         />
-        <button
-          type="button"
-          className="attachment-attach-button"
-          aria-label={composer.attachLabel}
-          disabled={isAttachmentUploading}
-          onClick={handleOpenAttachmentPicker}
-        >
-          <Paperclip aria-hidden="true" strokeWidth={1.9} />
-        </button>
+        {canEditAttachments ? (
+          <button
+            type="button"
+            className="attachment-attach-button"
+            aria-label={composer.attachLabel}
+            disabled={isAttachmentUploading}
+            onClick={handleOpenAttachmentPicker}
+          >
+            <Paperclip aria-hidden="true" strokeWidth={1.9} />
+          </button>
+        ) : null}
       </div>
       {activeAttachment && typeof document !== "undefined"
         ? createPortal(

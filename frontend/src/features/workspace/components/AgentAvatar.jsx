@@ -1,18 +1,55 @@
 import {
   BadgeDollarSign,
+  BrainCircuit,
+  Boxes,
   ChartColumnBig,
+  ClipboardCheck,
+  Cpu,
+  Database,
   FileSearch,
+  FlaskConical,
   Gavel,
   HardHat,
   Leaf,
+  Lightbulb,
+  Microscope,
+  Network,
+  Radar,
+  Scale,
   Shield,
   ShieldAlert,
   Swords,
+  Target,
   TriangleAlert,
+  Wrench,
   UserRound,
 } from "lucide-react";
 
-const accessoryByVariant = {
+export const agentAvatarVariantOptions = [
+  { value: "attacker", label: "Атакующий" },
+  { value: "defender", label: "Защитник" },
+  { value: "ecology", label: "Экология" },
+  { value: "finance", label: "Финансы" },
+  { value: "manufacturer", label: "Производство" },
+  { value: "patent", label: "Патенты" },
+  { value: "risk", label: "Риски" },
+  { value: "safety", label: "Безопасность" },
+  { value: "scaling", label: "Масштабирование" },
+  { value: "research", label: "Исследования" },
+  { value: "quality", label: "Качество" },
+  { value: "legal", label: "Право" },
+  { value: "engineering", label: "Инжиниринг" },
+  { value: "data", label: "Данные" },
+  { value: "strategy", label: "Стратегия" },
+  { value: "operations", label: "Операции" },
+  { value: "innovation", label: "Идеи" },
+  { value: "systems", label: "Системы" },
+  { value: "materials", label: "Материалы" },
+  { value: "diagnostics", label: "Диагностика" },
+  { value: "validation", label: "Валидация" },
+];
+
+export const accessoryByVariant = {
   attacker: Swords,
   defender: Shield,
   ecology: Leaf,
@@ -24,7 +61,25 @@ const accessoryByVariant = {
   risk: TriangleAlert,
   safety: ShieldAlert,
   scaling: ChartColumnBig,
+  research: Microscope,
+  quality: ClipboardCheck,
+  legal: Scale,
+  engineering: Wrench,
+  data: Database,
+  strategy: Target,
+  operations: Boxes,
+  innovation: Lightbulb,
+  systems: Network,
+  materials: FlaskConical,
+  diagnostics: Radar,
+  validation: Cpu,
 };
+
+export function AgentVariantIcon({ variant, className = "", strokeWidth = 2 }) {
+  const Icon = accessoryByVariant[variant] ?? BrainCircuit;
+
+  return <Icon className={className} aria-hidden="true" strokeWidth={strokeWidth} />;
+}
 
 export function AgentAvatar({ variant, size = "regular" }) {
   const AccessoryIcon = accessoryByVariant[variant] ?? null;

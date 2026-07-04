@@ -6,6 +6,10 @@ import { HypothesisCandidates } from "./HypothesisCandidates";
 import { useScenePlayback } from "../hooks/useScenePlayback";
 import { getElementCenter, createStraightPath } from "../utils/geometry";
 
+function clampNumber(value, min, max) {
+  return Math.min(Math.max(value, min), max);
+}
+
 export function WorkspaceScene({
   session,
   onAgentDragStart,
@@ -13,6 +17,7 @@ export function WorkspaceScene({
   onDropAgentToEvaluation,
   dragSource,
   isAgentEditingLocked,
+  onVerdictComplete,
 }) {
   const sceneRef = useRef(null);
   const manufacturerAvatarRef = useRef(null);
@@ -22,6 +27,7 @@ export function WorkspaceScene({
   const {
     activeDebateConnectionDirections,
     activeEvaluationConnectionDirections,
+    debateCycleNumber,
     debateRoleStatuses,
     evaluationAgentStatuses,
     hypotheses,
@@ -73,20 +79,6 @@ export function WorkspaceScene({
   }
 
   useLayoutEffect(() => {
-    const scrollContainer = sceneRef.current?.parentElement;
-
-    if (!scrollContainer) {
-      return;
-    }
-
-    scrollContainer.scrollTo({
-      top: 0,
-      left: 0,
-      behavior: "auto",
-    });
-  }, [session.id]);
-
-  useLayoutEffect(() => {
     const updateConnections = () => {
       const sceneElement = sceneRef.current;
       const manufacturerAvatar = manufacturerAvatarRef.current;
@@ -100,6 +92,10 @@ export function WorkspaceScene({
       const manufacturerSource = getElementCenter(manufacturerAvatar, sceneRect);
       const judgeAvatar = judgeAvatarRef.current;
       const judgeTarget = judgeAvatar ? getElementCenter(judgeAvatar, sceneRect) : null;
+      const evaluationViewport = sceneElement.querySelector(".evaluation-stage__agents");
+      const evaluationViewportRect = evaluationViewport?.getBoundingClientRect();
+      const evaluationMinX = evaluationViewportRect ? evaluationViewportRect.left - sceneRect.left : 0;
+      const evaluationMaxX = evaluationViewportRect ? evaluationViewportRect.right - sceneRect.left : sceneRect.width;
       const agentPaths = session.evaluation.agents
         .flatMap((agent) => {
           const targetElement = evaluationAvatarRefs.current.get(agent.id);
@@ -108,7 +104,11 @@ export function WorkspaceScene({
             return [];
           }
 
-          const agentCenter = getElementCenter(targetElement, sceneRect);
+          const rawAgentCenter = getElementCenter(targetElement, sceneRect);
+          const agentCenter = {
+            ...rawAgentCenter,
+            x: clampNumber(rawAgentCenter.x, evaluationMinX + 2, evaluationMaxX - 2),
+          };
           const agentConnections = [{
             id: `manufacturer-${agent.id}`,
             d: createStraightPath(manufacturerSource, agentCenter),
@@ -185,14 +185,17 @@ export function WorkspaceScene({
         debate={debate}
         manufacturerAvatarRef={manufacturerAvatarRef}
         activeConnectionDirections={activeDebateConnectionDirections}
+        debateCycleNumber={debateCycleNumber}
         hideAgentStatus={!hasHypotheses}
       />
       <EvaluationStage
         evaluation={evaluation}
         sessionId={session.id}
         answer={session.answer}
+        consultationMessages={session.consultationMessages ?? []}
         isAnswerVisible={isAnswerVisible}
         hideAgentStatus={!hasHypotheses}
+        onVerdictComplete={onVerdictComplete}
         onAgentAvatarRef={setEvaluationAvatarRef}
         judgeAvatarRef={judgeAvatarRef}
         onAgentDragStart={onAgentDragStart}

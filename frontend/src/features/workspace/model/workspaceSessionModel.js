@@ -155,7 +155,7 @@ export function formatComposerRequest(request) {
   return `${request.context.label} ${request.text}`;
 }
 
-export function createHypothesesFromRequests(requests, count = 4) {
+export function createHypothesesFromRequests(requests, count = 3) {
   const requestSummary = requests
     .slice(0, 2)
     .map((request) => request.text)
@@ -174,6 +174,51 @@ export function createHypothesesFromRequests(requests, count = 4) {
     description: requestSummary ? `${description} Исходный фокус: ${requestSummary}.` : description,
     processingStatus: getSequentialProcessingStatus(index, count),
   }));
+}
+
+export function createAnswerFromRequests(requests) {
+  const requestSummary = requests
+    .slice(0, 3)
+    .map((request) => `${request.context.label}: ${request.text}`)
+    .join(" ");
+
+  return [
+    "Вердикт: гипотезы прошли полный цикл дебатов и оценки, поэтому запускать следующий шаг можно только как ограниченную проверку с заранее заданными критериями остановки.",
+    requestSummary
+      ? `Ключевые вводные учтены: ${requestSummary}.`
+      : "Ключевые вводные пока заданы кратко, поэтому решение стоит считать предварительным.",
+    "Самая сильная часть кейса - возможность быстро проверить эффект без перестройки всего процесса. Самый слабый участок - риск, что лабораторный выигрыш исчезнет при переносе в повторяемый производственный режим.",
+    "Рекомендация: собрать короткий пилот, закрепить измеримый KPI, отдельно проверить ограничения и вернуться к расширенному обсуждению только после фактических данных.",
+  ].join(" ");
+}
+
+export function createChatTitleFromRequests(requests) {
+  const titleSource = (requests.find((request) => request.context.value === "context") ?? requests[0])?.text ?? "";
+  const normalizedTitle = titleSource
+    .replace(/[.,;:!?]+$/u, "")
+    .split(/\s+/u)
+    .filter(Boolean)
+    .slice(0, 7)
+    .join(" ");
+
+  if (!normalizedTitle) {
+    return "Новая проверка гипотез";
+  }
+
+  return normalizedTitle.length > 54 ? `${normalizedTitle.slice(0, 51).trim()}...` : normalizedTitle;
+}
+
+export function createConsultationAnswer(question, session) {
+  const hypothesisCount = session.hypotheses?.length ?? 0;
+  const focus = hypothesisCount > 0
+    ? `Опираюсь на ${hypothesisCount} выдвинутые гипотезы и уже вынесенный вердикт.`
+    : "Опираюсь на текущие вводные и предварительный вердикт.";
+
+  return [
+    focus,
+    `По вопросу: "${question.trim()}"`,
+    "Короткий ответ: уточните, какая гипотеза важнее для следующего действия, и проверяйте её через самый дешёвый измеримый эксперимент. Если вопрос касается риска, сначала смотрите на ограничения и данные, которые могут быстро опровергнуть гипотезу.",
+  ].join(" ");
 }
 
 export function hasPendingAgent(session) {
@@ -196,6 +241,16 @@ export function splitAgentsAroundCenter(agents, layoutBias = EVALUATION_SIDE_LEF
   };
 }
 
-export function insertEvaluationAgentAtEdge(agents, agent, edge) {
+export function insertEvaluationAgentAtEdge(agents, agent, edge, insertionIndex) {
+  if (Number.isInteger(insertionIndex)) {
+    const safeIndex = Math.min(Math.max(insertionIndex, 0), agents.length);
+
+    return [
+      ...agents.slice(0, safeIndex),
+      agent,
+      ...agents.slice(safeIndex),
+    ];
+  }
+
   return edge === EVALUATION_SIDE_LEFT ? [agent, ...agents] : [...agents, agent];
 }
