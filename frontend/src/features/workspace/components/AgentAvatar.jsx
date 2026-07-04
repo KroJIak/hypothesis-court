@@ -3,6 +3,7 @@ import {
   BrainCircuit,
   Boxes,
   ChartColumnBig,
+  CircleOff,
   ClipboardCheck,
   Cpu,
   Database,
@@ -26,6 +27,7 @@ import {
 } from "lucide-react";
 
 export const agentAvatarVariantOptions = [
+  { value: "empty", label: "Без иконки" },
   { value: "attacker", label: "Атакующий" },
   { value: "defender", label: "Защитник" },
   { value: "ecology", label: "Экология" },
@@ -76,7 +78,7 @@ export const accessoryByVariant = {
 };
 
 export function AgentVariantIcon({ variant, className = "", strokeWidth = 2 }) {
-  const Icon = accessoryByVariant[variant] ?? BrainCircuit;
+  const Icon = variant === "empty" ? CircleOff : accessoryByVariant[variant] ?? BrainCircuit;
 
   return <Icon className={className} aria-hidden="true" strokeWidth={strokeWidth} />;
 }

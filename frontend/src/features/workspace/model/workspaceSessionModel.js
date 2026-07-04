@@ -2,7 +2,6 @@ import {
   DEFAULT_EVALUATION_AGENT_STATUS,
   EVALUATION_SIDE_LEFT,
   EVALUATION_SIDE_RIGHT,
-  PENDING_AGENT_NAME,
 } from "../constants";
 import { getSequentialProcessingStatus } from "../utils/processingStatus";
 
@@ -131,7 +130,7 @@ export function createEvaluationAgent(agent) {
 export function createPendingAgent() {
   return {
     id: `pending-agent-${Date.now()}`,
-    name: PENDING_AGENT_NAME,
+    name: "",
     variant: "empty",
     isEmpty: true,
     isPendingSetup: true,

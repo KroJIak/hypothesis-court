@@ -38,7 +38,8 @@ export function AgentPalette({
   const [iconPickerAgentId, setIconPickerAgentId] = useState(null);
   const [setupPopoverStyle, setSetupPopoverStyle] = useState({ left: "0px", top: "0px" });
   const sortedAgents = sortAvailableAgents(agents);
-  const activePendingAgent = sortedAgents.find((agent) => agent.id === activePendingAgentId) ?? null;
+  const activePendingAgent =
+    sortedAgents.find((agent) => agent.id === activePendingAgentId && agent.isPendingSetup) ?? null;
 
   const setItemRef = useCallback((agentId, node) => {
     if (node) {

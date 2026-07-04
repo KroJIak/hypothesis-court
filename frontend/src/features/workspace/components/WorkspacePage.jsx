@@ -22,7 +22,6 @@ import {
 import {
   AGENT_DRAG_MIME_TYPE,
   EVALUATION_SIDE_RIGHT,
-  PENDING_AGENT_NAME,
 } from "../constants";
 import { useWorkspaceScene } from "../hooks/useWorkspaceScene";
 import { resetScenePlayback } from "../hooks/useScenePlayback";
@@ -481,6 +480,13 @@ export function WorkspacePage({
       return;
     }
 
+    const availableAgents = selectedSession.availableAgents ?? getInitialAvailableAgents(selectedSession, data.palette.agents);
+    const pendingAgent = availableAgents.find((agent) => agent.id === agentId && agent.isPendingSetup);
+
+    if (!pendingAgent) {
+      return;
+    }
+
     setActivePendingAgentId(agentId);
   }
 
@@ -518,9 +524,7 @@ export function WorkspacePage({
       return;
     }
 
-    const nextName = pendingAgent.name?.trim() && pendingAgent.name !== PENDING_AGENT_NAME
-      ? pendingAgent.name.trim()
-      : "Новый эксперт";
+    const nextName = pendingAgent.name?.trim() || "Новый эксперт";
     const prompt = [
       `Ты агент "${nextName}" в проверке гипотез.`,
       "Сфокусируйся на своей зоне ответственности, формулируй выводы коротко и проверяемо.",
@@ -530,7 +534,7 @@ export function WorkspacePage({
 
     handleChangePendingAgentSetup(agentId, {
       name: nextName,
-      variant: pendingAgent.variant === "empty" ? "risk" : pendingAgent.variant,
+      variant: pendingAgent.variant ?? "empty",
       systemPrompt: prompt,
     });
   }
@@ -552,7 +556,7 @@ export function WorkspacePage({
     const configuredAgent = {
       ...pendingAgent,
       name: nextName,
-      variant: pendingAgent.variant === "empty" ? "risk" : pendingAgent.variant,
+      variant: pendingAgent.variant ?? "empty",
       systemPrompt: nextSystemPrompt,
       isCustom: true,
       isEmpty: false,

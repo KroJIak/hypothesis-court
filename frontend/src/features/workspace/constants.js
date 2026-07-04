@@ -1,7 +1,6 @@
 export const COLLAPSED_RECENT_CHAT_LIMIT = 5;
 export const AGENT_DRAG_MIME_TYPE = "application/x-hypothesis-court-agent";
 export const DEFAULT_EVALUATION_AGENT_STATUS = "оценивает";
-export const PENDING_AGENT_NAME = "Новый агент";
 export const EVALUATION_SIDE_LEFT = "left";
 export const EVALUATION_SIDE_RIGHT = "right";
 export const EVALUATION_AGENT_SLOT_WIDTH = 76;

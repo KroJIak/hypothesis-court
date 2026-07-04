@@ -1,4 +1,4 @@
-import { Check, Sparkles, X } from "lucide-react";
+import { Sparkles, X } from "lucide-react";
 
 import { AgentVariantIcon, agentAvatarVariantOptions } from "./AgentAvatar";
 
@@ -13,19 +13,34 @@ export function AgentSetupPopover({
   style,
 }) {
   const agentName = agent.name ?? "";
-  const selectedVariant = agent.variant === "empty" ? "risk" : agent.variant;
+  const popoverTitle = agentName.trim();
+  const selectedVariant = agent.variant ?? "empty";
   const systemPrompt = agent.systemPrompt ?? "";
   const canSave = agentName.trim().length > 0 && systemPrompt.trim().length > 0;
 
+  function handleClose() {
+    if (canSave) {
+      onSave(agent.id);
+      return;
+    }
+
+    onClose();
+  }
+
   return (
-    <div className="agent-setup-popover" role="dialog" aria-label="Настройка нового агента" style={style}>
+    <div
+      className="agent-setup-popover"
+      role="dialog"
+      aria-label={popoverTitle ? `Настройка агента ${popoverTitle}` : "Настройка агента"}
+      style={style}
+    >
       <div className="agent-setup-popover__header">
-        <span className="agent-setup-popover__title">Новый агент</span>
+        <span className="agent-setup-popover__title">{popoverTitle}</span>
         <button
           type="button"
           className="agent-setup-popover__close"
           aria-label="Закрыть настройку агента"
-          onClick={onClose}
+          onClick={handleClose}
         >
           <X aria-hidden="true" strokeWidth={1.9} />
         </button>
@@ -94,16 +109,6 @@ export function AgentSetupPopover({
           placeholder="Опишите роль, стиль рассуждений и критерии оценки агента."
         />
       </label>
-
-      <button
-        type="button"
-        className="agent-setup-popover__save"
-        disabled={!canSave}
-        onClick={() => onSave(agent.id)}
-      >
-        <Check aria-hidden="true" strokeWidth={1.9} />
-        Сохранить
-      </button>
     </div>
   );
 }
