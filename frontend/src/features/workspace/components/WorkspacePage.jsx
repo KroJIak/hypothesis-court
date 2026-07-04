@@ -59,6 +59,7 @@ import "../workspace.css";
 
 const WORKSPACE_NOTIFICATION_TTL_MS = 4200;
 const WORKSPACE_NOTIFICATION_LIMIT = 5;
+const RUN_MODEL_FALLBACK = "LLM модель";
 
 function getEmptyPaletteAgents(data) {
   return data.palette.agents.filter((agent) => agent.isEmpty);
@@ -112,6 +113,76 @@ function applySelectedAgentsToSession(session, selectedAgents, userAgents, data)
   };
 }
 
+function createRunVersionId() {
+  return typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID()
+    : `run-version-${Date.now()}-${Math.random()}`;
+}
+
+function createRunVersionFromRequests(session, requests) {
+  const title = createChatTitleFromRequests(requests);
+  const hypotheses = createHypothesesFromRequests(requests);
+  const answer = createAnswerFromRequests(requests);
+
+  return {
+    id: createRunVersionId(),
+    title,
+    requests,
+    query: requests.map(formatComposerRequest).join("\n"),
+    answer,
+    hypotheses,
+    consultationMessages: [],
+    modelName: session.modelName ?? RUN_MODEL_FALLBACK,
+    createdAt: new Date().toISOString(),
+    completedAt: null,
+  };
+}
+
+function applyRunVersion(session, version, { isComplete = true } = {}) {
+  return {
+    ...session,
+    title: version.title,
+    query: version.query,
+    answer: version.answer,
+    launchedRequests: version.requests,
+    hypotheses: version.hypotheses,
+    consultationMessages: version.consultationMessages ?? [],
+    composerRequests: [],
+    isStarted: true,
+    isPendingDraft: false,
+    isEditingRunVersion: false,
+    isVerdictComplete: isComplete,
+    activeRunVersionId: version.id,
+  };
+}
+
+function getRunVersionContext(session) {
+  const runVersions = session.runVersions ?? [];
+  const activeVersionIndex = Math.max(
+    0,
+    runVersions.findIndex((version) => version.id === session.activeRunVersionId),
+  );
+
+  return {
+    runVersions,
+    activeVersionIndex,
+    activeVersion: runVersions[activeVersionIndex] ?? null,
+  };
+}
+
+function areRunRequestsEqual(firstRequests, secondRequests) {
+  if (firstRequests.length !== secondRequests.length) {
+    return false;
+  }
+
+  return firstRequests.every((request, index) => {
+    const comparedRequest = secondRequests[index];
+
+    return request.context.value === comparedRequest?.context?.value
+      && request.text.trim() === comparedRequest?.text?.trim();
+  });
+}
+
 export function WorkspacePage({
   accessToken,
   currentUser,
@@ -153,6 +224,11 @@ export function WorkspacePage({
   const agentEditingLockedReason = selectedSession?.isVerdictComplete
     ? "Агентов нельзя менять в завершенном чате."
     : "Агентов можно менять только до старта процесса.";
+  const {
+    runVersions,
+    activeVersionIndex,
+    activeVersion,
+  } = selectedSession ? getRunVersionContext(selectedSession) : { runVersions: [], activeVersionIndex: 0, activeVersion: null };
 
   const showWorkspaceNotification = useCallback((message, type = "info") => {
     if (!message) {
@@ -864,23 +940,41 @@ export function WorkspacePage({
       return;
     }
 
-    const nextQuery = composerRequests.map(formatComposerRequest).join("\n");
-    const nextTitle = createChatTitleFromRequests(composerRequests);
+    if (
+      selectedSession.isEditingRunVersion
+      && activeVersion
+      && areRunRequestsEqual(composerRequests, activeVersion.requests)
+    ) {
+      updateSelectedSession((session) => applyRunVersion(session, activeVersion, { isComplete: true }));
+      setDraftMessage("");
+      showWorkspaceNotification("Параметры не изменились", "info");
+      return;
+    }
+
+    const nextVersion = createRunVersionFromRequests(selectedSession, composerRequests);
+    const nextVersions = [
+      ...(selectedSession.runVersions ?? []),
+      nextVersion,
+    ];
 
     updateSelectedSession((session) => ({
       ...session,
+      title: nextVersion.title,
       isStarted: true,
       isPendingDraft: false,
-      title: nextTitle,
-      query: nextQuery,
+      isEditingRunVersion: false,
+      query: nextVersion.query,
       launchedRequests: composerRequests,
-      hypotheses: createHypothesesFromRequests(composerRequests),
-      answer: createAnswerFromRequests(composerRequests),
+      hypotheses: nextVersion.hypotheses,
+      answer: nextVersion.answer,
       isVerdictComplete: false,
       consultationMessages: [],
       composerRequests: [],
+      runVersions: nextVersions,
+      activeRunVersionId: nextVersion.id,
     }));
-    void handleRenameChat(selectedSession.id, nextTitle);
+    resetJudgeVerdict(selectedSession.id);
+    void handleRenameChat(selectedSession.id, nextVersion.title);
     void startChatSession({ accessToken, chatSessionId: selectedSession.id })
       .then((chatSession) => {
         setSessions((currentSessions) =>
@@ -925,6 +1019,14 @@ export function WorkspacePage({
         : {
             ...session,
             isVerdictComplete: true,
+            runVersions: (session.runVersions ?? []).map((version) =>
+              version.id === session.activeRunVersionId
+                ? {
+                    ...version,
+                    completedAt: version.completedAt ?? new Date().toISOString(),
+                  }
+                : version,
+            ),
           }
     ));
   }
@@ -935,6 +1037,85 @@ export function WorkspacePage({
 
   function handleCloseAgentHistory() {
     setActiveAgentHistoryTarget(null);
+  }
+
+  function handleSwitchRunVersion(nextIndex) {
+    if (!selectedSession || isProcessRunning || selectedSession.isEditingRunVersion) {
+      return;
+    }
+
+    const nextVersion = runVersions[nextIndex];
+
+    if (!nextVersion) {
+      return;
+    }
+
+    resetScenePlayback(selectedSession.id);
+    updateSelectedSession((session) => applyRunVersion(session, nextVersion, { isComplete: true }));
+  }
+
+  function handleEditRunVersion() {
+    if (!selectedSession || isProcessRunning || !activeVersion) {
+      return;
+    }
+
+    resetScenePlayback(selectedSession.id);
+    resetJudgeVerdict(selectedSession.id);
+    updateSelectedSession((session) => ({
+      ...session,
+      isStarted: false,
+      isPendingDraft: true,
+      isEditingRunVersion: true,
+      composerRequests: activeVersion.requests,
+      launchedRequests: [],
+      hypotheses: [],
+      answer: "",
+      consultationMessages: [],
+      isVerdictComplete: false,
+    }));
+    setDraftMessage("");
+  }
+
+  function handleCancelRunVersionEdit() {
+    if (!selectedSession?.isEditingRunVersion || !activeVersion) {
+      return;
+    }
+
+    updateSelectedSession((session) => applyRunVersion(session, activeVersion, { isComplete: true }));
+    setDraftMessage("");
+  }
+
+  async function handleCopyJudgeVerdict() {
+    if (!selectedSession?.answer) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(selectedSession.answer);
+      showWorkspaceNotification("Вывод судьи скопирован", "success");
+    } catch {
+      showWorkspaceNotification("Не удалось скопировать вывод судьи", "error");
+    }
+  }
+
+  function handleRegenerateRunVersion() {
+    if (!selectedSession || isProcessRunning || !activeVersion) {
+      return;
+    }
+
+    const nextVersion = createRunVersionFromRequests(selectedSession, activeVersion.requests);
+    const nextVersions = [
+      ...(selectedSession.runVersions ?? []),
+      nextVersion,
+    ];
+
+    resetScenePlayback(selectedSession.id);
+    resetJudgeVerdict(selectedSession.id);
+    updateSelectedSession((session) => ({
+      ...applyRunVersion(session, nextVersion, { isComplete: false }),
+      runVersions: nextVersions,
+      activeRunVersionId: nextVersion.id,
+    }));
   }
 
   function handleRemoveComposerRequest(requestId) {
@@ -981,6 +1162,26 @@ export function WorkspacePage({
     );
   }
 
+  const verdictActions = activeVersion
+    ? {
+        activeVersionIndex,
+        versionCount: runVersions.length,
+        activeVersion,
+        isLocked: isProcessRunning,
+        infoRows: [
+          `Версия: ${activeVersionIndex + 1} из ${runVersions.length}`,
+          `Параметров запуска: ${activeVersion.requests.length}`,
+          `Гипотез: ${activeVersion.hypotheses.length}`,
+          `Статус: ${selectedSession.isVerdictComplete ? "завершён" : "в процессе"}`,
+        ],
+        onPreviousVersion: () => handleSwitchRunVersion(activeVersionIndex - 1),
+        onNextVersion: () => handleSwitchRunVersion(activeVersionIndex + 1),
+        onEdit: handleEditRunVersion,
+        onCopy: handleCopyJudgeVerdict,
+        onRegenerate: handleRegenerateRunVersion,
+      }
+    : null;
+
   return (
     <main className={`workspace${isSidebarCollapsed ? " workspace--sidebar-collapsed" : ""}`}>
       {sidebar}
@@ -998,6 +1199,7 @@ export function WorkspacePage({
             isAgentEditingLocked={isAgentEditingLocked}
             onVerdictComplete={handleVerdictComplete}
             onOpenAgentHistory={handleOpenAgentHistory}
+            verdictActions={verdictActions}
           />
         </div>
 
@@ -1010,10 +1212,12 @@ export function WorkspacePage({
           isAttachmentUploading={isUploadingSessionFile}
           isProcessRunning={isProcessRunning}
           canEditAttachments={!selectedSession.isStarted}
+          isBranchDraft={Boolean(selectedSession.isEditingRunVersion)}
           onDraftMessageChange={setDraftMessage}
           onAttachFiles={handleAttachFiles}
           onRemoveAttachment={handleRemoveAttachment}
           onRemoveComposerRequest={handleRemoveComposerRequest}
+          onCancelBranchDraft={handleCancelRunVersionEdit}
           onStop={handleStopProcess}
           onSend={handleSend}
         />

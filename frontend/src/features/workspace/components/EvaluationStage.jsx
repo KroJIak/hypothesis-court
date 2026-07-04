@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { AgentCard } from "./AgentCard";
 import { JudgeVerdict } from "./JudgeVerdict";
+import { JudgeVerdictActions } from "./JudgeVerdictActions";
 import {
   EVALUATION_AGENT_GAP,
   EVALUATION_AGENT_SLOT_WIDTH,
@@ -27,6 +28,7 @@ export function EvaluationStage({
   isDropTargetVisible,
   isAgentEditingLocked,
   onOpenAgentHistory,
+  verdictActions,
 }) {
   const [activeDropIntent, setActiveDropIntent] = useState(null);
   const { leftAgents, rightAgents } = splitAgentsAroundCenter(evaluation.agents, evaluation.layoutBias);
@@ -183,7 +185,7 @@ export function EvaluationStage({
               <div className="agent-drop-slot" aria-hidden="true" />
             ) : null}
           </div>
-          {evaluation.agents.length === 0 && !isDropTargetVisible ? (
+          {evaluation.agents.length === 0 && !isDropTargetVisible && !isAgentEditingLocked ? (
             <div className="evaluation-stage__empty">Перетащите агента для оценки</div>
           ) : null}
         </div>
@@ -205,6 +207,7 @@ export function EvaluationStage({
       {isAnswerVisible && answer ? (
         <>
           <JudgeVerdict answer={answer} sessionId={sessionId} onComplete={onVerdictComplete} />
+          {verdictActions ? <JudgeVerdictActions {...verdictActions} /> : null}
           {consultationMessages.length > 0 ? (
             <div className="consultation-thread" aria-label="Консультация по гипотезам">
               {consultationMessages.map((message) => (

@@ -197,10 +197,12 @@ export function Composer({
   isAttachmentUploading = false,
   isProcessRunning = false,
   canEditAttachments = true,
+  isBranchDraft = false,
   onAttachFiles,
   onDraftMessageChange,
   onRemoveAttachment,
   onRemoveComposerRequest,
+  onCancelBranchDraft,
   onStop,
   onSend,
 }) {
@@ -492,6 +494,15 @@ export function Composer({
           </label>
 
           <div className="composer-panel__actions">
+            {isBranchDraft ? (
+              <button
+                type="button"
+                className="composer-action composer-action--cancel"
+                onClick={onCancelBranchDraft}
+              >
+                Отмена
+              </button>
+            ) : null}
             <button
               type="submit"
               className={

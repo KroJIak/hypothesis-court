@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 const TYPEWRITER_INTERVAL_MS = 18;
 const TYPEWRITER_CHUNK_SIZE = 4;
@@ -23,14 +23,9 @@ function getInitialVisibleAnswer(sessionId, answer) {
 }
 
 export function JudgeVerdict({ answer, sessionId, onComplete }) {
-  const verdictRef = useRef(null);
-  const shouldAutoScrollRef = useRef(false);
-  const canAutoScrollRef = useRef(false);
   const [visibleAnswer, setVisibleAnswer] = useState(() => getInitialVisibleAnswer(sessionId, answer));
 
   useEffect(() => {
-    shouldAutoScrollRef.current = false;
-
     if (!answer) {
       setVisibleAnswer("");
       return undefined;
@@ -38,7 +33,6 @@ export function JudgeVerdict({ answer, sessionId, onComplete }) {
 
     const progressKey = getVerdictProgressKey(sessionId, answer);
     let nextLength = verdictProgressBySession.get(progressKey) ?? 0;
-    canAutoScrollRef.current = nextLength === 0;
 
     if (nextLength >= answer.length) {
       setVisibleAnswer(answer);
@@ -51,7 +45,6 @@ export function JudgeVerdict({ answer, sessionId, onComplete }) {
     const intervalId = window.setInterval(() => {
       nextLength = Math.min(answer.length, nextLength + TYPEWRITER_CHUNK_SIZE);
       verdictProgressBySession.set(progressKey, nextLength);
-      shouldAutoScrollRef.current = canAutoScrollRef.current;
       setVisibleAnswer(answer.slice(0, nextLength));
 
       if (nextLength >= answer.length) {
@@ -63,20 +56,8 @@ export function JudgeVerdict({ answer, sessionId, onComplete }) {
     return () => window.clearInterval(intervalId);
   }, [answer, sessionId]);
 
-  useEffect(() => {
-    if (!shouldAutoScrollRef.current) {
-      return;
-    }
-
-    verdictRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "end",
-    });
-    shouldAutoScrollRef.current = false;
-  }, [visibleAnswer]);
-
   return (
-    <div ref={verdictRef} className="judge-verdict" aria-live="polite">
+    <div className="judge-verdict" aria-live="polite">
       <p>{visibleAnswer}</p>
     </div>
   );

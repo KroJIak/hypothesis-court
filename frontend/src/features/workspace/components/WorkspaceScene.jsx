@@ -19,11 +19,13 @@ export function WorkspaceScene({
   isAgentEditingLocked,
   onVerdictComplete,
   onOpenAgentHistory,
+  verdictActions,
 }) {
   const sceneRef = useRef(null);
   const manufacturerAvatarRef = useRef(null);
   const judgeAvatarRef = useRef(null);
   const evaluationAvatarRefs = useRef(new Map());
+  const answerRevealScrollKeyRef = useRef(null);
   const [connectionLayer, setConnectionLayer] = useState({ width: 0, height: 0, paths: [] });
   const {
     activeDebateConnectionDirections,
@@ -162,6 +164,43 @@ export function WorkspaceScene({
     };
   }, [session.evaluation.agents]);
 
+  useLayoutEffect(() => {
+    const answerRevealScrollKey = `${session.id}:${session.answer ?? ""}`;
+
+    if (!isAnswerVisible) {
+      answerRevealScrollKeyRef.current = null;
+      return;
+    }
+
+    if (answerRevealScrollKeyRef.current === answerRevealScrollKey) {
+      return;
+    }
+
+    answerRevealScrollKeyRef.current = answerRevealScrollKey;
+
+    const sceneElement = sceneRef.current;
+    const judgeAvatarElement = judgeAvatarRef.current;
+    const scrollContainer = sceneElement?.parentElement;
+
+    if (!sceneElement || !judgeAvatarElement || !scrollContainer) {
+      return;
+    }
+
+    const containerRect = scrollContainer.getBoundingClientRect();
+    const judgeAvatarRect = judgeAvatarElement.getBoundingClientRect();
+    const maxScrollTop = scrollContainer.scrollHeight - scrollContainer.clientHeight;
+    const nextScrollTop = clampNumber(
+      scrollContainer.scrollTop + judgeAvatarRect.top - containerRect.top,
+      0,
+      Math.max(0, maxScrollTop),
+    );
+
+    scrollContainer.scrollTo({
+      top: nextScrollTop,
+      behavior: "auto",
+    });
+  }, [isAnswerVisible, session.answer, session.id]);
+
   return (
     <div className={`workspace-scene${hasHypotheses ? "" : " workspace-scene--empty"}`} ref={sceneRef}>
       {connectionLayer.paths.length > 0 ? (
@@ -206,6 +245,7 @@ export function WorkspaceScene({
         isDropTargetVisible={!isAgentEditingLocked && dragSource === "palette"}
         isAgentEditingLocked={isAgentEditingLocked}
         onOpenAgentHistory={onOpenAgentHistory}
+        verdictActions={verdictActions}
       />
     </div>
   );

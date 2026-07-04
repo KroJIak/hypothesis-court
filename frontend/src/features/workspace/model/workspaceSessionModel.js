@@ -32,13 +32,38 @@ export function getInitialAvailableAgents(session, paletteAgents) {
 }
 
 export function createWorkspaceSession(session, paletteAgents) {
+  const runVersions = session.runVersions ?? createInitialRunVersions(session);
+
   return {
     ...session,
     composerRequests: session.composerRequests ?? [],
     launchedRequests: session.launchedRequests ?? [],
     hypotheses: session.hypotheses ?? [],
+    runVersions,
+    activeRunVersionId: session.activeRunVersionId ?? runVersions.at(-1)?.id ?? null,
     availableAgents: getInitialAvailableAgents(session, paletteAgents),
   };
+}
+
+function createInitialRunVersions(session) {
+  if (!session.answer || (session.launchedRequests ?? []).length === 0) {
+    return [];
+  }
+
+  const createdAt = session.updatedAt ?? session.createdAt ?? new Date().toISOString();
+
+  return [{
+    id: `${session.id}-run-1`,
+    title: session.title,
+    requests: session.launchedRequests ?? [],
+    query: session.query ?? "",
+    answer: session.answer,
+    hypotheses: session.hypotheses ?? [],
+    consultationMessages: session.consultationMessages ?? [],
+    modelName: session.modelName ?? "LLM модель",
+    createdAt,
+    completedAt: session.isVerdictComplete ? createdAt : null,
+  }];
 }
 
 export function applyChatSessionMetadata(session, chatSession) {
