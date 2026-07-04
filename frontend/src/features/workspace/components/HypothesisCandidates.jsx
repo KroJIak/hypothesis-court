@@ -209,7 +209,7 @@ export function HypothesisCandidates({
         <button
           type="button"
           className="hypothesis-candidates__graph-trigger"
-          aria-label="Открыть граф доказательств"
+          aria-label="Открыть граф знаний"
           onClick={() => onOpenKnowledgeGraph?.({ source: "graph-trigger" })}
         >
           <Network aria-hidden="true" strokeWidth={1.8} />

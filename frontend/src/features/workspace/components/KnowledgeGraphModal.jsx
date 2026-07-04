@@ -25,15 +25,27 @@ const TOOLTIP_EDGE_OFFSET = 16;
 const MIN_CAMERA_SCALE = 0.54;
 const MAX_CAMERA_SCALE = 2.6;
 const CAMERA_ZOOM_INTENSITY = 0.0012;
-const NODE_REPEL_RADIUS = 76;
-const NODE_REPEL_STEP = 18;
+const NODE_CLICK_DRAG_THRESHOLD = 5;
+const NODE_RADIUS = 18;
+const SAME_ZONE_NODE_DISTANCE = 58;
+const CROSS_ZONE_NODE_DISTANCE = 82;
+const NODE_REPEL_STEP = 22;
 const NODE_DRAG_LIMIT = 520;
-const ZONE_NODE_PADDING = 42;
-const ZONE_AVOID_RADIUS = 96;
-const ZONE_AVOID_STEP = 68;
+const GRAPH_LAYOUT_RELAXATION_STEPS = 5;
+const DRAG_RELAXATION_STEPS = 3;
+const ZONE_NODE_PADDING = 38;
+const ZONE_AVOID_RADIUS = 112;
+const ZONE_AVOID_STEP = 78;
 const ZONE_MIN_WIDTH = 142;
 const ZONE_MIN_HEIGHT = 96;
-const ZONE_GAP = 22;
+const ZONE_GAP = 28;
+const ZONE_COHESION_RADIUS = 138;
+const ZONE_COHESION_FOLLOW = 0.38;
+const ZONE_COHESION_PULLBACK = 0.58;
+const ZONE_HULL_NODE_RADIUS = 36;
+const ZONE_CLUSTER_RADIUS = 70;
+const ZONE_CLUSTER_PULL = 0.18;
+const ZONE_BOUNDS_PUSH = 18;
 
 const INITIAL_CAMERA = {
   x: 0,
@@ -48,6 +60,7 @@ const ZONE_LAYOUTS = {
   hypotheses: { x: 732, y: 82, width: 284, height: 250 },
   decision: { x: 720, y: 408, width: 300, height: 170 },
 };
+const ZONE_SEQUENCE = ["brief", "sources", "evidence", "hypotheses", "decision"];
 
 const NODE_META = {
   brief: { label: "Вводная", icon: BookOpenText },
@@ -62,6 +75,10 @@ const NODE_META = {
 
 function clampGraphCoordinate(value, axisSize) {
   return clampNumber(value, -NODE_DRAG_LIMIT, axisSize + NODE_DRAG_LIMIT);
+}
+
+function isFiniteNumber(value) {
+  return typeof value === "number" && Number.isFinite(value);
 }
 
 function createSmoothZonePath(bounds) {
@@ -80,6 +97,107 @@ function createSmoothZonePath(bounds) {
     `C ${left - width * 0.04} ${bottom - height * 0.34}, ${left - width * 0.04} ${top + height * 0.28}, ${left + width * 0.16} ${top + height * 0.04}`,
     "Z",
   ].join(" ");
+}
+
+function getConvexHull(points) {
+  if (points.length <= 1) {
+    return points;
+  }
+
+  const sortedPoints = [...points].sort((firstPoint, secondPoint) =>
+    firstPoint.x === secondPoint.x
+      ? firstPoint.y - secondPoint.y
+      : firstPoint.x - secondPoint.x,
+  );
+
+  function cross(origin, firstPoint, secondPoint) {
+    return (
+      (firstPoint.x - origin.x) * (secondPoint.y - origin.y)
+      - (firstPoint.y - origin.y) * (secondPoint.x - origin.x)
+    );
+  }
+
+  const lowerHull = [];
+  const upperHull = [];
+
+  sortedPoints.forEach((point) => {
+    while (
+      lowerHull.length >= 2
+      && cross(lowerHull[lowerHull.length - 2], lowerHull[lowerHull.length - 1], point) <= 0
+    ) {
+      lowerHull.pop();
+    }
+
+    lowerHull.push(point);
+  });
+
+  [...sortedPoints].reverse().forEach((point) => {
+    while (
+      upperHull.length >= 2
+      && cross(upperHull[upperHull.length - 2], upperHull[upperHull.length - 1], point) <= 0
+    ) {
+      upperHull.pop();
+    }
+
+    upperHull.push(point);
+  });
+
+  return lowerHull.slice(0, -1).concat(upperHull.slice(0, -1));
+}
+
+function createSmoothHullPath(points) {
+  if (points.length === 0) {
+    return "";
+  }
+
+  if (points.length < 3) {
+    const [firstPoint, secondPoint = firstPoint] = points;
+    const centerX = (firstPoint.x + secondPoint.x) / 2;
+    const centerY = (firstPoint.y + secondPoint.y) / 2;
+    const radius = Math.max(
+      ZONE_MIN_HEIGHT / 2,
+      Math.hypot(firstPoint.x - secondPoint.x, firstPoint.y - secondPoint.y) / 2 + ZONE_HULL_NODE_RADIUS,
+    );
+
+    return [
+      `M ${centerX} ${centerY - radius}`,
+      `C ${centerX + radius} ${centerY - radius}, ${centerX + radius} ${centerY + radius}, ${centerX} ${centerY + radius}`,
+      `C ${centerX - radius} ${centerY + radius}, ${centerX - radius} ${centerY - radius}, ${centerX} ${centerY - radius}`,
+      "Z",
+    ].join(" ");
+  }
+
+  return points.map((point, index) => {
+    const previousPoint = points[(index - 1 + points.length) % points.length];
+    const nextPoint = points[(index + 1) % points.length];
+    const startX = point.x + (previousPoint.x - point.x) * 0.24;
+    const startY = point.y + (previousPoint.y - point.y) * 0.24;
+    const endX = point.x + (nextPoint.x - point.x) * 0.24;
+    const endY = point.y + (nextPoint.y - point.y) * 0.24;
+
+    return index === 0
+      ? `M ${startX} ${startY} Q ${point.x} ${point.y} ${endX} ${endY}`
+      : `L ${startX} ${startY} Q ${point.x} ${point.y} ${endX} ${endY}`;
+  }).join(" ").concat(" Z");
+}
+
+function createZoneHullPath(zoneNodes, fallbackBounds) {
+  if (zoneNodes.length === 0) {
+    return createSmoothZonePath(fallbackBounds);
+  }
+
+  const samplePoints = zoneNodes.flatMap((node) =>
+    Array.from({ length: 8 }, (_, index) => {
+      const angle = (Math.PI * 2 * index) / 8;
+
+      return {
+        x: node.x + Math.cos(angle) * ZONE_HULL_NODE_RADIUS,
+        y: node.y + Math.sin(angle) * ZONE_HULL_NODE_RADIUS,
+      };
+    }),
+  );
+
+  return createSmoothHullPath(getConvexHull(samplePoints));
 }
 
 function expandBounds(bounds, amount) {
@@ -144,6 +262,274 @@ function getNodePosition(layout, index, count) {
   const y = layout.y + paddingY + (rows === 1 ? availableHeight / 2 : (availableHeight * row) / (rows - 1));
 
   return { x, y };
+}
+
+function getExplicitNodePosition(node) {
+  const position = node.position ?? node.layout;
+  const x = isFiniteNumber(node.x) ? node.x : position?.x;
+  const y = isFiniteNumber(node.y) ? node.y : position?.y;
+
+  if (!isFiniteNumber(x) || !isFiniteNumber(y)) {
+    return null;
+  }
+
+  return { x, y };
+}
+
+function getNodeLayoutOrder(node) {
+  const order = node.layoutOrder ?? node.order ?? node.layout?.order;
+
+  return isFiniteNumber(order) ? order : null;
+}
+
+function getOrderedZoneNodes(graph, nodesByZone, originalOrderById) {
+  const orderedNodesByZone = new Map();
+
+  nodesByZone.forEach((zoneNodes, zoneId) => {
+    orderedNodesByZone.set(zoneId, [...zoneNodes].sort(
+      (firstNode, secondNode) => (originalOrderById.get(firstNode.id) ?? 0) - (originalOrderById.get(secondNode.id) ?? 0),
+    ));
+  });
+
+  const adjacentIdsByNodeId = new Map();
+
+  graph.edges.forEach((edge) => {
+    const fromAdjacent = adjacentIdsByNodeId.get(edge.from) ?? [];
+    const toAdjacent = adjacentIdsByNodeId.get(edge.to) ?? [];
+
+    fromAdjacent.push(edge.to);
+    toAdjacent.push(edge.from);
+    adjacentIdsByNodeId.set(edge.from, fromAdjacent);
+    adjacentIdsByNodeId.set(edge.to, toAdjacent);
+  });
+
+  for (let iteration = 0; iteration < 6; iteration += 1) {
+    const zoneOrder = iteration % 2 === 0 ? ZONE_SEQUENCE : [...ZONE_SEQUENCE].reverse();
+    const rankByNodeId = new Map();
+
+    orderedNodesByZone.forEach((zoneNodes) => {
+      zoneNodes.forEach((node, index) => {
+        rankByNodeId.set(node.id, index);
+      });
+    });
+
+    zoneOrder.forEach((zoneId) => {
+      const zoneNodes = orderedNodesByZone.get(zoneId);
+
+      if (!zoneNodes) {
+        return;
+      }
+
+      zoneNodes.sort((firstNode, secondNode) => {
+        const firstExplicitOrder = getNodeLayoutOrder(firstNode);
+        const secondExplicitOrder = getNodeLayoutOrder(secondNode);
+
+        if (firstExplicitOrder !== null || secondExplicitOrder !== null) {
+          return (firstExplicitOrder ?? originalOrderById.get(firstNode.id) ?? 0)
+            - (secondExplicitOrder ?? originalOrderById.get(secondNode.id) ?? 0);
+        }
+
+        const getBarycenter = (node) => {
+          const adjacentRanks = (adjacentIdsByNodeId.get(node.id) ?? [])
+            .map((id) => rankByNodeId.get(id))
+            .filter(isFiniteNumber);
+
+          if (adjacentRanks.length === 0) {
+            return originalOrderById.get(node.id) ?? 0;
+          }
+
+          return adjacentRanks.reduce((sum, rank) => sum + rank, 0) / adjacentRanks.length;
+        };
+
+        const firstScore = getBarycenter(firstNode);
+        const secondScore = getBarycenter(secondNode);
+
+        return firstScore === secondScore
+          ? (originalOrderById.get(firstNode.id) ?? 0) - (originalOrderById.get(secondNode.id) ?? 0)
+          : firstScore - secondScore;
+      });
+    });
+  }
+
+  return orderedNodesByZone;
+}
+
+function getMinimumNodeDistance(firstNode, secondNode) {
+  return firstNode.zone === secondNode.zone ? SAME_ZONE_NODE_DISTANCE : CROSS_ZONE_NODE_DISTANCE;
+}
+
+function getPositionFromMap(node, positions) {
+  return positions.get(node.id) ?? { x: node.x, y: node.y };
+}
+
+function setPositionInMap(positions, nodeId, position) {
+  positions.set(nodeId, {
+    x: clampGraphCoordinate(position.x, GRAPH_WIDTH),
+    y: clampGraphCoordinate(position.y, GRAPH_HEIGHT),
+  });
+}
+
+function getZoneCentroid(nodes, positions, zoneId) {
+  const zoneNodes = nodes.filter((node) => node.zone === zoneId);
+
+  if (zoneNodes.length === 0) {
+    return null;
+  }
+
+  const total = zoneNodes.reduce(
+    (accumulator, node) => {
+      const position = getPositionFromMap(node, positions);
+
+      return {
+        x: accumulator.x + position.x,
+        y: accumulator.y + position.y,
+      };
+    },
+    { x: 0, y: 0 },
+  );
+
+  return {
+    x: total.x / zoneNodes.length,
+    y: total.y / zoneNodes.length,
+  };
+}
+
+function pullZoneIntoCompactCluster(nodes, positions, zoneId, lockedNodeIds = new Set()) {
+  const centroid = getZoneCentroid(nodes, positions, zoneId);
+
+  if (!centroid) {
+    return;
+  }
+
+  nodes.forEach((node) => {
+    if (node.zone !== zoneId || lockedNodeIds.has(node.id)) {
+      return;
+    }
+
+    const position = getPositionFromMap(node, positions);
+    const dx = position.x - centroid.x;
+    const dy = position.y - centroid.y;
+    const distance = Math.hypot(dx, dy);
+
+    if (distance <= ZONE_CLUSTER_RADIUS) {
+      return;
+    }
+
+    const excess = distance - ZONE_CLUSTER_RADIUS;
+    setPositionInMap(positions, node.id, {
+      x: position.x - (dx / distance) * excess * ZONE_CLUSTER_PULL,
+      y: position.y - (dy / distance) * excess * ZONE_CLUSTER_PULL,
+    });
+  });
+}
+
+function clampPositionToLayout(position, layout) {
+  const padding = NODE_RADIUS + 12;
+
+  return {
+    x: clampNumber(position.x, layout.x + padding, layout.x + layout.width - padding),
+    y: clampNumber(position.y, layout.y + padding, layout.y + layout.height - padding),
+  };
+}
+
+function relaxGraphPositions(nodes, edges, initialPositions, options = {}) {
+  const {
+    lockedNodeIds = new Set(),
+    shouldClampToZone = false,
+    steps = GRAPH_LAYOUT_RELAXATION_STEPS,
+  } = options;
+  const positions = new Map(nodes.map((node) => [node.id, initialPositions.get(node.id) ?? { x: node.x, y: node.y }]));
+  const nodeById = new Map(nodes.map((node) => [node.id, node]));
+
+  for (let step = 0; step < steps; step += 1) {
+    edges.forEach((edge) => {
+      const fromNode = nodeById.get(edge.from);
+      const toNode = nodeById.get(edge.to);
+
+      if (!fromNode || !toNode || fromNode.zone === toNode.zone) {
+        return;
+      }
+
+      const fromPosition = getPositionFromMap(fromNode, positions);
+      const toPosition = getPositionFromMap(toNode, positions);
+      const averageY = (fromPosition.y + toPosition.y) / 2;
+      const pull = 0.05;
+
+      if (!lockedNodeIds.has(fromNode.id)) {
+        setPositionInMap(positions, fromNode.id, {
+          x: fromPosition.x,
+          y: fromPosition.y + (averageY - fromPosition.y) * pull,
+        });
+      }
+
+      if (!lockedNodeIds.has(toNode.id)) {
+        setPositionInMap(positions, toNode.id, {
+          x: toPosition.x,
+          y: toPosition.y + (averageY - toPosition.y) * pull,
+        });
+      }
+    });
+
+    for (let firstIndex = 0; firstIndex < nodes.length; firstIndex += 1) {
+      for (let secondIndex = firstIndex + 1; secondIndex < nodes.length; secondIndex += 1) {
+        const firstNode = nodes[firstIndex];
+        const secondNode = nodes[secondIndex];
+        const firstPosition = getPositionFromMap(firstNode, positions);
+        const secondPosition = getPositionFromMap(secondNode, positions);
+        const dx = secondPosition.x - firstPosition.x;
+        const dy = secondPosition.y - firstPosition.y;
+        const distance = Math.hypot(dx, dy);
+        const minimumDistance = getMinimumNodeDistance(firstNode, secondNode);
+
+        if (distance >= minimumDistance) {
+          continue;
+        }
+
+        const fallbackAngle = getStableAngle(`${firstNode.id}-${secondNode.id}`);
+        const directionX = distance > 0.01 ? dx / distance : Math.cos(fallbackAngle);
+        const directionY = distance > 0.01 ? dy / distance : Math.sin(fallbackAngle);
+        const push = (minimumDistance - distance) / 2;
+        const firstLocked = lockedNodeIds.has(firstNode.id);
+        const secondLocked = lockedNodeIds.has(secondNode.id);
+
+        if (!firstLocked) {
+          setPositionInMap(positions, firstNode.id, {
+            x: firstPosition.x - directionX * (secondLocked ? push * 2 : push),
+            y: firstPosition.y - directionY * (secondLocked ? push * 2 : push),
+          });
+        }
+
+        if (!secondLocked) {
+          setPositionInMap(positions, secondNode.id, {
+            x: secondPosition.x + directionX * (firstLocked ? push * 2 : push),
+            y: secondPosition.y + directionY * (firstLocked ? push * 2 : push),
+          });
+        }
+      }
+    }
+
+    ZONE_SEQUENCE.forEach((zoneId) => {
+      pullZoneIntoCompactCluster(nodes, positions, zoneId, lockedNodeIds);
+    });
+
+    if (shouldClampToZone) {
+      nodes.forEach((node) => {
+        if (lockedNodeIds.has(node.id)) {
+          return;
+        }
+
+        const layout = ZONE_LAYOUTS[node.zone];
+
+        if (!layout) {
+          return;
+        }
+
+        setPositionInMap(positions, node.id, clampPositionToLayout(getPositionFromMap(node, positions), layout));
+      });
+    }
+  }
+
+  return positions;
 }
 
 function getSvgPoint(event, svgElement) {
@@ -215,38 +601,183 @@ function getStableAngle(id) {
   return (hash % 360) * (Math.PI / 180);
 }
 
-function repelNearbyNodes(nodes, draggedNodeId, draggedPosition, currentPositions) {
-  const nextPositions = {
-    ...currentPositions,
-    [draggedNodeId]: draggedPosition,
-  };
-
+function moveZoneNodes(nodes, positions, zoneId, delta, lockedNodeIds = new Set()) {
   nodes.forEach((node) => {
-    if (node.id === draggedNodeId) {
+    if (node.zone !== zoneId || lockedNodeIds.has(node.id)) {
       return;
     }
 
-    const currentPosition = nextPositions[node.id] ?? { x: node.x, y: node.y };
-    const dx = currentPosition.x - draggedPosition.x;
-    const dy = currentPosition.y - draggedPosition.y;
-    const distance = Math.hypot(dx, dy);
+    const position = getPositionFromMap(node, positions);
 
-    if (distance >= NODE_REPEL_RADIUS) {
-      return;
+    setPositionInMap(positions, node.id, {
+      x: position.x + delta.x,
+      y: position.y + delta.y,
+    });
+  });
+}
+
+function getNodesWithPositions(nodes, positions) {
+  return nodes.map((node) => ({
+    ...node,
+    ...getPositionFromMap(node, positions),
+  }));
+}
+
+function applyZoneBoundsRepulsion(nodes, positions, lockedNodeIds = new Set()) {
+  const positionedNodes = getNodesWithPositions(nodes, positions);
+  const zoneBounds = ZONE_SEQUENCE
+    .map((zoneId) => ({
+      id: zoneId,
+      bounds: ZONE_LAYOUTS[zoneId] ? createZoneBounds(zoneId, positionedNodes) : null,
+    }))
+    .filter((zone) => zone.bounds);
+
+  for (let firstIndex = 0; firstIndex < zoneBounds.length; firstIndex += 1) {
+    for (let secondIndex = firstIndex + 1; secondIndex < zoneBounds.length; secondIndex += 1) {
+      const firstZone = zoneBounds[firstIndex];
+      const secondZone = zoneBounds[secondIndex];
+
+      if (!doBoundsOverlap(firstZone.bounds, secondZone.bounds, ZONE_GAP)) {
+        continue;
+      }
+
+      const firstCenter = getBoundsCenter(firstZone.bounds);
+      const secondCenter = getBoundsCenter(secondZone.bounds);
+      const dx = secondCenter.x - firstCenter.x;
+      const dy = secondCenter.y - firstCenter.y;
+      const distance = Math.hypot(dx, dy) || 1;
+      const push = ZONE_BOUNDS_PUSH;
+      const firstDelta = {
+        x: -(dx / distance) * push,
+        y: -(dy / distance) * push,
+      };
+      const secondDelta = {
+        x: (dx / distance) * push,
+        y: (dy / distance) * push,
+      };
+
+      moveZoneNodes(nodes, positions, firstZone.id, firstDelta, lockedNodeIds);
+      moveZoneNodes(nodes, positions, secondZone.id, secondDelta, lockedNodeIds);
     }
+  }
+}
 
-    const fallbackAngle = getStableAngle(node.id);
-    const directionX = distance > 0.01 ? dx / distance : Math.cos(fallbackAngle);
-    const directionY = distance > 0.01 ? dy / distance : Math.sin(fallbackAngle);
-    const push = ((NODE_REPEL_RADIUS - distance) / NODE_REPEL_RADIUS) * NODE_REPEL_STEP;
+function applyZoneCohesion(nodes, draggedNodeId, draggedPosition, currentPositions) {
+  const draggedNode = nodes.find((node) => node.id === draggedNodeId);
+  const positions = new Map(nodes.map((node) => [
+    node.id,
+    currentPositions[node.id] ?? { x: node.x, y: node.y },
+  ]));
 
-    nextPositions[node.id] = {
-      x: clampGraphCoordinate(currentPosition.x + directionX * push, GRAPH_WIDTH),
-      y: clampGraphCoordinate(currentPosition.y + directionY * push, GRAPH_HEIGHT),
-    };
+  positions.set(draggedNodeId, draggedPosition);
+
+  if (!draggedNode) {
+    return positions;
+  }
+
+  const sameZoneNodes = nodes.filter((node) => node.zone === draggedNode.zone && node.id !== draggedNodeId);
+
+  if (sameZoneNodes.length === 0) {
+    return positions;
+  }
+
+  const centroid = sameZoneNodes.reduce(
+    (accumulator, node) => {
+      const position = getPositionFromMap(node, positions);
+
+      return {
+        x: accumulator.x + position.x,
+        y: accumulator.y + position.y,
+      };
+    },
+    { x: 0, y: 0 },
+  );
+  centroid.x /= sameZoneNodes.length;
+  centroid.y /= sameZoneNodes.length;
+
+  const dx = draggedPosition.x - centroid.x;
+  const dy = draggedPosition.y - centroid.y;
+  const distance = Math.hypot(dx, dy);
+
+  if (distance <= ZONE_COHESION_RADIUS) {
+    return nextPositions;
+  }
+
+  const directionX = dx / distance;
+  const directionY = dy / distance;
+  const excess = distance - ZONE_COHESION_RADIUS;
+  const pullback = excess * ZONE_COHESION_PULLBACK;
+  const follow = excess * ZONE_COHESION_FOLLOW;
+
+  setPositionInMap(positions, draggedNodeId, {
+    x: clampGraphCoordinate(draggedPosition.x - directionX * pullback, GRAPH_WIDTH),
+    y: clampGraphCoordinate(draggedPosition.y - directionY * pullback, GRAPH_HEIGHT),
   });
 
-  return nextPositions;
+  sameZoneNodes.forEach((node) => {
+    const currentPosition = getPositionFromMap(node, positions);
+
+    setPositionInMap(positions, node.id, {
+      x: clampGraphCoordinate(currentPosition.x + directionX * follow, GRAPH_WIDTH),
+      y: clampGraphCoordinate(currentPosition.y + directionY * follow, GRAPH_HEIGHT),
+    });
+  });
+
+  return positions;
+}
+
+function repelNearbyNodes(nodes, draggedNodeId, draggedPosition, currentPositions) {
+  const positions = applyZoneCohesion(nodes, draggedNodeId, draggedPosition, currentPositions);
+  const draggedNode = nodes.find((node) => node.id === draggedNodeId);
+  const lockedNodeIds = new Set([draggedNodeId]);
+
+  for (let step = 0; step < DRAG_RELAXATION_STEPS; step += 1) {
+    if (draggedNode) {
+      pullZoneIntoCompactCluster(nodes, positions, draggedNode.zone, lockedNodeIds);
+    }
+
+    for (let firstIndex = 0; firstIndex < nodes.length; firstIndex += 1) {
+      for (let secondIndex = firstIndex + 1; secondIndex < nodes.length; secondIndex += 1) {
+        const firstNode = nodes[firstIndex];
+        const secondNode = nodes[secondIndex];
+        const firstPosition = getPositionFromMap(firstNode, positions);
+        const secondPosition = getPositionFromMap(secondNode, positions);
+        const dx = secondPosition.x - firstPosition.x;
+        const dy = secondPosition.y - firstPosition.y;
+        const distance = Math.hypot(dx, dy);
+        const minimumDistance = getMinimumNodeDistance(firstNode, secondNode);
+
+        if (distance >= minimumDistance) {
+          continue;
+        }
+
+        const fallbackAngle = getStableAngle(`${firstNode.id}-${secondNode.id}`);
+        const directionX = distance > 0.01 ? dx / distance : Math.cos(fallbackAngle);
+        const directionY = distance > 0.01 ? dy / distance : Math.sin(fallbackAngle);
+        const push = Math.min(NODE_REPEL_STEP, (minimumDistance - distance) / 2);
+        const firstLocked = lockedNodeIds.has(firstNode.id);
+        const secondLocked = lockedNodeIds.has(secondNode.id);
+
+        if (!firstLocked) {
+          setPositionInMap(positions, firstNode.id, {
+            x: firstPosition.x - directionX * (secondLocked ? push * 2 : push),
+            y: firstPosition.y - directionY * (secondLocked ? push * 2 : push),
+          });
+        }
+
+        if (!secondLocked) {
+          setPositionInMap(positions, secondNode.id, {
+            x: secondPosition.x + directionX * (firstLocked ? push * 2 : push),
+            y: secondPosition.y + directionY * (firstLocked ? push * 2 : push),
+          });
+        }
+      }
+    }
+
+    applyZoneBoundsRepulsion(nodes, positions, lockedNodeIds);
+  }
+
+  return Object.fromEntries(positions);
 }
 
 function createZoneBounds(zoneId, nodes) {
@@ -350,7 +881,15 @@ function resolveZoneOverlaps(zoneBounds, initialOffsets) {
         const dx = firstCenter.x - secondCenter.x;
         const dy = firstCenter.y - secondCenter.y;
         const length = Math.hypot(dx, dy) || 1;
-        const push = 12;
+        const overlapX = Math.min(
+          firstBounds.x + firstBounds.width - secondBounds.x,
+          secondBounds.x + secondBounds.width - firstBounds.x,
+        );
+        const overlapY = Math.min(
+          firstBounds.y + firstBounds.height - secondBounds.y,
+          secondBounds.y + secondBounds.height - firstBounds.y,
+        );
+        const push = Math.max(14, Math.min(36, Math.min(overlapX, overlapY) / 2 + ZONE_GAP / 2));
 
         offsets.set(firstZone.id, {
           x: firstOffset.x + (dx / length) * push,
@@ -367,17 +906,69 @@ function resolveZoneOverlaps(zoneBounds, initialOffsets) {
   return offsets;
 }
 
-function SourceQuote({ source }) {
+function SourceQuote({ source, className = "knowledge-graph-source-quote" }) {
   if (!source?.quote) {
     return source?.excerpt ? <p>{source.excerpt}</p> : null;
   }
 
   return (
-    <p className="knowledge-graph-tooltip__quote">
+    <p className={className}>
       {source.contextBefore ? <span>{source.contextBefore} </span> : null}
-      <strong>{source.quote}</strong>
+      <span className={`${className}__mark`}>{source.quote}</span>
       {source.contextAfter ? <span> {source.contextAfter}</span> : null}
     </p>
+  );
+}
+
+function ItemDetailsPanel({ item, nodesCount, edgesCount, scale }) {
+  if (!item) {
+    return (
+      <>
+        <h3>Как читать граф</h3>
+        <p>
+          Колесо мыши меняет масштаб, пустое поле двигает камеру, а узлы можно переносить внутри своей смысловой зоны.
+          Нажмите на любой кружок или связь, чтобы открыть источник, цитату и подробности здесь, справа.
+        </p>
+        <div className="knowledge-graph-inspector__stats">
+          <span>{nodesCount} узлов</span>
+          <span>{edgesCount} связей</span>
+          <span>{Math.round(scale * 100)}%</span>
+        </div>
+      </>
+    );
+  }
+
+  const itemType = item.kind === "node" ? NODE_META[item.item.type]?.label : "Связь";
+  const details = Array.isArray(item.item.details)
+    ? item.item.details
+    : item.item.details
+      ? [item.item.details]
+      : [];
+  const source = item.item.source;
+
+  return (
+    <>
+      <span className="knowledge-graph-inspector__type">{itemType}</span>
+      <h3>{item.item.label}</h3>
+      {item.item.summary ? <p>{item.item.summary}</p> : null}
+      {source ? (
+        <section className="knowledge-graph-inspector__source" aria-label="Фрагмент источника">
+          <span>Источник</span>
+          <strong>{source.title ?? item.item.label}</strong>
+          <SourceQuote source={source} />
+        </section>
+      ) : null}
+      {details.length > 0 ? (
+        <ul className="knowledge-graph-inspector__details">
+          {details.slice(0, 5).map((detail, index) => (
+            <li key={`${item.item.id}-inspector-detail-${index}`}>{detail}</li>
+          ))}
+        </ul>
+      ) : null}
+      {item.kind === "edge" ? (
+        <p className="knowledge-graph-inspector__hint">Эта связь показывает, почему один узел влияет на другой.</p>
+      ) : null}
+    </>
   );
 }
 
@@ -387,25 +978,13 @@ function GraphTooltip({ item }) {
   }
 
   const nodeType = item.kind === "node" ? NODE_META[item.item.type]?.label : "Связь";
-  const details = Array.isArray(item.item.details)
-    ? item.item.details
-    : item.item.details
-      ? [item.item.details]
-      : [];
-  const source = item.item.source;
 
   return createPortal(
     <aside className="knowledge-graph-tooltip" style={item.style} role="tooltip">
       <span className="knowledge-graph-tooltip__type">{nodeType}</span>
       <strong>{item.item.label}</strong>
-      {source ? <SourceQuote source={source} /> : item.item.summary ? <p>{item.item.summary}</p> : null}
-      {details.length > 0 ? (
-        <ul>
-          {details.slice(0, 3).map((detail, index) => (
-            <li key={`${item.item.id}-detail-${index}`}>{detail}</li>
-          ))}
-        </ul>
-      ) : null}
+      {item.item.summary ? <p>{item.item.summary}</p> : null}
+      <span className="knowledge-graph-tooltip__hint">Нажмите, чтобы открыть подробности справа</span>
     </aside>,
     document.body,
   );
@@ -423,7 +1002,9 @@ export function KnowledgeGraphModal({
   const pendingCameraRef = useRef(null);
   const nodePositionsFrameRef = useRef(null);
   const pendingNodePositionsRef = useRef(null);
+  const suppressNextNodeClickRef = useRef(null);
   const [activeItem, setActiveItem] = useState(null);
+  const [selectedItem, setSelectedItem] = useState(null);
   const [camera, setCamera] = useState(INITIAL_CAMERA);
   const [nodePositions, setNodePositions] = useState({});
   const [draggedNodeId, setDraggedNodeId] = useState(null);
@@ -431,6 +1012,11 @@ export function KnowledgeGraphModal({
   const graph = useMemo(() => buildKnowledgeGraph(session), [session]);
   const positionedGraph = useMemo(() => {
     const nodesByZone = new Map();
+    const originalOrderById = new Map();
+
+    graph.nodes.forEach((node, index) => {
+      originalOrderById.set(node.id, index);
+    });
 
     graph.nodes.forEach((node) => {
       const zoneId = ZONE_LAYOUTS[node.zone] ? node.zone : "evidence";
@@ -439,16 +1025,42 @@ export function KnowledgeGraphModal({
       nodesByZone.set(zoneId, zoneNodes);
     });
 
-    const nodes = graph.nodes.map((node) => {
+    const orderedNodesByZone = getOrderedZoneNodes(graph, nodesByZone, originalOrderById);
+    const explicitPositionNodeIds = new Set();
+    const baseNodes = graph.nodes.map((node) => {
       const zoneId = ZONE_LAYOUTS[node.zone] ? node.zone : "evidence";
-      const zoneNodes = nodesByZone.get(zoneId) ?? [];
+      const zoneNodes = orderedNodesByZone.get(zoneId) ?? [];
       const index = Math.max(0, zoneNodes.findIndex((zoneNode) => zoneNode.id === node.id));
-      const basePosition = getNodePosition(ZONE_LAYOUTS[zoneId], index, zoneNodes.length);
-      const savedPosition = nodePositions[node.id];
+      const explicitPosition = getExplicitNodePosition(node);
+      const basePosition = explicitPosition ?? getNodePosition(ZONE_LAYOUTS[zoneId], index, zoneNodes.length);
+
+      if (explicitPosition) {
+        explicitPositionNodeIds.add(node.id);
+      }
 
       return {
         ...node,
         zone: zoneId,
+        x: basePosition.x,
+        y: basePosition.y,
+      };
+    });
+    const basePositionByNodeId = relaxGraphPositions(
+      baseNodes,
+      graph.edges,
+      new Map(baseNodes.map((node) => [node.id, { x: node.x, y: node.y }])),
+      {
+        lockedNodeIds: explicitPositionNodeIds,
+        shouldClampToZone: true,
+        steps: GRAPH_LAYOUT_RELAXATION_STEPS,
+      },
+    );
+    const nodes = baseNodes.map((node) => {
+      const basePosition = basePositionByNodeId.get(node.id) ?? { x: node.x, y: node.y };
+      const savedPosition = nodePositions[node.id];
+
+      return {
+        ...node,
         x: savedPosition?.x ?? basePosition.x,
         y: savedPosition?.y ?? basePosition.y,
       };
@@ -496,6 +1108,12 @@ export function KnowledgeGraphModal({
       bounds: zone.bounds
         ? addOffsetToBounds(zone.bounds, zoneOffsets.get(zone.id) ?? { x: 0, y: 0 })
         : null,
+      path: zone.bounds
+        ? createZoneHullPath(
+            visualNodes.filter((node) => node.zone === zone.id),
+            addOffsetToBounds(zone.bounds, zoneOffsets.get(zone.id) ?? { x: 0, y: 0 }),
+          )
+        : null,
     }));
 
     return {
@@ -507,9 +1125,10 @@ export function KnowledgeGraphModal({
       zoneBounds,
     };
   }, [draggedNodeId, graph, nodePositions]);
+  const visibleDetailsItem = selectedItem;
   const connectedIds = useMemo(
-    () => getConnectedIds(positionedGraph, activeItem),
-    [activeItem, positionedGraph],
+    () => getConnectedIds(positionedGraph, visibleDetailsItem),
+    [positionedGraph, visibleDetailsItem],
   );
 
   useEffect(() => {
@@ -518,7 +1137,21 @@ export function KnowledgeGraphModal({
     setNodePositions({});
     setDraggedNodeId(null);
     setActiveItem(null);
+    setSelectedItem(null);
+    suppressNextNodeClickRef.current = null;
   }, [session.id]);
+
+  useEffect(() => {
+    if (!focusNodeId) {
+      return;
+    }
+
+    const focusedNode = positionedGraph.nodes.find((node) => node.id === focusNodeId);
+
+    if (focusedNode) {
+      setSelectedItem({ kind: "node", item: focusedNode });
+    }
+  }, [focusNodeId, positionedGraph.nodes]);
 
   useEffect(() => {
     cameraRef.current = camera;
@@ -613,6 +1246,11 @@ export function KnowledgeGraphModal({
     setActiveItem(null);
   }, []);
 
+  const selectGraphItem = useCallback((item) => {
+    setSelectedItem(item);
+    setActiveItem(null);
+  }, []);
+
   useEffect(() => {
     if (!activeItem) {
       return undefined;
@@ -662,6 +1300,8 @@ export function KnowledgeGraphModal({
 
     const svgPoint = getSvgPoint(event, svgRef.current);
 
+    setActiveItem(null);
+    setSelectedItem(null);
     dragStateRef.current = {
       type: "camera",
       pointerId: event.pointerId,
@@ -681,13 +1321,17 @@ export function KnowledgeGraphModal({
 
     event.stopPropagation();
     const worldPoint = getWorldPoint(event, svgRef.current, cameraRef.current);
+    const svgPoint = getSvgPoint(event, svgRef.current);
 
     dragStateRef.current = {
       type: "node",
       pointerId: event.pointerId,
       nodeId: node.id,
+      startX: svgPoint.x,
+      startY: svgPoint.y,
       offsetX: node.x - worldPoint.x,
       offsetY: node.y - worldPoint.y,
+      didMove: false,
     };
     setDraggedNodeId(node.id);
     setActiveItem(null);
@@ -705,6 +1349,10 @@ export function KnowledgeGraphModal({
     if (dragState.type === "camera") {
       const svgPoint = getSvgPoint(event, svgElement);
 
+      if (Math.hypot(svgPoint.x - dragState.startX, svgPoint.y - dragState.startY) > NODE_CLICK_DRAG_THRESHOLD) {
+        dragState.didMove = true;
+      }
+
       const nextCamera = {
         ...dragState.camera,
         x: dragState.camera.x + svgPoint.x - dragState.startX,
@@ -713,6 +1361,11 @@ export function KnowledgeGraphModal({
 
       scheduleCameraUpdate(nextCamera);
       return;
+    }
+
+    const svgPoint = getSvgPoint(event, svgElement);
+    if (Math.hypot(svgPoint.x - dragState.startX, svgPoint.y - dragState.startY) > NODE_CLICK_DRAG_THRESHOLD) {
+      dragState.didMove = true;
     }
 
     const worldPoint = getWorldPoint(event, svgElement, cameraRef.current);
@@ -736,6 +1389,15 @@ export function KnowledgeGraphModal({
     const dragState = dragStateRef.current;
 
     if (dragState?.pointerId === event.pointerId) {
+      if (dragState.type === "node" && dragState.didMove) {
+        suppressNextNodeClickRef.current = dragState.nodeId;
+        window.setTimeout(() => {
+          if (suppressNextNodeClickRef.current === dragState.nodeId) {
+            suppressNextNodeClickRef.current = null;
+          }
+        }, 0);
+      }
+
       dragStateRef.current = null;
       setDraggedNodeId(null);
       setIsCameraDragging(false);
@@ -767,7 +1429,7 @@ export function KnowledgeGraphModal({
         className="knowledge-graph-modal"
         role="dialog"
         aria-modal="true"
-        aria-label="Граф доказательств"
+        aria-label="Граф знаний"
         onClick={(event) => event.stopPropagation()}
       >
         <button
@@ -780,8 +1442,7 @@ export function KnowledgeGraphModal({
         </button>
 
         <header className="knowledge-graph-modal__header">
-          <span className="knowledge-graph-modal__eyebrow">Evidence / Knowledge Graph</span>
-          <h2 className="knowledge-graph-modal__title">Карта доказательств</h2>
+          <h2 className="knowledge-graph-modal__title">Граф знаний</h2>
           <p className="knowledge-graph-modal__subtitle">
             Связи между вводными, источниками, фактами, гипотезами и итоговой оценкой.
           </p>
@@ -798,7 +1459,7 @@ export function KnowledgeGraphModal({
               ].filter(Boolean).join(" ")}
               viewBox={`0 0 ${GRAPH_WIDTH} ${GRAPH_HEIGHT}`}
               role="img"
-              aria-label="Граф доказательств и гипотез"
+              aria-label="Граф знаний"
               onWheel={handleGraphWheel}
               onPointerDown={handleGraphPointerDown}
               onPointerMove={handleGraphPointerMove}
@@ -830,7 +1491,7 @@ export function KnowledgeGraphModal({
 
                   return (
                     <g key={zone.id} className={`knowledge-graph-zone knowledge-graph-zone--${zone.tone}`}>
-                      <path d={createSmoothZonePath(zone.bounds)} />
+                      <path d={zone.path ?? createSmoothZonePath(zone.bounds)} />
                       <text x={zone.bounds.x + 24} y={zone.bounds.y + 34} className="knowledge-graph-zone__label">
                         {zone.label}
                       </text>
@@ -844,7 +1505,7 @@ export function KnowledgeGraphModal({
                 <g className="knowledge-graph__edges">
                   {positionedGraph.edges.map((edge) => {
                     const isActive = connectedIds.edgeIds.has(edge.id);
-                    const isDimmed = activeItem && !isActive;
+                    const isDimmed = visibleDetailsItem && !isActive;
 
                     return (
                       <g key={edge.id}>
@@ -863,6 +1524,10 @@ export function KnowledgeGraphModal({
                           onMouseEnter={(event) => showEdgeTooltip(event, edge)}
                           onMouseMove={(event) => showEdgeTooltip(event, edge)}
                           onMouseLeave={hideTooltip}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            selectGraphItem({ kind: "edge", item: edge });
+                          }}
                         />
                       </g>
                     );
@@ -875,7 +1540,7 @@ export function KnowledgeGraphModal({
                     const Icon = meta.icon;
                     const isFocused = focusNodeId === node.id;
                     const isActive = connectedIds.nodeIds.has(node.id);
-                    const isDimmed = activeItem && !isActive;
+                    const isDimmed = visibleDetailsItem && !isActive;
                     const isDragging = draggedNodeId === node.id;
 
                     return (
@@ -899,6 +1564,21 @@ export function KnowledgeGraphModal({
                         onMouseLeave={hideTooltip}
                         onFocus={(event) => showNodeTooltip(event, node)}
                         onBlur={hideTooltip}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          if (suppressNextNodeClickRef.current === node.id) {
+                            suppressNextNodeClickRef.current = null;
+                            return;
+                          }
+
+                          selectGraphItem({ kind: "node", item: node });
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            selectGraphItem({ kind: "node", item: node });
+                          }
+                        }}
                       >
                         <circle r="18" />
                         <g className="knowledge-graph-node__icon" transform="translate(-9 -9)">
@@ -928,16 +1608,12 @@ export function KnowledgeGraphModal({
           </div>
 
           <aside className="knowledge-graph-inspector">
-            <h3>Как читать граф</h3>
-            <p>
-              Колесо мыши меняет масштаб, пустое поле двигает камеру, а сами узлы можно перетаскивать.
-              При наведении видны источник, цитата, факт, гипотеза или причина связи.
-            </p>
-            <div className="knowledge-graph-inspector__stats">
-              <span>{positionedGraph.nodes.length} узлов</span>
-              <span>{positionedGraph.edges.length} связей</span>
-              <span>{Math.round(camera.scale * 100)}%</span>
-            </div>
+            <ItemDetailsPanel
+              item={selectedItem}
+              nodesCount={positionedGraph.nodes.length}
+              edgesCount={positionedGraph.edges.length}
+              scale={camera.scale}
+            />
           </aside>
         </div>
 
