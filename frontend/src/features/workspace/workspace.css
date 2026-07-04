@@ -1757,38 +1757,6 @@
   font-size: 0.82rem;
 }
 
-.agent-palette-trash {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  width: 58px;
-  height: 42px;
-  margin: 2px auto 0;
-  border: 1px solid rgba(255, 94, 94, 0.22);
-  border-radius: 15px;
-  background: rgba(154, 31, 31, 0.14);
-  color: rgba(255, 196, 196, 0.5);
-  opacity: 0.68;
-  transition:
-    background-color 160ms ease,
-    color 160ms ease,
-    opacity 160ms ease,
-    transform 160ms ease;
-}
-
-.agent-palette-trash svg {
-  width: 18px;
-  height: 18px;
-}
-
-.agent-palette-trash:hover {
-  background: rgba(174, 44, 44, 0.34);
-  color: rgba(255, 230, 230, 0.94);
-  opacity: 1;
-  transform: translateY(-1px);
-}
-
 .agent-setup-popover {
   position: fixed;
   z-index: 1100;

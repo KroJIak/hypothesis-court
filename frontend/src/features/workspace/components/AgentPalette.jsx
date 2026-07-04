@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus } from "lucide-react";
 
 import { AgentAvatar } from "./AgentAvatar";
 import { AgentSetupPopover } from "./AgentSetupPopover";
@@ -20,15 +20,12 @@ export function AgentPalette({
   onAgentDragEnd,
   onDropAgentToPalette,
   onReorderPaletteAgent,
-  onDeleteCustomAgent,
   isDropTargetVisible,
-  isDeleteTargetVisible,
   isAddAgentDisabled,
   isAgentEditingLocked,
   lockedReason,
   activePendingAgentId,
   onOpenPendingAgentSetup,
-  onClosePendingAgentSetup,
   onChangePendingAgentSetup,
   onGeneratePendingAgentPrompt,
   onDeletePendingAgentSetup,
@@ -41,7 +38,7 @@ export function AgentPalette({
   const sortedAgents = sortAvailableAgents(agents);
   const activePendingAgent =
     sortedAgents.find((agent) =>
-      agent.id === activePendingAgentId && (agent.isPendingSetup || agent.isCustom),
+      agent.id === activePendingAgentId && (agent.isPendingSetup || !agent.isEmpty),
     ) ?? null;
 
   const setItemRef = useCallback((agentId, node) => {
@@ -96,7 +93,7 @@ export function AgentPalette({
   }, [activePendingAgent, updateSetupPopoverPosition]);
 
   function handlePendingAgentClick(agent) {
-    if (isAgentEditingLocked || (!agent.isPendingSetup && !agent.isCustom)) {
+    if (isAgentEditingLocked || (!agent.isPendingSetup && agent.isEmpty)) {
       return;
     }
 
@@ -146,33 +143,6 @@ export function AgentPalette({
     onReorderPaletteAgent(payload.agentId, targetAgent.id, placement);
   }
 
-  function handleDeleteDragOver(event) {
-    if (!isDeleteTargetVisible) {
-      return;
-    }
-
-    event.preventDefault();
-    event.stopPropagation();
-    event.dataTransfer.dropEffect = "move";
-  }
-
-  function handleDeleteDrop(event) {
-    if (!isDeleteTargetVisible) {
-      return;
-    }
-
-    const payload = readAgentDragPayload(event);
-
-    event.preventDefault();
-    event.stopPropagation();
-
-    if (!payload?.agentId) {
-      return;
-    }
-
-    onDeleteCustomAgent(payload.agentId);
-  }
-
   return (
     <aside
       className={`agent-palette${isDropTargetVisible ? " agent-palette--drop-ready" : ""}`}
@@ -185,7 +155,11 @@ export function AgentPalette({
         type="button"
         className="palette-add-button"
         disabled={isAddAgentDisabled}
-        onClick={onAddAgent}
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onAddAgent();
+        }}
         aria-label={palette.addAgentLabel}
         title={isAgentEditingLocked ? lockedReason : palette.addAgentLabel}
       >
@@ -209,8 +183,8 @@ export function AgentPalette({
                 : "palette-list__item palette-list__item--draggable"
             }
             style={{ viewTransitionName: getAgentViewTransitionName(agent.id) }}
-            role={(agent.isPendingSetup || agent.isCustom) && !isAgentEditingLocked ? "button" : undefined}
-            tabIndex={(agent.isPendingSetup || agent.isCustom) && !isAgentEditingLocked ? 0 : undefined}
+            role={(agent.isPendingSetup || !agent.isEmpty) && !isAgentEditingLocked ? "button" : undefined}
+            tabIndex={(agent.isPendingSetup || !agent.isEmpty) && !isAgentEditingLocked ? 0 : undefined}
             draggable={!isAgentEditingLocked && !agent.isEmpty && !agent.isPendingSetup}
             onClick={() => handlePendingAgentClick(agent)}
             onKeyDown={(event) => handlePendingAgentKeyDown(event, agent)}
@@ -227,18 +201,6 @@ export function AgentPalette({
           <span className="palette-list__empty">Все агенты на сцене</span>
         ) : null}
       </div>
-      {isDeleteTargetVisible ? (
-        <div
-          className="agent-palette-trash"
-          role="button"
-          tabIndex={-1}
-          aria-label="Удалить созданного агента"
-          onDragOver={handleDeleteDragOver}
-          onDrop={handleDeleteDrop}
-        >
-          <Trash2 aria-hidden="true" strokeWidth={1.9} />
-        </div>
-      ) : null}
       {activePendingAgent && typeof document !== "undefined"
         ? createPortal(
             <AgentSetupPopover
@@ -257,10 +219,6 @@ export function AgentPalette({
               onGeneratePrompt={onGeneratePendingAgentPrompt}
               onDelete={onDeletePendingAgentSetup}
               onSave={onSavePendingAgentSetup}
-              onClose={() => {
-                setIconPickerAgentId(null);
-                onClosePendingAgentSetup();
-              }}
               style={setupPopoverStyle}
             />,
             document.body,

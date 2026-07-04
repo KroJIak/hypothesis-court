@@ -38,7 +38,6 @@ import {
   createWorkspaceSessionFromChatSession,
   formatComposerRequest,
   getInitialAvailableAgents,
-  hasPendingAgent,
   insertEvaluationAgentAtEdge,
   reorderAvailableAgents,
   sortAvailableAgents,
@@ -162,6 +161,7 @@ export function WorkspacePage({
   const [customAgents, setCustomAgents] = useState(() => readStoredCustomAgents());
   const [activePendingAgentId, setActivePendingAgentId] = useState(null);
   const sceneScrollRef = useRef(null);
+  const addAgentFrameRef = useRef(null);
   const deferredChatSearchQuery = useDeferredValue(chatSearchQuery);
   const selectedSession = sessions.find((session) => session.id === selectedChatId) ?? sessions[0] ?? null;
   const isAgentEditingLocked = selectedSession
@@ -488,9 +488,13 @@ export function WorkspacePage({
       return;
     }
 
-    if (hasPendingAgent(selectedSession)) {
+    if (addAgentFrameRef.current !== null) {
       return;
     }
+
+    addAgentFrameRef.current = window.requestAnimationFrame(() => {
+      addAgentFrameRef.current = null;
+    });
 
     updateSelectedSession((session) => {
       const availableAgents = session.availableAgents ?? getInitialAvailableAgents(session, data.palette.agents);
@@ -510,7 +514,7 @@ export function WorkspacePage({
     const availableAgents = selectedSession.availableAgents ?? getInitialAvailableAgents(selectedSession, data.palette.agents);
     const editableAgent = availableAgents.find((agent) => (
       agent.id === agentId
-        && (agent.isPendingSetup || agent.isCustom)
+        && (agent.isPendingSetup || !agent.isEmpty)
     ));
 
     if (!editableAgent) {
@@ -518,10 +522,6 @@ export function WorkspacePage({
     }
 
     setActivePendingAgentId(agentId);
-  }
-
-  function handleClosePendingAgentSetup() {
-    setActivePendingAgentId(null);
   }
 
   function handleChangePendingAgentSetup(agentId, changes) {
@@ -532,7 +532,7 @@ export function WorkspacePage({
     updateSelectedSession((session) => ({
       ...session,
       availableAgents: (session.availableAgents ?? getInitialAvailableAgents(session, data.palette.agents)).map((agent) =>
-        agent.id === agentId && (agent.isPendingSetup || agent.isCustom)
+        agent.id === agentId && (agent.isPendingSetup || !agent.isEmpty)
           ? {
               ...agent,
               ...changes,
@@ -548,7 +548,7 @@ export function WorkspacePage({
     }
 
     const availableAgents = selectedSession.availableAgents ?? getInitialAvailableAgents(selectedSession, data.palette.agents);
-    const pendingAgent = availableAgents.find((agent) => agent.id === agentId && (agent.isPendingSetup || agent.isCustom));
+    const pendingAgent = availableAgents.find((agent) => agent.id === agentId && (agent.isPendingSetup || !agent.isEmpty));
 
     if (!pendingAgent) {
       return;
@@ -577,54 +577,58 @@ export function WorkspacePage({
     const availableAgents = selectedSession.availableAgents ?? getInitialAvailableAgents(selectedSession, data.palette.agents);
     const pendingAgent = availableAgents.find((agent) => (
       agent.id === agentId
-        && (agent.isPendingSetup || agent.isCustom)
+        && (agent.isPendingSetup || !agent.isEmpty)
     ));
     const nextName = pendingAgent?.name?.trim() || "Новый эксперт";
     const nextSystemPrompt = pendingAgent?.systemPrompt?.trim() ?? "";
 
-    if (!pendingAgent || !nextSystemPrompt) {
+    if (!pendingAgent) {
       return;
     }
 
+    const isCustomAgent = Boolean(pendingAgent.isCustom || pendingAgent.isPendingSetup);
     const configuredAgent = {
       ...pendingAgent,
       name: nextName,
       variant: pendingAgent.variant ?? "empty",
       systemPrompt: nextSystemPrompt,
-      isCustom: true,
+      isCustom: isCustomAgent,
       isEmpty: false,
       isPendingSetup: false,
     };
 
-    setSessions((currentSessions) =>
-      updateAgentInSessions(
-        currentSessions.map((session) => {
-          if (session.id !== selectedSession.id) {
-            return session;
-          }
+    setSessions((currentSessions) => {
+      const nextSessions = currentSessions.map((session) => {
+        if (session.id !== selectedSession.id) {
+          return session;
+        }
 
-          return {
-            ...session,
-            availableAgents: sortAvailableAgents(
-              (session.availableAgents ?? getInitialAvailableAgents(session, data.palette.agents)).map((agent) =>
-                agent.id === agentId && (agent.isPendingSetup || agent.isCustom) ? configuredAgent : agent,
-              ),
+        return {
+          ...session,
+          availableAgents: sortAvailableAgents(
+            (session.availableAgents ?? getInitialAvailableAgents(session, data.palette.agents)).map((agent) =>
+              agent.id === agentId && (agent.isPendingSetup || !agent.isEmpty) ? configuredAgent : agent,
             ),
-          };
-        }),
-        configuredAgent,
-      ),
-    );
+          ),
+        };
+      });
 
-    setCustomAgents((currentAgents) => {
-      const nextAgents = sortAvailableAgents([
-        ...currentAgents.filter((agent) => agent.id !== configuredAgent.id),
-        configuredAgent,
-      ]);
-
-      writeStoredCustomAgents(nextAgents);
-      return nextAgents;
+      return configuredAgent.isCustom
+        ? updateAgentInSessions(nextSessions, configuredAgent)
+        : nextSessions;
     });
+
+    if (configuredAgent.isCustom) {
+      setCustomAgents((currentAgents) => {
+        const nextAgents = sortAvailableAgents([
+          ...currentAgents.filter((agent) => agent.id !== configuredAgent.id),
+          configuredAgent,
+        ]);
+
+        writeStoredCustomAgents(nextAgents);
+        return nextAgents;
+      });
+    }
 
     setActivePendingAgentId(null);
   }
@@ -637,7 +641,7 @@ export function WorkspacePage({
     const availableAgents = selectedSession.availableAgents ?? getInitialAvailableAgents(selectedSession, data.palette.agents);
     const agent = availableAgents.find((availableAgent) => (
       availableAgent.id === agentId
-        && (availableAgent.isPendingSetup || availableAgent.isCustom)
+        && (availableAgent.isPendingSetup || !availableAgent.isEmpty)
     ));
 
     if (!agent) {
@@ -991,15 +995,12 @@ export function WorkspacePage({
         onAgentDragEnd={handleAgentDragEnd}
         onDropAgentToPalette={handleDropAgentToPalette}
         onReorderPaletteAgent={handleReorderPaletteAgent}
-        onDeleteCustomAgent={handleDeleteCustomAgent}
         isDropTargetVisible={dragSource === "evaluation"}
-        isDeleteTargetVisible={customAgents.length > 0 && !isAgentEditingLocked}
-        isAddAgentDisabled={isAgentEditingLocked || hasPendingAgent(selectedSession)}
+        isAddAgentDisabled={isAgentEditingLocked}
         isAgentEditingLocked={isAgentEditingLocked}
         lockedReason="Агентов можно менять только до старта процесса."
         activePendingAgentId={activePendingAgentId}
         onOpenPendingAgentSetup={handleOpenPendingAgentSetup}
-        onClosePendingAgentSetup={handleClosePendingAgentSetup}
         onChangePendingAgentSetup={handleChangePendingAgentSetup}
         onGeneratePendingAgentPrompt={handleGeneratePendingAgentPrompt}
         onDeletePendingAgentSetup={handleDeletePendingAgentSetup}

@@ -10,22 +10,15 @@ export function AgentSetupPopover({
   onGeneratePrompt,
   onDelete,
   onSave,
-  onClose,
   style,
 }) {
   const agentName = agent.name ?? "";
   const popoverTitle = agentName.trim() || "Новый эксперт";
   const selectedVariant = agent.variant ?? "empty";
   const systemPrompt = agent.systemPrompt ?? "";
-  const canSave = systemPrompt.trim().length > 0;
 
   function handleClose() {
-    if (canSave) {
-      onSave(agent.id);
-      return;
-    }
-
-    onClose();
+    onSave(agent.id);
   }
 
   return (
