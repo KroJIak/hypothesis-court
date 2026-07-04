@@ -1403,6 +1403,10 @@
   transform: translate(-50%, -50%);
 }
 
+.agent-avatar--empty .agent-avatar__base-icon {
+  inset-block-start: 50%;
+}
+
 .agent-avatar__accessory {
   position: absolute;
   left: 50%;
@@ -1814,8 +1818,9 @@
 .agent-setup-popover__title {
   min-width: 0;
   overflow: hidden;
-  color: rgba(244, 244, 244, 0.78);
-  font-size: 0.82rem;
+  color: #ffffff;
+  font-size: 0.98rem;
+  font-weight: 650;
   line-height: 1;
   text-overflow: ellipsis;
   white-space: nowrap;

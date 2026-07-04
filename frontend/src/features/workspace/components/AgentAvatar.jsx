@@ -3,7 +3,6 @@ import {
   BrainCircuit,
   Boxes,
   ChartColumnBig,
-  CircleOff,
   ClipboardCheck,
   Cpu,
   Database,
@@ -78,16 +77,23 @@ export const accessoryByVariant = {
 };
 
 export function AgentVariantIcon({ variant, className = "", strokeWidth = 2 }) {
-  const Icon = variant === "empty" ? CircleOff : accessoryByVariant[variant] ?? BrainCircuit;
+  if (variant === "empty") {
+    return null;
+  }
+
+  const Icon = accessoryByVariant[variant] ?? BrainCircuit;
 
   return <Icon className={className} aria-hidden="true" strokeWidth={strokeWidth} />;
 }
 
 export function AgentAvatar({ variant, size = "regular" }) {
   const AccessoryIcon = accessoryByVariant[variant] ?? null;
+  const className = AccessoryIcon
+    ? `agent-avatar agent-avatar--${size}`
+    : `agent-avatar agent-avatar--${size} agent-avatar--empty`;
 
   return (
-    <div className={`agent-avatar agent-avatar--${size}`}>
+    <div className={className}>
       <div className="agent-avatar__plate">
         <UserRound className="agent-avatar__base-icon" aria-hidden="true" strokeWidth={1.3} />
         {AccessoryIcon ? (
