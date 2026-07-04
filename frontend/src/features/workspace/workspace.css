@@ -13,11 +13,16 @@
 .workspace {
   --workspace-bottom-lift: 14px;
   --workspace-agent-avatar-size: 62px;
+  --workspace-answer-inline-gap: clamp(24px, 5.4vw, 68px);
+  --workspace-verdict-inline-gap: clamp(16px, 2.6vw, 32px);
+  --workspace-verdict-scroll-top-offset: 0px;
   box-sizing: border-box;
   display: grid;
   grid-template-columns: 232px minmax(0, 1fr) 152px;
   height: 100vh;
+  height: 100dvh;
   min-height: 100vh;
+  min-height: 100dvh;
   overflow: hidden;
   background: #050505;
   color: #f4f4f4;
@@ -773,12 +778,19 @@
 }
 
 .workspace-main {
-  --workspace-answer-column-width: min(680px, calc(100% - 136px));
-  --workspace-verdict-column-width: min(1280px, calc(100% - 64px));
+  --workspace-answer-column-width: min(
+    680px,
+    calc(100% - var(--workspace-answer-inline-gap) - var(--workspace-answer-inline-gap))
+  );
+  --workspace-verdict-column-width: min(
+    1280px,
+    calc(100% - var(--workspace-verdict-inline-gap) - var(--workspace-verdict-inline-gap))
+  );
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 100%;
+  min-height: 0;
   min-width: 0;
   overflow: hidden;
   padding: 12px 16px calc(12px + var(--workspace-bottom-lift));
@@ -898,6 +910,7 @@
 }
 
 .workspace-main__scene {
+  --workspace-verdict-scroll-top-offset: 0px;
   position: relative;
   flex: 1;
   min-height: 0;
@@ -913,6 +926,7 @@
 .workspace-scene {
   box-sizing: border-box;
   position: relative;
+  min-height: 100%;
   padding-top: 4px;
 }
 
@@ -3074,6 +3088,8 @@
 
 @media (max-width: 760px) {
   .workspace-main {
+    --workspace-answer-inline-gap: 0px;
+    --workspace-verdict-inline-gap: 0px;
     --workspace-answer-column-width: 100%;
     --workspace-verdict-column-width: 100%;
   }
