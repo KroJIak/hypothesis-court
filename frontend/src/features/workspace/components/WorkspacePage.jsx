@@ -295,8 +295,9 @@ export function WorkspacePage({
   const newAgentBaselineByIdRef = useRef(new Map());
   const deferredChatSearchQuery = useDeferredValue(chatSearchQuery);
   const selectedSession = sessions.find((session) => session.id === selectedChatId) ?? sessions[0] ?? null;
-  const selectedSessionAvailableAgents = selectedSession?.availableAgents
-    ?? (selectedSession && data ? getInitialAvailableAgents(selectedSession, getPaletteAgents(userAgents, data)) : []);
+  const selectedSessionAvailableAgents = selectedSession && data
+    ? refreshAvailableAgentsForSession(selectedSession, userAgents, data).availableAgents
+    : [];
   const unchangedNewAgent = findUnchangedNewAgent(selectedSessionAvailableAgents, newAgentBaselineByIdRef.current);
   const isAgentEditingLocked = selectedSession
     ? selectedSession.isStarted || (selectedSession.hypotheses ?? []).length > 0
@@ -496,7 +497,7 @@ export function WorkspacePage({
         setSessions((currentSessions) =>
           currentSessions.map((session) =>
             session.id === selectedChatId
-              ? applySelectedAgentsToSession(session, selectedAgents, [], data)
+              ? applySelectedAgentsToSession(session, selectedAgents, userAgents, data)
               : session,
           ),
         );
@@ -510,7 +511,7 @@ export function WorkspacePage({
       });
 
     return () => controller.abort();
-  }, [accessToken, data, selectedChatId, showWorkspaceError, status]);
+  }, [accessToken, data, selectedChatId, showWorkspaceError, status, userAgents]);
 
   useEffect(() => {
     if (status !== "success" || !selectedChatId) {
