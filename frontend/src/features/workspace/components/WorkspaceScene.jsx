@@ -18,6 +18,7 @@ export function WorkspaceScene({
   dragSource,
   isAgentEditingLocked,
   onVerdictComplete,
+  onOpenAgentHistory,
 }) {
   const sceneRef = useRef(null);
   const manufacturerAvatarRef = useRef(null);
@@ -187,6 +188,7 @@ export function WorkspaceScene({
         activeConnectionDirections={activeDebateConnectionDirections}
         debateCycleNumber={debateCycleNumber}
         hideAgentStatus={!hasHypotheses}
+        onOpenAgentHistory={onOpenAgentHistory}
       />
       <EvaluationStage
         evaluation={evaluation}
@@ -203,6 +205,7 @@ export function WorkspaceScene({
         onDropAgent={onDropAgentToEvaluation}
         isDropTargetVisible={!isAgentEditingLocked && dragSource === "palette"}
         isAgentEditingLocked={isAgentEditingLocked}
+        onOpenAgentHistory={onOpenAgentHistory}
       />
     </div>
   );

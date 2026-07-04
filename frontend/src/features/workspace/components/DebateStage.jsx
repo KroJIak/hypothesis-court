@@ -9,6 +9,7 @@ export function DebateStage({
   activeConnectionDirections,
   debateCycleNumber,
   hideAgentStatus,
+  onOpenAgentHistory,
 }) {
   const stageRef = useRef(null);
   const topLeftAvatarRef = useRef(null);
@@ -118,7 +119,15 @@ export function DebateStage({
         </svg>
       ) : null}
       <div className="debate-stage__triangle debate-stage__triangle--left">
-        <AgentCard {...rolesByPlacement["top-left"]} hideStatus={hideAgentStatus} avatarRef={topLeftAvatarRef} />
+        <AgentCard
+          {...rolesByPlacement["top-left"]}
+          hideStatus={hideAgentStatus}
+          avatarRef={topLeftAvatarRef}
+          onClick={() => onOpenAgentHistory?.({
+            type: "debate",
+            agent: rolesByPlacement["top-left"],
+          })}
+        />
       </div>
       <div className="debate-stage__triangle debate-stage__triangle--center" aria-live="polite">
         {debateCycleNumber ? (
@@ -129,10 +138,26 @@ export function DebateStage({
         ) : null}
       </div>
       <div className="debate-stage__triangle debate-stage__triangle--right">
-        <AgentCard {...rolesByPlacement["top-right"]} hideStatus={hideAgentStatus} avatarRef={topRightAvatarRef} />
+        <AgentCard
+          {...rolesByPlacement["top-right"]}
+          hideStatus={hideAgentStatus}
+          avatarRef={topRightAvatarRef}
+          onClick={() => onOpenAgentHistory?.({
+            type: "debate",
+            agent: rolesByPlacement["top-right"],
+          })}
+        />
       </div>
       <div className="debate-stage__triangle debate-stage__triangle--bottom">
-        <AgentCard {...rolesByPlacement["bottom-center"]} hideStatus={hideAgentStatus} avatarRef={setBottomAvatarRef} />
+        <AgentCard
+          {...rolesByPlacement["bottom-center"]}
+          hideStatus={hideAgentStatus}
+          avatarRef={setBottomAvatarRef}
+          onClick={() => onOpenAgentHistory?.({
+            type: "debate",
+            agent: rolesByPlacement["bottom-center"],
+          })}
+        />
       </div>
     </section>
   );

@@ -26,6 +26,7 @@ export function EvaluationStage({
   onDropAgent,
   isDropTargetVisible,
   isAgentEditingLocked,
+  onOpenAgentHistory,
 }) {
   const [activeDropIntent, setActiveDropIntent] = useState(null);
   const { leftAgents, rightAgents } = splitAgentsAroundCenter(evaluation.agents, evaluation.layoutBias);
@@ -133,6 +134,10 @@ export function EvaluationStage({
           avatarRef={(node) => onAgentAvatarRef(agent.id, node)}
           onDragStart={(event) => onAgentDragStart(event, "evaluation", agent.id)}
           onDragEnd={onAgentDragEnd}
+          onClick={() => onOpenAgentHistory?.({
+            type: "evaluation",
+            agent,
+          })}
         />
       </div>
     );
@@ -185,7 +190,16 @@ export function EvaluationStage({
       </div>
 
       <div className="evaluation-stage__judge">
-        <AgentCard {...evaluation.judge} compact hideStatus={hideAgentStatus} avatarRef={judgeAvatarRef} />
+        <AgentCard
+          {...evaluation.judge}
+          compact
+          hideStatus={hideAgentStatus}
+          avatarRef={judgeAvatarRef}
+          onClick={() => onOpenAgentHistory?.({
+            type: "judge",
+            agent: evaluation.judge,
+          })}
+        />
       </div>
 
       {isAnswerVisible && answer ? (

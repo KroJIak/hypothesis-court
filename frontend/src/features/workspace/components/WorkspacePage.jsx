@@ -1,6 +1,7 @@
 import { useDeferredValue, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { AgentPalette } from "./AgentPalette";
+import { AgentMessageHistoryModal } from "./AgentMessageHistoryModal";
 import { Composer } from "./Composer";
 import { RequestSummaryRail } from "./RequestSummaryRail";
 import { Sidebar } from "./Sidebar";
@@ -159,6 +160,7 @@ export function WorkspacePage({
   const [removedAttachmentIdsBySession, setRemovedAttachmentIdsBySession] = useState({});
   const [customAgents, setCustomAgents] = useState(() => readStoredCustomAgents());
   const [activePendingAgentId, setActivePendingAgentId] = useState(null);
+  const [activeAgentHistoryTarget, setActiveAgentHistoryTarget] = useState(null);
   const sceneScrollRef = useRef(null);
   const addAgentFrameRef = useRef(null);
   const deferredChatSearchQuery = useDeferredValue(chatSearchQuery);
@@ -218,6 +220,10 @@ export function WorkspacePage({
   useEffect(() => {
     setSessions((currentSessions) => syncCustomAgentsIntoSessions(currentSessions, customAgents));
   }, [customAgents]);
+
+  useEffect(() => {
+    setActiveAgentHistoryTarget(null);
+  }, [selectedChatId]);
 
   useEffect(() => {
     if (status !== "success" || !selectedChatId) {
@@ -889,6 +895,14 @@ export function WorkspacePage({
     ));
   }
 
+  function handleOpenAgentHistory(target) {
+    setActiveAgentHistoryTarget(target);
+  }
+
+  function handleCloseAgentHistory() {
+    setActiveAgentHistoryTarget(null);
+  }
+
   function handleRemoveComposerRequest(requestId) {
     updateSelectedSession((session) => ({
       ...session,
@@ -949,6 +963,7 @@ export function WorkspacePage({
             dragSource={dragSource}
             isAgentEditingLocked={isAgentEditingLocked}
             onVerdictComplete={handleVerdictComplete}
+            onOpenAgentHistory={handleOpenAgentHistory}
           />
         </div>
 
@@ -988,6 +1003,14 @@ export function WorkspacePage({
         onSavePendingAgentSetup={handleSavePendingAgentSetup}
         onAddAgent={handleAddAgent}
       />
+
+      {activeAgentHistoryTarget ? (
+        <AgentMessageHistoryModal
+          session={selectedSession}
+          target={activeAgentHistoryTarget}
+          onClose={handleCloseAgentHistory}
+        />
+      ) : null}
     </main>
   );
 }

@@ -16,6 +16,7 @@ export function AgentCard({
   avatarRef = null,
   draggable = false,
   hideStatus = false,
+  onClick,
   onDragStart,
   onDragEnd,
 }) {
@@ -66,6 +67,15 @@ export function AgentCard({
     setIsNameVisible(false);
   }, []);
 
+  const handleKeyDown = useCallback((event) => {
+    if (!onClick || (event.key !== "Enter" && event.key !== " ")) {
+      return;
+    }
+
+    event.preventDefault();
+    onClick(event);
+  }, [onClick]);
+
   useEffect(() => {
     if (!isNameVisible) {
       return undefined;
@@ -82,10 +92,14 @@ export function AgentCard({
 
   return (
     <div
-      className={`scene-agent${compact ? " scene-agent--compact" : ""}${draggable ? " scene-agent--draggable" : ""}`}
+      className={`scene-agent${compact ? " scene-agent--compact" : ""}${draggable ? " scene-agent--draggable" : ""}${onClick ? " scene-agent--interactive" : ""}`}
       draggable={draggable}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onClick={onClick}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
+      onKeyDown={handleKeyDown}
       onMouseEnter={showNameTooltip}
       onMouseLeave={hideNameTooltip}
       onFocus={showNameTooltip}
