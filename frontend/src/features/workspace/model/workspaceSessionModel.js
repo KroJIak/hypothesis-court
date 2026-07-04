@@ -52,6 +52,15 @@ export function sortAvailableAgents(agents) {
       return firstAgent.isCustom ? -1 : 1;
     }
 
+    if (firstAgent.isCustom && secondAgent.isCustom) {
+      const firstCreatedAt = Date.parse(firstAgent.createdAt ?? "");
+      const secondCreatedAt = Date.parse(secondAgent.createdAt ?? "");
+
+      if (Number.isFinite(firstCreatedAt) && Number.isFinite(secondCreatedAt) && firstCreatedAt !== secondCreatedAt) {
+        return secondCreatedAt - firstCreatedAt;
+      }
+    }
+
     if (firstAgent.isEmpty === secondAgent.isEmpty) {
       return 0;
     }
@@ -361,4 +370,27 @@ export function insertEvaluationAgentAtEdge(agents, agent, edge, insertionIndex)
   }
 
   return edge === EVALUATION_SIDE_LEFT ? [agent, ...agents] : [...agents, agent];
+}
+
+export function moveEvaluationAgentToIndex(agents, agentId, insertionIndex) {
+  const currentIndex = agents.findIndex((agent) => agent.id === agentId);
+
+  if (currentIndex === -1) {
+    return agents;
+  }
+
+  const movingAgent = agents[currentIndex];
+  const remainingAgents = agents.filter((agent) => agent.id !== agentId);
+  const adjustedInsertionIndex = Number.isInteger(insertionIndex) && currentIndex < insertionIndex
+    ? insertionIndex - 1
+    : insertionIndex;
+  const safeIndex = Number.isInteger(insertionIndex)
+    ? Math.min(Math.max(adjustedInsertionIndex, 0), remainingAgents.length)
+    : remainingAgents.length;
+
+  return [
+    ...remainingAgents.slice(0, safeIndex),
+    movingAgent,
+    ...remainingAgents.slice(safeIndex),
+  ];
 }

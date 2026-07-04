@@ -10,6 +10,8 @@ function mapAgent(dto) {
     isCustom: Boolean(dto.is_custom),
     isEmpty: Boolean(dto.is_empty),
     isPendingSetup: false,
+    createdAt: dto.created_at ?? null,
+    updatedAt: dto.updated_at ?? null,
   };
 }
 

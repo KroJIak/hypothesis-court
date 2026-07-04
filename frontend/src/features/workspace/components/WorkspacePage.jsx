@@ -61,6 +61,7 @@ import {
   formatComposerRequest,
   getInitialAvailableAgents,
   insertEvaluationAgentAtEdge,
+  moveEvaluationAgentToIndex,
   sortAvailableAgents,
 } from "../model/workspaceSessionModel";
 import { readAgentDragPayload } from "../utils/dragPayload";
@@ -1054,7 +1055,7 @@ export function WorkspacePage({
   function handleMoveAgentToEvaluation(agentId, edge, insertionIndex) {
     runLayoutTransition(() => {
       updateSelectedSession((session) => {
-        const availableAgents = session.availableAgents ?? getInitialAvailableAgents(session, getPaletteAgents(userAgents, data));
+        const availableAgents = selectedSessionAvailableAgents;
         const movingAgent = availableAgents.find((agent) => agent.id === agentId);
 
         if (!movingAgent || session.evaluation.agents.some((agent) => agent.id === agentId)) {
@@ -1095,6 +1096,45 @@ export function WorkspacePage({
       })
       .catch((error) => {
         showWorkspaceError(error, "Не удалось добавить агента в чат");
+      });
+  }
+
+  function handleReorderEvaluationAgent(agentId, edge, insertionIndex) {
+    runLayoutTransition(() => {
+      updateSelectedSession((session) => {
+        if (!session.evaluation.agents.some((agent) => agent.id === agentId)) {
+          return session;
+        }
+
+        return {
+          ...session,
+          evaluation: {
+            ...session.evaluation,
+            layoutBias: edge,
+            agents: moveEvaluationAgentToIndex(session.evaluation.agents, agentId, insertionIndex),
+          },
+        };
+      });
+    });
+
+    void attachChatSessionAgent({
+      accessToken,
+      chatSessionId: selectedSession.id,
+      agentId,
+      placement: edge,
+      position: insertionIndex,
+    })
+      .then((selectedAgents) => {
+        setSessions((currentSessions) =>
+          currentSessions.map((session) =>
+            session.id === selectedSession.id
+              ? applySelectedAgentsToSession(session, selectedAgents, userAgents, data)
+              : session,
+          ),
+        );
+      })
+      .catch((error) => {
+        showWorkspaceError(error, "Не удалось переставить агента");
       });
   }
 
@@ -1151,12 +1191,17 @@ export function WorkspacePage({
 
     const payload = readAgentDragPayload(event);
 
-    if (payload?.source !== "palette") {
+    if (payload?.source !== "palette" && payload?.source !== "evaluation") {
       return;
     }
 
     const edge = typeof dropTarget === "string" ? dropTarget : dropTarget.side;
     const insertionIndex = typeof dropTarget === "string" ? undefined : dropTarget.index;
+
+    if (payload.source === "evaluation") {
+      handleReorderEvaluationAgent(payload.agentId, edge, insertionIndex);
+      return;
+    }
 
     handleMoveAgentToEvaluation(payload.agentId, edge, insertionIndex);
   }

@@ -1716,6 +1716,13 @@
   text-align: center;
 }
 
+.evaluation-stage__empty--drop-ready {
+  background: rgba(255, 255, 255, 0.075);
+  color: rgba(244, 244, 244, 0.76);
+  outline: 1px dashed rgba(255, 255, 255, 0.28);
+  outline-offset: 4px;
+}
+
 .workspace-scene--empty .evaluation-stage {
   margin-top: -4px;
 }

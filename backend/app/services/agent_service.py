@@ -175,6 +175,14 @@ class AgentService:
                 agent_id=agent_id,
             )
             if existing is not None:
+                self._move_selected_agent(
+                    user=user,
+                    chat_session_id=chat_session_id,
+                    selected_agent=existing,
+                    placement=placement,
+                    position=position,
+                )
+                self._session.commit()
                 return existing
             selected_agent = self._agents.create_selected_agent(
                 self._session,
@@ -183,10 +191,15 @@ class AgentService:
                     chat_session_id=chat_session_id,
                     agent_id=agent_id,
                     placement=self._normalize_placement(placement),
-                    position=position
-                    if position is not None
-                    else self._agents.get_next_selected_position(self._session, chat_session_id=chat_session_id),
+                    position=self._agents.get_next_selected_position(self._session, chat_session_id=chat_session_id),
                 ),
+            )
+            self._move_selected_agent(
+                user=user,
+                chat_session_id=chat_session_id,
+                selected_agent=selected_agent,
+                placement=placement,
+                position=position,
             )
             self._session.commit()
             return selected_agent
@@ -224,6 +237,35 @@ class AgentService:
         if agent is None:
             raise NotFoundError("Agent not found.")
         return agent
+
+    def _move_selected_agent(
+        self,
+        *,
+        user: User,
+        chat_session_id: uuid.UUID,
+        selected_agent: ChatSessionAgent,
+        placement: str,
+        position: int | None,
+    ) -> None:
+        selected_agent.placement = self._normalize_placement(placement)
+        selected_agents = [
+            row[0]
+            for row in self._agents.list_selected_agents(
+                self._session,
+                user_id=user.id,
+                chat_session_id=chat_session_id,
+            )
+        ]
+        remaining_agents = [agent for agent in selected_agents if agent.id != selected_agent.id]
+        safe_position = len(remaining_agents) if position is None else min(max(position, 0), len(remaining_agents))
+        ordered_agents = [
+            *remaining_agents[:safe_position],
+            selected_agent,
+            *remaining_agents[safe_position:],
+        ]
+
+        for index, agent in enumerate(ordered_agents):
+            agent.position = index
 
     def _ensure_chat_session(self, *, user: User, chat_session_id: uuid.UUID) -> None:
         chat_session = self._agents.get_active_chat_session_for_user(

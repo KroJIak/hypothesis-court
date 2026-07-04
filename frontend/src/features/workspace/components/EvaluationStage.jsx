@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 
 import { AgentCard } from "./AgentCard";
 import { JudgeVerdict } from "./JudgeVerdict";
@@ -34,12 +34,44 @@ export function EvaluationStage({
   const [activeDropIntent, setActiveDropIntent] = useState(null);
   const { leftAgents, rightAgents } = splitAgentsAroundCenter(evaluation.agents, evaluation.layoutBias);
   const activeDropSide = activeDropIntent?.side ?? null;
+  const hasDropPreview = isDropTargetVisible && !isAgentEditingLocked;
   const leftSideCount = leftAgents.length + (activeDropSide === EVALUATION_SIDE_LEFT ? 1 : 0);
   const rightSideCount = rightAgents.length + (activeDropSide === EVALUATION_SIDE_RIGHT ? 1 : 0);
   const sideSlotCount = Math.max(leftSideCount, rightSideCount, 1);
   const sideWidth = (sideSlotCount * EVALUATION_AGENT_SLOT_WIDTH) - EVALUATION_AGENT_GAP;
 
   function getEdgeDropIntent(event) {
+    const dropRect = event.currentTarget.getBoundingClientRect();
+    const slotElements = Array.from(event.currentTarget.querySelectorAll(".evaluation-stage__slot"));
+
+    if (slotElements.length === 0) {
+      return {
+        side: EVALUATION_SIDE_RIGHT,
+        index: 0,
+      };
+    }
+
+    const slotIndex = slotElements.findIndex((slotElement) => {
+      const slotRect = slotElement.getBoundingClientRect();
+
+      return event.clientX < slotRect.left + slotRect.width / 2;
+    });
+    const absoluteIndex = slotIndex === -1 ? slotElements.length : slotIndex;
+
+    if (absoluteIndex <= leftAgents.length) {
+      return {
+        side: EVALUATION_SIDE_LEFT,
+        index: absoluteIndex,
+      };
+    }
+
+    return {
+      side: EVALUATION_SIDE_RIGHT,
+      index: absoluteIndex - leftAgents.length,
+    };
+  }
+
+  function getFallbackEdgeDropIntent(event) {
     const dropRect = event.currentTarget.getBoundingClientRect();
     const edgeActivationWidth = Math.min(
       dropRect.width * 0.36,
@@ -72,7 +104,7 @@ export function EvaluationStage({
     event.dataTransfer.dropEffect = "move";
 
     if (isDropTargetVisible) {
-      const dropIntent = getEdgeDropIntent(event);
+      const dropIntent = getEdgeDropIntent(event) ?? getFallbackEdgeDropIntent(event);
 
       setActiveDropIntent(dropIntent);
 
@@ -113,7 +145,7 @@ export function EvaluationStage({
       return;
     }
 
-    handleDrop(event, activeDropIntent ?? getEdgeDropIntent(event));
+    handleDrop(event, activeDropIntent ?? getEdgeDropIntent(event) ?? getFallbackEdgeDropIntent(event));
   }
 
   function handleDragLeave(event) {
@@ -167,10 +199,17 @@ export function EvaluationStage({
             }
             aria-label="Добавить агента слева"
           >
-            {activeDropSide === EVALUATION_SIDE_LEFT ? (
+            {leftAgents.map((agent, index) => (
+              <Fragment key={agent.id}>
+                {activeDropSide === EVALUATION_SIDE_LEFT && activeDropIntent?.index === index ? (
+                  <div className="agent-drop-slot" aria-hidden="true" />
+                ) : null}
+                {renderAgentSlot(agent)}
+              </Fragment>
+            ))}
+            {activeDropSide === EVALUATION_SIDE_LEFT && activeDropIntent?.index === leftAgents.length ? (
               <div className="agent-drop-slot" aria-hidden="true" />
             ) : null}
-            {leftAgents.map(renderAgentSlot)}
           </div>
           <div className="evaluation-stage__center-lane" aria-hidden="true" />
           <div
@@ -181,13 +220,28 @@ export function EvaluationStage({
             }
             aria-label="Добавить агента справа"
           >
-            {rightAgents.map(renderAgentSlot)}
-            {activeDropSide === EVALUATION_SIDE_RIGHT ? (
+            {rightAgents.map((agent, index) => (
+              <Fragment key={agent.id}>
+                {activeDropSide === EVALUATION_SIDE_RIGHT && activeDropIntent?.index === index ? (
+                  <div className="agent-drop-slot" aria-hidden="true" />
+                ) : null}
+                {renderAgentSlot(agent)}
+              </Fragment>
+            ))}
+            {activeDropSide === EVALUATION_SIDE_RIGHT && activeDropIntent?.index === rightAgents.length ? (
               <div className="agent-drop-slot" aria-hidden="true" />
             ) : null}
           </div>
-          {evaluation.agents.length === 0 && !isDropTargetVisible && !isAgentEditingLocked ? (
-            <div className="evaluation-stage__empty">Перетащите агента для оценки</div>
+          {evaluation.agents.length === 0 && !isAgentEditingLocked ? (
+            <div
+              className={
+                hasDropPreview
+                  ? "evaluation-stage__empty evaluation-stage__empty--drop-ready"
+                  : "evaluation-stage__empty"
+              }
+            >
+              Перетащите агента для оценки
+            </div>
           ) : null}
         </div>
       </div>

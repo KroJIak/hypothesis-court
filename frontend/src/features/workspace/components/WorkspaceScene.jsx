@@ -448,7 +448,7 @@ export function WorkspaceScene({
         onAgentDragStart={onAgentDragStart}
         onAgentDragEnd={onAgentDragEnd}
         onDropAgent={onDropAgentToEvaluation}
-        isDropTargetVisible={!isAgentEditingLocked && dragSource === "palette"}
+        isDropTargetVisible={!isAgentEditingLocked && (dragSource === "palette" || dragSource === "evaluation")}
         isAgentEditingLocked={isAgentEditingLocked}
         onOpenAgentHistory={onOpenAgentHistory}
         verdictActions={verdictActions}
