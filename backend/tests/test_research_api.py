@@ -1,4 +1,5 @@
 import uuid
+import base64
 from datetime import timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -120,3 +121,17 @@ def test_research_api_contracts(monkeypatch, tmp_path):
     export_response = client.get(f"/chat-sessions/{chat_session.id}/research-runs/{run['id']}/export?format=md")
     assert export_response.status_code == 200
     assert "## Вердикт" in export_response.json()["content"]
+
+    csv_export_response = client.get(f"/chat-sessions/{chat_session.id}/research-runs/{run['id']}/export?format=csv")
+    assert csv_export_response.status_code == 200
+    assert csv_export_response.json()["content_type"].startswith("text/csv")
+
+    docx_export_response = client.get(f"/chat-sessions/{chat_session.id}/research-runs/{run['id']}/export?format=docx")
+    assert docx_export_response.status_code == 200
+    assert docx_export_response.json()["content_encoding"] == "base64"
+    assert base64.b64decode(docx_export_response.json()["content"]).startswith(b"PK")
+
+    pdf_export_response = client.get(f"/chat-sessions/{chat_session.id}/research-runs/{run['id']}/export?format=pdf")
+    assert pdf_export_response.status_code == 200
+    assert pdf_export_response.json()["content_encoding"] == "base64"
+    assert base64.b64decode(pdf_export_response.json()["content"]).startswith(b"%PDF")

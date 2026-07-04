@@ -255,6 +255,7 @@ class ResearchExportResponse(BaseModel):
     filename: str
     content_type: str
     content: str
+    content_encoding: str = "text"
 
 
 class ResearchGraphNodeResponse(BaseModel):

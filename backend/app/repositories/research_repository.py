@@ -2,6 +2,7 @@ import uuid
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
+from pgvector.sqlalchemy import HALFVEC
 
 from app.models.chat_session import ChatSession
 from app.models.debate_message import DebateMessage
@@ -160,6 +161,30 @@ class ResearchRepository:
             .order_by(DocumentChunk.position.asc())
         )
         return session.execute(stmt).scalars().all()
+
+    def search_chunks_by_vector(
+        self,
+        session: Session,
+        *,
+        user_id: uuid.UUID,
+        chat_session_id: uuid.UUID,
+        query_vector: list[float],
+        limit: int,
+    ) -> list[tuple[DocumentChunk, float]]:
+        indexed_vector = func.cast(DocumentChunk.embedding_vector, HALFVEC(3072))
+        query_half_vector = func.cast(query_vector, HALFVEC(3072))
+        distance = indexed_vector.cosine_distance(query_half_vector)
+        stmt = (
+            select(DocumentChunk, distance.label("distance"))
+            .where(
+                DocumentChunk.user_id == user_id,
+                DocumentChunk.chat_session_id == chat_session_id,
+                DocumentChunk.embedding_vector.is_not(None),
+            )
+            .order_by(distance.asc())
+            .limit(limit)
+        )
+        return [(chunk, max(0.0, min(1.0, 1.0 - float(distance_value)))) for chunk, distance_value in session.execute(stmt).all()]
 
     def create_chunk(self, session: Session, chunk: DocumentChunk) -> DocumentChunk:
         session.add(chunk)

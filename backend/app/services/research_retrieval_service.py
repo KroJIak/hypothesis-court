@@ -27,6 +27,9 @@ class ResearchRetrievalService:
         self._settings = settings
 
     def ensure_chunk_embeddings(self, chunks: list[DocumentChunk]) -> None:
+        for chunk in chunks:
+            if chunk.embedding and chunk.embedding_vector is None and len(chunk.embedding) == 3072:
+                chunk.embedding_vector = chunk.embedding
         pending_chunks = [chunk for chunk in chunks if not chunk.embedding]
         if not pending_chunks:
             return
@@ -36,16 +39,29 @@ class ResearchRetrievalService:
             vectors = client.create_embeddings(model=model, inputs=[chunk.content for chunk in batch])
             for chunk, vector in zip(batch, vectors, strict=True):
                 chunk.embedding = vector
+                chunk.embedding_vector = vector if len(vector) == 3072 else None
                 chunk.embedding_model = model
                 chunk.embedding_dimensions = len(vector)
                 chunk.embedded_at = datetime.now(UTC)
+
+    def embed_query(self, query: str) -> list[float]:
+        client, model = self._provider_settings_service.get_embedding_client(self._settings)
+        return client.create_embeddings(model=model, inputs=[query])[0]
 
     def retrieve(self, *, query: str, chunks: list[DocumentChunk], limit: int) -> list[RetrievalResult]:
         if not chunks:
             return []
         self.ensure_chunk_embeddings(chunks)
-        client, model = self._provider_settings_service.get_embedding_client(self._settings)
-        query_vector = client.create_embeddings(model=model, inputs=[query])[0]
+        query_vector = self.embed_query(query)
+        return self.rank_with_query_vector(query_vector=query_vector, chunks=chunks, limit=limit)
+
+    def rank_with_query_vector(
+        self,
+        *,
+        query_vector: list[float],
+        chunks: list[DocumentChunk],
+        limit: int,
+    ) -> list[RetrievalResult]:
         scored = [
             RetrievalResult(chunk=chunk, score=self._cosine_similarity(query_vector, chunk.embedding or []))
             for chunk in chunks

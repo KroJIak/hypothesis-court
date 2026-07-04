@@ -1,4 +1,7 @@
+import base64
+import csv
 import hashlib
+import io
 import json
 import re
 import uuid
@@ -6,6 +9,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
+from xml.sax.saxutils import escape
 
 from sqlalchemy.orm import Session
 
@@ -62,7 +66,7 @@ from app.schemas.research import (
 from app.services.exceptions import ConflictError, NotFoundError, ServiceError, ValidationError
 from app.services.document_text_extractor import DocumentTextExtractor
 from app.services.research_llm_orchestrator import EvidenceDraft, HypothesisDraft, ResearchLlmOrchestrator
-from app.services.research_retrieval_service import ResearchRetrievalService
+from app.services.research_retrieval_service import ResearchRetrievalService, RetrievalResult
 
 _CHUNK_MAX_CHARS = 1800
 _WORD_RE = re.compile(r"\s+")
@@ -305,6 +309,26 @@ class ResearchService:
                 filename=f"research-run-{detail.version_number}.md",
                 content_type="text/markdown; charset=utf-8",
                 content=self._build_markdown_export(detail),
+            )
+        if normalized_format == "csv":
+            return ResearchExportResponse(
+                filename=f"research-run-{detail.version_number}.csv",
+                content_type="text/csv; charset=utf-8",
+                content=self._build_csv_export(detail),
+            )
+        if normalized_format == "docx":
+            return ResearchExportResponse(
+                filename=f"research-run-{detail.version_number}.docx",
+                content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                content=self._build_docx_export(detail),
+                content_encoding="base64",
+            )
+        if normalized_format == "pdf":
+            return ResearchExportResponse(
+                filename=f"research-run-{detail.version_number}.pdf",
+                content_type="application/pdf",
+                content=self._build_pdf_export(detail),
+                content_encoding="base64",
             )
         raise ValidationError("Неподдерживаемый формат экспорта.")
 
@@ -593,6 +617,7 @@ class ResearchService:
             self._check_cancelled(run)
             self._append_event(run=run, stage=ResearchRunStage.RETRIEVAL, progress_percent=25, message="Поиск релевантных фрагментов начался.")
             evidence_drafts, evidence_source_chunks = self._extract_evidence_drafts(
+                run=run,
                 research_brief=research_brief,
                 chunks=chunks,
                 retrieval_limit=pipeline_settings.retrieval_limit,
@@ -731,6 +756,7 @@ class ResearchService:
     def _extract_evidence_drafts(
         self,
         *,
+        run: ResearchRun,
         research_brief: str,
         chunks: list[DocumentChunk],
         retrieval_limit: int,
@@ -739,7 +765,26 @@ class ResearchService:
         if not chunks:
             return orchestrator.extract_evidence(research_brief=research_brief, fragments=[], limit=8), []
         retrieval_service = self._require_retrieval_service()
-        retrieval_results = retrieval_service.retrieve(query=research_brief, chunks=chunks, limit=retrieval_limit)
+        retrieval_service.ensure_chunk_embeddings(chunks)
+        self._session.flush()
+        query_vector = retrieval_service.embed_query(research_brief)
+        if len(query_vector) == 3072 and any(chunk.embedding_vector is not None for chunk in chunks):
+            retrieval_results = [
+                RetrievalResult(chunk=chunk, score=score)
+                for chunk, score in self._repository.search_chunks_by_vector(
+                    self._session,
+                    user_id=run.user_id,
+                    chat_session_id=run.chat_session_id,
+                    query_vector=query_vector,
+                    limit=retrieval_limit,
+                )
+            ]
+        else:
+            retrieval_results = retrieval_service.rank_with_query_vector(
+                query_vector=query_vector,
+                chunks=chunks,
+                limit=retrieval_limit,
+            )
         source_chunks = [result.chunk for result in retrieval_results]
         drafts = orchestrator.extract_evidence(
             research_brief=research_brief,
@@ -762,6 +807,14 @@ class ResearchService:
             if draft.source_index is not None:
                 metadata["source_index"] = draft.source_index
             relevance_score = self._evidence_relevance_score(draft=draft, chunk=chunk)
+            if chunk is not None:
+                metadata["source_snapshot"] = {
+                    "session_file_id": str(chunk.session_file_id),
+                    "chunk_id": str(chunk.id),
+                    "chunk_position": chunk.position,
+                    "content_hash": chunk.content_hash,
+                    "source_metadata": chunk.source_metadata,
+                }
             evidence_items.append(
                 self._repository.create_evidence(
                     self._session,
@@ -1291,6 +1344,177 @@ class ResearchService:
                 lines.extend(["", "## Первые проверки"])
                 lines.extend(f"- {item}" for item in detail.verdict.next_checks)
         return "\n".join(lines).strip() + "\n"
+
+    @staticmethod
+    def _build_csv_export(detail: ResearchRunDetailResponse) -> str:
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["section", "id", "parent_id", "field", "value"])
+        writer.writerow(["run", str(detail.id), "", "title", ResearchService._csv_safe(detail.title)])
+        writer.writerow(["run", str(detail.id), "", "version", detail.version_number])
+        writer.writerow(["run", str(detail.id), "", "status", detail.status.value])
+        for item in detail.inputs:
+            writer.writerow(["input", str(item.id), str(detail.id), ResearchService._csv_safe(item.label), ResearchService._csv_safe(item.text)])
+        for item in detail.evidence:
+            writer.writerow(["evidence", str(item.id), str(detail.id), item.kind.value, ResearchService._csv_safe(item.summary)])
+            if item.quote:
+                writer.writerow(["evidence", str(item.id), str(detail.id), "quote", ResearchService._csv_safe(item.quote)])
+        for hypothesis in detail.hypotheses:
+            writer.writerow(
+                [
+                    "hypothesis",
+                    str(hypothesis.id),
+                    str(detail.id),
+                    ResearchService._csv_safe(hypothesis.title),
+                    ResearchService._csv_safe(hypothesis.statement),
+                ]
+            )
+            writer.writerow(["hypothesis", str(hypothesis.id), str(detail.id), "mechanism", ResearchService._csv_safe(hypothesis.mechanism)])
+            writer.writerow(["hypothesis", str(hypothesis.id), str(detail.id), "risk_profile", ResearchService._csv_safe(hypothesis.risk_profile)])
+            for evaluation in hypothesis.evaluations:
+                writer.writerow(
+                    [
+                        "evaluation",
+                        str(evaluation.id),
+                        str(hypothesis.id),
+                        ResearchService._csv_safe(evaluation.evaluator_name),
+                        ResearchService._csv_safe(f"{evaluation.score}: {evaluation.verdict}"),
+                    ]
+                )
+        if detail.verdict is not None:
+            writer.writerow(["verdict", str(detail.verdict.id), str(detail.id), "summary", ResearchService._csv_safe(detail.verdict.summary)])
+            writer.writerow(
+                [
+                    "verdict",
+                    str(detail.verdict.id),
+                    str(detail.id),
+                    "recommendation",
+                    ResearchService._csv_safe(detail.verdict.recommendation),
+                ]
+            )
+            for index, check in enumerate(detail.verdict.next_checks, start=1):
+                writer.writerow(
+                    [
+                        "next_check",
+                        f"{detail.verdict.id}:{index}",
+                        str(detail.verdict.id),
+                        str(index),
+                        ResearchService._csv_safe(check),
+                    ]
+                )
+        return output.getvalue()
+
+    @staticmethod
+    def _csv_safe(value: object) -> object:
+        if not isinstance(value, str) or not value:
+            return value
+        if value[0] in ("=", "+", "-", "@", "\t", "\r", "\n"):
+            return "'" + value
+        return value
+
+    @staticmethod
+    def _build_docx_export(detail: ResearchRunDetailResponse) -> str:
+        from docx import Document
+
+        document = Document()
+        document.add_heading(detail.title, level=1)
+        document.add_paragraph(f"Версия: {detail.version_number}")
+        document.add_paragraph(f"Статус: {detail.status.value}")
+        document.add_paragraph(f"Модель: {detail.model_name or 'не указана'}")
+
+        document.add_heading("Входные параметры", level=2)
+        for item in detail.inputs:
+            document.add_paragraph(f"{item.label} ({item.kind.value}): {item.text}", style="List Bullet")
+
+        document.add_heading("Evidence", level=2)
+        for item in detail.evidence:
+            document.add_paragraph(f"{item.title} [{item.kind.value}]", style="List Bullet")
+            document.add_paragraph(item.summary)
+            if item.quote:
+                document.add_paragraph(f"Цитата: {item.quote}")
+
+        document.add_heading("Гипотезы", level=2)
+        for hypothesis in detail.hypotheses:
+            document.add_heading(hypothesis.title, level=3)
+            document.add_paragraph(hypothesis.statement)
+            document.add_paragraph(f"Механизм: {hypothesis.mechanism}")
+            document.add_paragraph(f"Риски: {hypothesis.risk_profile}")
+            if hypothesis.evaluations:
+                document.add_paragraph("Оценки:")
+                for evaluation in hypothesis.evaluations:
+                    document.add_paragraph(
+                        f"{evaluation.evaluator_name}: {evaluation.score} - {evaluation.verdict}",
+                        style="List Bullet",
+                    )
+
+        if detail.verdict is not None:
+            document.add_heading("Вердикт", level=2)
+            document.add_paragraph(detail.verdict.summary)
+            document.add_paragraph(detail.verdict.recommendation)
+            if detail.verdict.next_checks:
+                document.add_heading("Первые проверки", level=2)
+                for item in detail.verdict.next_checks:
+                    document.add_paragraph(item, style="List Bullet")
+
+        buffer = io.BytesIO()
+        document.save(buffer)
+        return base64.b64encode(buffer.getvalue()).decode("ascii")
+
+    @staticmethod
+    def _build_pdf_export(detail: ResearchRunDetailResponse) -> str:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+
+        font_name = "Helvetica"
+        for font_path in (
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            "/usr/local/share/fonts/DejaVuSans.ttf",
+        ):
+            try:
+                pdfmetrics.registerFont(TTFont("DejaVuSans", font_path))
+                font_name = "DejaVuSans"
+                break
+            except Exception:
+                continue
+
+        buffer = io.BytesIO()
+        document = SimpleDocTemplate(buffer, pagesize=A4, title=detail.title)
+        styles = getSampleStyleSheet()
+        for style_name in ("Title", "Heading1", "Heading2", "Heading3", "BodyText", "Bullet"):
+            styles[style_name].fontName = font_name
+
+        story = [
+            Paragraph(escape(detail.title), styles["Title"]),
+            Paragraph(f"Версия: {detail.version_number}", styles["BodyText"]),
+            Paragraph(f"Статус: {escape(detail.status.value)}", styles["BodyText"]),
+            Paragraph(f"Модель: {escape(detail.model_name or 'не указана')}", styles["BodyText"]),
+            Spacer(1, 12),
+            Paragraph("Входные параметры", styles["Heading2"]),
+        ]
+        for item in detail.inputs:
+            story.append(Paragraph(escape(f"{item.label} ({item.kind.value}): {item.text}"), styles["Bullet"]))
+        story.extend([Spacer(1, 12), Paragraph("Evidence", styles["Heading2"])])
+        for item in detail.evidence:
+            story.append(Paragraph(escape(f"{item.title} [{item.kind.value}]: {item.summary}"), styles["BodyText"]))
+        story.extend([Spacer(1, 12), Paragraph("Гипотезы", styles["Heading2"])])
+        for hypothesis in detail.hypotheses:
+            story.append(Paragraph(escape(hypothesis.title), styles["Heading3"]))
+            story.append(Paragraph(escape(hypothesis.statement), styles["BodyText"]))
+            story.append(Paragraph(escape(f"Риски: {hypothesis.risk_profile}"), styles["BodyText"]))
+        if detail.verdict is not None:
+            story.extend([Spacer(1, 12), Paragraph("Вердикт", styles["Heading2"])])
+            story.append(Paragraph(escape(detail.verdict.summary), styles["BodyText"]))
+            story.append(Paragraph(escape(detail.verdict.recommendation), styles["BodyText"]))
+            if detail.verdict.next_checks:
+                story.append(Paragraph("Первые проверки", styles["Heading2"]))
+                for item in detail.verdict.next_checks:
+                    story.append(Paragraph(escape(item), styles["Bullet"]))
+
+        document.build(story)
+        return base64.b64encode(buffer.getvalue()).decode("ascii")
 
     def _require_llm_orchestrator(self) -> ResearchLlmOrchestrator:
         if self._llm_orchestrator is None:

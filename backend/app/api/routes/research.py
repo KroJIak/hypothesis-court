@@ -131,7 +131,7 @@ def get_research_run_progress(
 def export_research_run(
     chat_session_id: uuid.UUID,
     run_id: uuid.UUID,
-    export_format: str = Query(default="json", alias="format", pattern="^(json|md|markdown)$"),
+    export_format: str = Query(default="json", alias="format", pattern="^(json|md|markdown|csv|docx|pdf)$"),
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
     settings: Settings = Depends(get_settings),

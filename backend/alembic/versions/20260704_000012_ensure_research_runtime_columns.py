@@ -39,17 +39,15 @@ def upgrade() -> None:
     if "embedded_at" not in document_chunk_columns:
         op.add_column("document_chunks", sa.Column("embedded_at", sa.DateTime(timezone=True), nullable=True))
 
-    constraint_names = {
-        constraint["name"]
-        for constraint in sa.inspect(op.get_bind()).get_check_constraints("document_chunks")
-    }
-    if "ck_document_chunks__embedding_dimensions_positive" not in constraint_names:
+    check_constraints = sa.inspect(op.get_bind()).get_check_constraints("document_chunks")
+    check_sql = " ".join(str(constraint.get("sqltext") or "") for constraint in check_constraints)
+    if "embedding_dimensions" not in check_sql:
         op.create_check_constraint(
             "ck_document_chunks__embedding_dimensions_positive",
             "document_chunks",
             "embedding_dimensions is null or embedding_dimensions > 0",
         )
-    if "ck_document_chunks__embedding_model_max_length" not in constraint_names:
+    if "embedding_model" not in check_sql:
         op.create_check_constraint(
             "ck_document_chunks__embedding_model_max_length",
             "document_chunks",

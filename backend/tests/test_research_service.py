@@ -1,3 +1,4 @@
+import base64
 import uuid
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -46,6 +47,9 @@ class DummySession:
 
     def rollback(self) -> None:
         self.rollbacks += 1
+
+    def flush(self) -> None:
+        pass
 
 
 class FakeResearchRepository:
@@ -162,6 +166,15 @@ class FakeResearchRepository:
         del session
         return [chunk for chunk in self.chunks if chunk.session_file_id == session_file_id]
 
+    def search_chunks_by_vector(self, session, *, user_id, chat_session_id, query_vector, limit):
+        del session, query_vector
+        chunks = [
+            item
+            for item in self.chunks
+            if item.user_id == user_id and item.chat_session_id == chat_session_id and item.embedding_vector is not None
+        ]
+        return [(chunk, 0.99 - index * 0.01) for index, chunk in enumerate(chunks[:limit])]
+
     def create_chunk(self, session, chunk):
         del session
         return self._store(self.chunks, chunk)
@@ -242,6 +255,22 @@ class FakeResearchRepository:
 class FakeRetrievalService:
     def __init__(self) -> None:
         self.calls = 0
+
+    def ensure_chunk_embeddings(self, chunks):
+        for chunk in chunks:
+            chunk.embedding = [1.0, 0.0]
+            chunk.embedding_vector = None
+            chunk.embedding_dimensions = 2
+            chunk.embedding_model = "fake-embedding"
+
+    def embed_query(self, query):
+        del query
+        return [1.0, 0.0]
+
+    def rank_with_query_vector(self, *, query_vector, chunks, limit):
+        del query_vector
+        self.calls += 1
+        return [RetrievalResult(chunk=chunk, score=1 - index * 0.01) for index, chunk in enumerate(chunks[:limit])]
 
     def retrieve(self, *, query, chunks, limit):
         del query
@@ -631,7 +660,7 @@ def test_feedback_is_persisted_for_hypothesis(service_bundle, user, chat_session
     assert feedback_list.items[0].comment == "Нужно больше экспериментов."
 
 
-def test_export_run_returns_json_and_markdown(service_bundle, user, chat_session):
+def test_export_run_returns_supported_report_formats(service_bundle, user, chat_session):
     service, _, _ = service_bundle
     run = service.create_run(
         user=user,
@@ -642,11 +671,39 @@ def test_export_run_returns_json_and_markdown(service_bundle, user, chat_session
 
     json_export = service.export_run(user=user, chat_session_id=chat_session.id, run_id=run.id, export_format="json")
     markdown_export = service.export_run(user=user, chat_session_id=chat_session.id, run_id=run.id, export_format="md")
+    csv_export = service.export_run(user=user, chat_session_id=chat_session.id, run_id=run.id, export_format="csv")
+    docx_export = service.export_run(user=user, chat_session_id=chat_session.id, run_id=run.id, export_format="docx")
+    pdf_export = service.export_run(user=user, chat_session_id=chat_session.id, run_id=run.id, export_format="pdf")
 
     assert json_export.content_type == "application/json"
+    assert json_export.content_encoding == "text"
     assert '"hypotheses"' in json_export.content
     assert markdown_export.content_type.startswith("text/markdown")
     assert "## Вердикт" in markdown_export.content
+    assert csv_export.content_type.startswith("text/csv")
+    assert "hypothesis" in csv_export.content
+    assert docx_export.content_encoding == "base64"
+    assert base64.b64decode(docx_export.content).startswith(b"PK")
+    assert pdf_export.content_encoding == "base64"
+    assert base64.b64decode(pdf_export.content).startswith(b"%PDF")
+
+
+def test_csv_export_escapes_spreadsheet_formulas(service_bundle, user, chat_session):
+    service, _, _ = service_bundle
+    run = service.create_run(
+        user=user,
+        chat_session_id=chat_session.id,
+        input_requests=[
+            ResearchInputRequest(kind=ResearchInputKind.KPI, label="KPI", text='=IMPORTXML("https://example.com")'),
+            ResearchInputRequest(kind=ResearchInputKind.CONTEXT, label="Контекст", text="+unsafe"),
+        ],
+        hypothesis_count=3,
+    )
+
+    csv_export = service.export_run(user=user, chat_session_id=chat_session.id, run_id=run.id, export_format="csv")
+
+    assert "'=IMPORTXML" in csv_export.content
+    assert "'+unsafe" in csv_export.content
 
 
 def test_activate_run_switches_active_version(service_bundle, user, chat_session):
@@ -780,6 +837,61 @@ def test_regenerate_preserves_existing_chunk_references(tmp_path, service_bundle
     assert len(repository.chunks) == 1
     assert first_chunk_ids
     assert first_chunk_ids == second_chunk_ids
+
+
+def test_existing_json_embeddings_are_promoted_to_vector_branch(service_bundle, user, chat_session):
+    service, repository, _ = service_bundle
+    chunk = DocumentChunk(
+        id=uuid.uuid4(),
+        session_file_id=uuid.uuid4(),
+        chat_session_id=chat_session.id,
+        user_id=user.id,
+        position=0,
+        content="legacy embedding chunk",
+        content_hash="b" * 64,
+        token_count=3,
+        embedding=[0.001] * 3072,
+        embedding_vector=None,
+        embedding_dimensions=3072,
+        embedding_model="legacy",
+    )
+    repository.chunks.append(chunk)
+
+    class VectorRetrievalService(FakeRetrievalService):
+        def ensure_chunk_embeddings(self, chunks):
+            for item in chunks:
+                if item.embedding and item.embedding_vector is None and len(item.embedding) == 3072:
+                    item.embedding_vector = item.embedding
+
+        def embed_query(self, query):
+            del query
+            return [0.001] * 3072
+
+    service._retrieval_service = VectorRetrievalService()
+    run = repository.create_run(
+        None,
+        ResearchRun(
+            id=uuid.uuid4(),
+            chat_session_id=chat_session.id,
+            user_id=user.id,
+            version_number=1,
+            trigger="initial",
+            status=ResearchRunStatus.RUNNING,
+            title="Vector branch",
+            hypothesis_count=3,
+        ),
+    )
+
+    drafts, source_chunks = service._extract_evidence_drafts(
+        run=run,
+        research_brief="Повысить прочность",
+        chunks=[chunk],
+        retrieval_limit=3,
+    )
+
+    assert drafts
+    assert source_chunks == [chunk]
+    assert chunk.embedding_vector is not None
 
 
 def test_broken_supported_file_marks_failed_without_failing_run(tmp_path, service_bundle, user, chat_session):
