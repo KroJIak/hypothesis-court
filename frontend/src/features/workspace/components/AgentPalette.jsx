@@ -132,8 +132,6 @@ export function AgentPalette({
         return;
       }
 
-      event.preventDefault();
-      event.stopPropagation();
       requestCloseSetupPopover();
     }
 

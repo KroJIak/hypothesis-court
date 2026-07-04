@@ -22,8 +22,8 @@ class AgentRepository:
             select(UserAgent)
             .where(UserAgent.user_id == user_id, UserAgent.deleted_at.is_(None))
             .order_by(
-                UserAgent.default_key.is_(None).asc(),
-                UserAgent.created_at.asc(),
+                UserAgent.default_key.is_(None).desc(),
+                UserAgent.created_at.desc(),
                 UserAgent.name.asc(),
             )
         )

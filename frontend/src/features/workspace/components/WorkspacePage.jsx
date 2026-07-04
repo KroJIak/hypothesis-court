@@ -996,7 +996,7 @@ export function WorkspacePage({
       );
       newAgentBaselineByIdRef.current.delete(agentId);
       newAgentBaselineByIdRef.current.delete(updatedAgent.id);
-      setActivePendingAgentId(null);
+      setActivePendingAgentId((currentAgentId) => (currentAgentId === agentId ? null : currentAgentId));
     } catch (error) {
       showWorkspaceError(error, "Не удалось сохранить агента");
     }
@@ -1020,7 +1020,7 @@ export function WorkspacePage({
           .filter((availableAgent) => availableAgent.id !== agentId),
       }));
       newAgentBaselineByIdRef.current.delete(agentId);
-      setActivePendingAgentId(null);
+      setActivePendingAgentId((currentAgentId) => (currentAgentId === agentId ? null : currentAgentId));
       return;
     }
 
@@ -1029,7 +1029,7 @@ export function WorkspacePage({
       setUserAgents((currentAgents) => currentAgents.filter((currentAgent) => currentAgent.id !== agentId));
       setSessions((currentSessions) => removeAgentFromSessions(currentSessions, agentId));
       newAgentBaselineByIdRef.current.delete(agentId);
-      setActivePendingAgentId(null);
+      setActivePendingAgentId((currentAgentId) => (currentAgentId === agentId ? null : currentAgentId));
       setDragSource(null);
     } catch (error) {
       showWorkspaceError(error, "Не удалось удалить агента");
