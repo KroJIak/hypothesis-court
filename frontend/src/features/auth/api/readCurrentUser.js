@@ -10,7 +10,7 @@ export async function readCurrentUser(accessToken, signal) {
   });
 
   if (!response.ok) {
-    throw new Error("Не удалось восстановить сессию.");
+    throw new Error("Не удалось восстановить сессию");
   }
 
   return response.json();

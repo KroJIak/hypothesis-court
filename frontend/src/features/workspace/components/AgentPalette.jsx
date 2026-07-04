@@ -170,9 +170,6 @@ export function AgentPalette({
             <span className="palette-list__label">{agent.name}</span>
           </div>
         ))}
-        {sortedAgents.length === 0 && !isDropTargetVisible ? (
-          <span className="palette-list__empty">Все агенты на сцене</span>
-        ) : null}
       </div>
       {activePendingAgent && typeof document !== "undefined"
         ? createPortal(

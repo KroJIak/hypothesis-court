@@ -22,7 +22,7 @@ export async function changeOwnPassword({
   });
 
   if (!response.ok) {
-    const detail = await readApiError(response, "Не удалось сменить пароль.");
+    const detail = await readApiError(response, "Не удалось сменить пароль");
     throw new Error(detail);
   }
 

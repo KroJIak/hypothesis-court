@@ -1,8 +1,10 @@
+import { formatApiErrorMessage } from "../../../api/apiErrorMessage";
+
 export async function readApiError(response, fallbackMessage) {
   try {
     const payload = await response.json();
-    return typeof payload?.detail === "string" ? payload.detail : fallbackMessage;
+    return formatApiErrorMessage(payload?.detail, fallbackMessage);
   } catch {
-    return fallbackMessage;
+    return formatApiErrorMessage(null, fallbackMessage);
   }
 }

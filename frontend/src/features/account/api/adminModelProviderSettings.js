@@ -35,7 +35,7 @@ export async function getProviderSettings({ accessToken, provider }) {
   });
 
   if (!response.ok) {
-    const detail = await readApiError(response, "Не удалось загрузить настройки провайдера.");
+    const detail = await readApiError(response, "Не удалось загрузить настройки провайдера");
     throw new Error(detail);
   }
 
@@ -64,7 +64,7 @@ export async function updateProviderSettings({
   });
 
   if (!response.ok) {
-    const detail = await readApiError(response, "Не удалось сохранить настройки провайдера.");
+    const detail = await readApiError(response, "Не удалось сохранить настройки провайдера");
     throw new Error(detail);
   }
 
@@ -83,7 +83,7 @@ export async function listProviderModels({ accessToken, provider, providerType, 
   });
 
   if (!response.ok) {
-    const detail = await readApiError(response, "Не удалось загрузить список моделей.");
+    const detail = await readApiError(response, "Не удалось загрузить список моделей");
     throw new Error(detail);
   }
 
@@ -110,7 +110,7 @@ export async function testProviderConnection({
   });
 
   if (!response.ok) {
-    const detail = await readApiError(response, "Не удалось проверить подключение.");
+    const detail = await readApiError(response, "Не удалось проверить подключение");
     throw new Error(detail);
   }
 

@@ -10,7 +10,7 @@ export async function listAdminUsers(accessToken) {
   });
 
   if (!response.ok) {
-    const detail = await readApiError(response, "Не удалось загрузить пользователей.");
+    const detail = await readApiError(response, "Не удалось загрузить пользователей");
     throw new Error(detail);
   }
 
@@ -33,7 +33,7 @@ export async function createAdminUser({ accessToken, username, password, isAdmin
   });
 
   if (!response.ok) {
-    const detail = await readApiError(response, "Не удалось создать пользователя.");
+    const detail = await readApiError(response, "Не удалось создать пользователя");
     throw new Error(detail);
   }
 
@@ -54,7 +54,7 @@ export async function updateAdminUserRole({ accessToken, userId, isAdmin }) {
   });
 
   if (!response.ok) {
-    const detail = await readApiError(response, "Не удалось изменить роль пользователя.");
+    const detail = await readApiError(response, "Не удалось изменить роль пользователя");
     throw new Error(detail);
   }
 
@@ -75,7 +75,7 @@ export async function resetAdminUserPassword({ accessToken, userId, newPassword 
   });
 
   if (!response.ok) {
-    const detail = await readApiError(response, "Не удалось сменить пароль.");
+    const detail = await readApiError(response, "Не удалось сменить пароль");
     throw new Error(detail);
   }
 
@@ -91,7 +91,7 @@ export async function deleteAdminUser({ accessToken, userId }) {
   });
 
   if (!response.ok) {
-    const detail = await readApiError(response, "Не удалось удалить пользователя.");
+    const detail = await readApiError(response, "Не удалось удалить пользователя");
     throw new Error(detail);
   }
 }

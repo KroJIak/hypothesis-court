@@ -10,6 +10,6 @@ export async function logout(accessToken) {
   });
 
   if (!response.ok) {
-    throw new Error("Не удалось завершить сессию.");
+    throw new Error("Не удалось завершить сессию");
   }
 }

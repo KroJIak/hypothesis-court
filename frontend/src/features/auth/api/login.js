@@ -1,3 +1,4 @@
+import { formatApiErrorMessage } from "../../../api/apiErrorMessage";
 import { getApiBaseUrl } from "../../../api/baseUrl";
 
 export async function login({ username, password, signal }) {
@@ -15,18 +16,18 @@ export async function login({ username, password, signal }) {
   });
 
   if (!response.ok) {
-    const detail = await readErrorDetail(response);
-    throw new Error(detail || "Не удалось выполнить вход.");
+    const detail = await readErrorDetail(response, "Не удалось выполнить вход");
+    throw new Error(detail);
   }
 
   return response.json();
 }
 
-async function readErrorDetail(response) {
+async function readErrorDetail(response, fallbackMessage) {
   try {
     const payload = await response.json();
-    return typeof payload?.detail === "string" ? payload.detail : null;
+    return formatApiErrorMessage(payload?.detail, fallbackMessage);
   } catch {
-    return null;
+    return formatApiErrorMessage(null, fallbackMessage);
   }
 }

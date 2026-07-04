@@ -28,7 +28,7 @@ export function AdminUsersSection({ accessToken, currentUser }) {
     refreshUsers()
       .catch((error) => {
         if (isActive) {
-          setErrorMessage(error instanceof Error ? error.message : "Не удалось загрузить пользователей.");
+          setErrorMessage(error instanceof Error ? error.message : "Не удалось загрузить пользователей");
         }
       })
       .finally(() => {
@@ -64,7 +64,7 @@ export function AdminUsersSection({ accessToken, currentUser }) {
       setRole("user");
       await refreshUsers();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Не удалось создать пользователя.");
+      setErrorMessage(error instanceof Error ? error.message : "Не удалось создать пользователя");
     } finally {
       setIsSaving(false);
     }
@@ -82,7 +82,7 @@ export function AdminUsersSection({ accessToken, currentUser }) {
         currentUsers.map((item) => (item.id === updatedUser.id ? updatedUser : item)),
       );
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Не удалось изменить роль пользователя.");
+      setErrorMessage(error instanceof Error ? error.message : "Не удалось изменить роль пользователя");
     }
   }
 
@@ -101,7 +101,7 @@ export function AdminUsersSection({ accessToken, currentUser }) {
         [user.id]: "",
       }));
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Не удалось сменить пароль.");
+      setErrorMessage(error instanceof Error ? error.message : "Не удалось сменить пароль");
     }
   }
 
@@ -114,7 +114,7 @@ export function AdminUsersSection({ accessToken, currentUser }) {
       });
       setUsers((currentUsers) => currentUsers.filter((item) => item.id !== user.id));
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Не удалось удалить пользователя.");
+      setErrorMessage(error instanceof Error ? error.message : "Не удалось удалить пользователя");
     }
   }
 

@@ -2181,6 +2181,15 @@
   padding: 0;
 }
 
+.agent-setup-popover__selected-icon-slot,
+.agent-setup-popover__option-icon-slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.agent-setup-popover__selected-icon-slot,
 .agent-setup-popover__selected-icon {
   width: 24px;
   height: 24px;
@@ -2219,6 +2228,7 @@
   outline: none;
 }
 
+.agent-setup-popover__option-icon-slot,
 .agent-setup-popover__option-icon {
   width: 19px;
   height: 19px;
