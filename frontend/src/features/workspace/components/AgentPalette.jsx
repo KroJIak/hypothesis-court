@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 
 import { AgentAvatar } from "./AgentAvatar";
 import { AgentSetupPopover } from "./AgentSetupPopover";
@@ -20,7 +20,9 @@ export function AgentPalette({
   onAgentDragEnd,
   onDropAgentToPalette,
   onReorderPaletteAgent,
+  onDeleteCustomAgent,
   isDropTargetVisible,
+  isDeleteTargetVisible,
   isAddAgentDisabled,
   isAgentEditingLocked,
   lockedReason,
@@ -135,9 +137,36 @@ export function AgentPalette({
     event.stopPropagation();
 
     const itemRect = event.currentTarget.getBoundingClientRect();
-    const placement = event.clientY > itemRect.top + itemRect.height / 2 ? "after" : "before";
+    const placement = event.clientX > itemRect.left + itemRect.width / 2 ? "after" : "before";
 
     onReorderPaletteAgent(payload.agentId, targetAgent.id, placement);
+  }
+
+  function handleDeleteDragOver(event) {
+    if (!isDeleteTargetVisible) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = "move";
+  }
+
+  function handleDeleteDrop(event) {
+    if (!isDeleteTargetVisible) {
+      return;
+    }
+
+    const payload = readAgentDragPayload(event);
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (!payload?.agentId) {
+      return;
+    }
+
+    onDeleteCustomAgent(payload.agentId);
   }
 
   return (
@@ -194,6 +223,18 @@ export function AgentPalette({
           <span className="palette-list__empty">Все агенты на сцене</span>
         ) : null}
       </div>
+      {isDeleteTargetVisible ? (
+        <div
+          className="agent-palette-trash"
+          role="button"
+          tabIndex={-1}
+          aria-label="Удалить созданного агента"
+          onDragOver={handleDeleteDragOver}
+          onDrop={handleDeleteDrop}
+        >
+          <Trash2 aria-hidden="true" strokeWidth={1.9} />
+        </div>
+      ) : null}
       {activePendingAgent && typeof document !== "undefined"
         ? createPortal(
             <AgentSetupPopover

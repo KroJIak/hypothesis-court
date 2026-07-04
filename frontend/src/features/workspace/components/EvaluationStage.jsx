@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import { AgentCard } from "./AgentCard";
 import { JudgeVerdict } from "./JudgeVerdict";
 import {
@@ -13,8 +15,10 @@ export function EvaluationStage({
   evaluation,
   sessionId,
   answer,
+  consultationMessages = [],
   isAnswerVisible,
   hideAgentStatus,
+  onVerdictComplete,
   onAgentAvatarRef,
   judgeAvatarRef,
   onAgentDragStart,
@@ -23,11 +27,37 @@ export function EvaluationStage({
   isDropTargetVisible,
   isAgentEditingLocked,
 }) {
+  const [activeDropIntent, setActiveDropIntent] = useState(null);
   const { leftAgents, rightAgents } = splitAgentsAroundCenter(evaluation.agents, evaluation.layoutBias);
-  const leftSideCount = leftAgents.length + (isDropTargetVisible ? 1 : 0);
-  const rightSideCount = rightAgents.length + (isDropTargetVisible ? 1 : 0);
+  const activeDropSide = activeDropIntent?.side ?? null;
+  const leftSideCount = leftAgents.length + (activeDropSide === EVALUATION_SIDE_LEFT ? 1 : 0);
+  const rightSideCount = rightAgents.length + (activeDropSide === EVALUATION_SIDE_RIGHT ? 1 : 0);
   const sideSlotCount = Math.max(leftSideCount, rightSideCount, 1);
   const sideWidth = (sideSlotCount * EVALUATION_AGENT_SLOT_WIDTH) - EVALUATION_AGENT_GAP;
+
+  function getEdgeDropIntent(event) {
+    const dropRect = event.currentTarget.getBoundingClientRect();
+    const edgeActivationWidth = Math.min(
+      dropRect.width * 0.36,
+      (EVALUATION_AGENT_SLOT_WIDTH + EVALUATION_AGENT_GAP) * 2.4,
+    );
+
+    if (event.clientX <= dropRect.left + edgeActivationWidth) {
+      return {
+        side: EVALUATION_SIDE_LEFT,
+        index: 0,
+      };
+    }
+
+    if (event.clientX >= dropRect.right - edgeActivationWidth) {
+      return {
+        side: EVALUATION_SIDE_RIGHT,
+        index: rightAgents.length,
+      };
+    }
+
+    return null;
+  }
 
   function handleDragOver(event) {
     if (isAgentEditingLocked) {
@@ -36,17 +66,42 @@ export function EvaluationStage({
 
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
+
+    if (isDropTargetVisible) {
+      const dropIntent = getEdgeDropIntent(event);
+
+      setActiveDropIntent(dropIntent);
+
+      if (dropIntent?.side === EVALUATION_SIDE_LEFT) {
+        event.currentTarget.scrollTo({ left: 0, behavior: "smooth" });
+      }
+
+      if (dropIntent?.side === EVALUATION_SIDE_RIGHT) {
+        event.currentTarget.scrollTo({
+          left: event.currentTarget.scrollWidth - event.currentTarget.clientWidth,
+          behavior: "smooth",
+        });
+      }
+    }
   }
 
-  function handleDrop(event, side) {
+  function handleDrop(event, dropIntent) {
     event.preventDefault();
     event.stopPropagation();
 
-    if (isAgentEditingLocked) {
+    if (isAgentEditingLocked || !dropIntent) {
       return;
     }
 
-    onDropAgent(event, side);
+    const insertionIndex = dropIntent.side === EVALUATION_SIDE_LEFT
+      ? dropIntent.index
+      : leftAgents.length + dropIntent.index;
+
+    onDropAgent(event, {
+      side: dropIntent.side,
+      index: insertionIndex,
+    });
+    setActiveDropIntent(null);
   }
 
   function handleWideDrop(event) {
@@ -54,12 +109,33 @@ export function EvaluationStage({
       return;
     }
 
-    const dropRect = event.currentTarget.getBoundingClientRect();
-    const dropSide = event.clientX < dropRect.left + (dropRect.width / 2)
-      ? EVALUATION_SIDE_LEFT
-      : EVALUATION_SIDE_RIGHT;
+    handleDrop(event, activeDropIntent ?? getEdgeDropIntent(event));
+  }
 
-    handleDrop(event, dropSide);
+  function handleDragLeave(event) {
+    if (!event.currentTarget.contains(event.relatedTarget)) {
+      setActiveDropIntent(null);
+    }
+  }
+
+  function renderAgentSlot(agent) {
+    return (
+      <div
+        key={agent.id}
+        className="evaluation-stage__slot"
+        style={{ viewTransitionName: getAgentViewTransitionName(agent.id) }}
+      >
+        <AgentCard
+          {...agent}
+          compact
+          draggable={!isAgentEditingLocked}
+          hideStatus={hideAgentStatus}
+          avatarRef={(node) => onAgentAvatarRef(agent.id, node)}
+          onDragStart={(event) => onAgentDragStart(event, "evaluation", agent.id)}
+          onDragEnd={onAgentDragEnd}
+        />
+      </div>
+    );
   }
 
   return (
@@ -67,6 +143,7 @@ export function EvaluationStage({
       <div
         className="evaluation-stage__agents"
         onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
         onDrop={handleWideDrop}
         aria-label="Перетащите сюда оценочного агента"
       >
@@ -75,57 +152,29 @@ export function EvaluationStage({
           style={{ "--evaluation-side-width": `${sideWidth}px` }}
         >
           <div
-            className="evaluation-stage__side evaluation-stage__side--left"
-            onDragOver={handleDragOver}
-            onDrop={(event) => handleDrop(event, EVALUATION_SIDE_LEFT)}
+            className={
+              activeDropSide === EVALUATION_SIDE_LEFT
+                ? "evaluation-stage__side evaluation-stage__side--left evaluation-stage__side--drop-active"
+                : "evaluation-stage__side evaluation-stage__side--left"
+            }
             aria-label="Добавить агента слева"
           >
-            {isDropTargetVisible ? (
+            {activeDropSide === EVALUATION_SIDE_LEFT ? (
               <div className="agent-drop-slot" aria-hidden="true" />
             ) : null}
-            {leftAgents.map((agent) => (
-              <div
-                key={agent.id}
-                className="evaluation-stage__slot"
-                style={{ viewTransitionName: getAgentViewTransitionName(agent.id) }}
-              >
-                <AgentCard
-                  {...agent}
-                  compact
-                  draggable={!isAgentEditingLocked}
-                  hideStatus={hideAgentStatus}
-                  avatarRef={(node) => onAgentAvatarRef(agent.id, node)}
-                  onDragStart={(event) => onAgentDragStart(event, "evaluation", agent.id)}
-                  onDragEnd={onAgentDragEnd}
-                />
-              </div>
-            ))}
+            {leftAgents.map(renderAgentSlot)}
           </div>
           <div className="evaluation-stage__center-lane" aria-hidden="true" />
           <div
-            className="evaluation-stage__side evaluation-stage__side--right"
-            onDragOver={handleDragOver}
-            onDrop={(event) => handleDrop(event, EVALUATION_SIDE_RIGHT)}
+            className={
+              activeDropSide === EVALUATION_SIDE_RIGHT
+                ? "evaluation-stage__side evaluation-stage__side--right evaluation-stage__side--drop-active"
+                : "evaluation-stage__side evaluation-stage__side--right"
+            }
             aria-label="Добавить агента справа"
           >
-            {rightAgents.map((agent) => (
-              <div
-                key={agent.id}
-                className="evaluation-stage__slot"
-                style={{ viewTransitionName: getAgentViewTransitionName(agent.id) }}
-              >
-                <AgentCard
-                  {...agent}
-                  compact
-                  draggable
-                  hideStatus={hideAgentStatus}
-                  avatarRef={(node) => onAgentAvatarRef(agent.id, node)}
-                  onDragStart={(event) => onAgentDragStart(event, "evaluation", agent.id)}
-                  onDragEnd={onAgentDragEnd}
-                />
-              </div>
-            ))}
-            {isDropTargetVisible ? (
+            {rightAgents.map(renderAgentSlot)}
+            {activeDropSide === EVALUATION_SIDE_RIGHT ? (
               <div className="agent-drop-slot" aria-hidden="true" />
             ) : null}
           </div>
@@ -140,7 +189,19 @@ export function EvaluationStage({
       </div>
 
       {isAnswerVisible && answer ? (
-        <JudgeVerdict answer={answer} sessionId={sessionId} />
+        <>
+          <JudgeVerdict answer={answer} sessionId={sessionId} onComplete={onVerdictComplete} />
+          {consultationMessages.length > 0 ? (
+            <div className="consultation-thread" aria-label="Консультация по гипотезам">
+              {consultationMessages.map((message) => (
+                <div key={message.id} className="consultation-message">
+                  <p className="consultation-message__question">{message.question}</p>
+                  <p className="consultation-message__answer">{message.answer}</p>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </>
       ) : null}
     </section>
   );

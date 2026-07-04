@@ -22,7 +22,7 @@ function getInitialVisibleAnswer(sessionId, answer) {
   return answer.slice(0, cachedLength);
 }
 
-export function JudgeVerdict({ answer, sessionId }) {
+export function JudgeVerdict({ answer, sessionId, onComplete }) {
   const verdictRef = useRef(null);
   const shouldAutoScrollRef = useRef(false);
   const canAutoScrollRef = useRef(false);
@@ -42,6 +42,7 @@ export function JudgeVerdict({ answer, sessionId }) {
 
     if (nextLength >= answer.length) {
       setVisibleAnswer(answer);
+      onComplete?.();
       return undefined;
     }
 
@@ -55,6 +56,7 @@ export function JudgeVerdict({ answer, sessionId }) {
 
       if (nextLength >= answer.length) {
         window.clearInterval(intervalId);
+        onComplete?.();
       }
     }, TYPEWRITER_INTERVAL_MS);
 

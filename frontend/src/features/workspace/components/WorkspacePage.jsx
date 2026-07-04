@@ -30,6 +30,9 @@ import { resetJudgeVerdict } from "./JudgeVerdict";
 import {
   createEvaluationAgent,
   createPendingAgent,
+  createAnswerFromRequests,
+  createChatTitleFromRequests,
+  createConsultationAnswer,
   createComposerRequest,
   createHypothesesFromRequests,
   applyChatSessionMetadata,
@@ -44,6 +47,70 @@ import {
 import { readAgentDragPayload } from "../utils/dragPayload";
 import { runLayoutTransition } from "../utils/layoutTransition";
 import "../workspace.css";
+
+const CUSTOM_AGENTS_STORAGE_KEY = "hypothesis-court.customAgents";
+
+function readStoredCustomAgents() {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  try {
+    const rawValue = window.localStorage.getItem(CUSTOM_AGENTS_STORAGE_KEY);
+    const parsedValue = rawValue ? JSON.parse(rawValue) : [];
+
+    return Array.isArray(parsedValue) ? parsedValue : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeStoredCustomAgents(agents) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(CUSTOM_AGENTS_STORAGE_KEY, JSON.stringify(agents));
+  } catch {
+    // Storage is a convenience layer; UI state still works without it.
+  }
+}
+
+function hasAgentInSession(session, agentId) {
+  return [...(session.availableAgents ?? []), ...(session.evaluation?.agents ?? [])]
+    .some((agent) => agent.id === agentId);
+}
+
+function syncCustomAgentsIntoSessions(sessions, customAgents) {
+  if (customAgents.length === 0) {
+    return sessions;
+  }
+
+  return sessions.map((session) => {
+    const nextCustomAgents = customAgents.filter((agent) => !hasAgentInSession(session, agent.id));
+
+    if (nextCustomAgents.length === 0) {
+      return session;
+    }
+
+    return {
+      ...session,
+      availableAgents: sortAvailableAgents([...(session.availableAgents ?? []), ...nextCustomAgents]),
+    };
+  });
+}
+
+function removeAgentFromSessions(sessions, agentId) {
+  return sessions.map((session) => ({
+    ...session,
+    availableAgents: (session.availableAgents ?? []).filter((agent) => agent.id !== agentId),
+    evaluation: {
+      ...session.evaluation,
+      agents: (session.evaluation?.agents ?? []).filter((agent) => agent.id !== agentId),
+    },
+  }));
+}
 
 export function WorkspacePage({
   accessToken,
@@ -66,6 +133,7 @@ export function WorkspacePage({
   const [isCreatingChat, setIsCreatingChat] = useState(false);
   const [isUploadingSessionFile, setIsUploadingSessionFile] = useState(false);
   const [removedAttachmentIdsBySession, setRemovedAttachmentIdsBySession] = useState({});
+  const [customAgents, setCustomAgents] = useState(() => readStoredCustomAgents());
   const [activePendingAgentId, setActivePendingAgentId] = useState(null);
   const sceneScrollRef = useRef(null);
   const deferredChatSearchQuery = useDeferredValue(chatSearchQuery);
@@ -74,7 +142,9 @@ export function WorkspacePage({
     ? selectedSession.isStarted || (selectedSession.hypotheses ?? []).length > 0
     : false;
   const isProcessRunning = selectedSession
-    ? selectedSession.isStarted && (selectedSession.launchedRequests ?? []).length > 0
+    ? selectedSession.isStarted
+      && (selectedSession.launchedRequests ?? []).length > 0
+      && !selectedSession.isVerdictComplete
     : false;
 
   useEffect(() => {
@@ -90,11 +160,18 @@ export function WorkspacePage({
       signal: controller.signal,
     })
       .then((payload) => {
-        const nextSessions = payload.items.map((chatSession) =>
-          createWorkspaceSessionFromChatSession(chatSession, data.sessions, data.palette.agents),
-        );
+        const paletteAgents = [...data.palette.agents, ...customAgents];
+        const nextSessions = syncCustomAgentsIntoSessions(payload.items.map((chatSession) =>
+          createWorkspaceSessionFromChatSession(chatSession, data.sessions, paletteAgents),
+        ), customAgents);
 
-        setSessions(nextSessions);
+        setSessions((currentSessions) =>
+          syncCustomAgentsIntoSessions(nextSessions, customAgents).map((nextSession) => {
+            const currentSession = currentSessions.find((session) => session.id === nextSession.id);
+
+            return currentSession?.isStarted === nextSession.isStarted ? currentSession : nextSession;
+          }),
+        );
         setSelectedChatId((currentChatId) =>
           nextSessions.some((session) => session.id === currentChatId)
             ? currentChatId
@@ -112,6 +189,10 @@ export function WorkspacePage({
 
     return () => controller.abort();
   }, [accessToken, data, deferredChatSearchQuery, status]);
+
+  useEffect(() => {
+    setSessions((currentSessions) => syncCustomAgentsIntoSessions(currentSessions, customAgents));
+  }, [customAgents]);
 
   useEffect(() => {
     if (status !== "success" || !selectedChatId) {
@@ -233,7 +314,11 @@ export function WorkspacePage({
         accessToken,
         title: data.shell.navigation.newChatLabel,
       });
-      const nextSession = createWorkspaceSessionFromChatSession(chatSession, data.sessions, data.palette.agents);
+      const nextSession = createWorkspaceSessionFromChatSession(
+        chatSession,
+        data.sessions,
+        [...data.palette.agents, ...customAgents],
+      );
       setChatSearchQuery("");
       setSessions((currentSessions) => [
         nextSession,
@@ -455,36 +540,44 @@ export function WorkspacePage({
       return;
     }
 
-    updateSelectedSession((session) => {
-      const availableAgents = session.availableAgents ?? getInitialAvailableAgents(session, data.palette.agents);
+    const availableAgents = selectedSession.availableAgents ?? getInitialAvailableAgents(selectedSession, data.palette.agents);
+    const pendingAgent = availableAgents.find((agent) => agent.id === agentId && agent.isPendingSetup);
+    const nextName = pendingAgent?.name?.trim() || "Новый эксперт";
+    const nextSystemPrompt = pendingAgent?.systemPrompt?.trim() ?? "";
 
-      return {
-        ...session,
-        availableAgents: sortAvailableAgents(
-          availableAgents.map((agent) => {
-            if (agent.id !== agentId || !agent.isPendingSetup) {
-              return agent;
-            }
+    if (!pendingAgent || !nextSystemPrompt) {
+      return;
+    }
 
-            const nextName = agent.name?.trim() || "Новый эксперт";
-            const nextSystemPrompt = agent.systemPrompt?.trim() ?? "";
+    const configuredAgent = {
+      ...pendingAgent,
+      name: nextName,
+      variant: pendingAgent.variant === "empty" ? "risk" : pendingAgent.variant,
+      systemPrompt: nextSystemPrompt,
+      isCustom: true,
+      isEmpty: false,
+      isPendingSetup: false,
+    };
 
-            if (!nextSystemPrompt) {
-              return agent;
-            }
-
-            return {
-              ...agent,
-              name: nextName,
-              variant: agent.variant === "empty" ? "risk" : agent.variant,
-              systemPrompt: nextSystemPrompt,
-              isEmpty: false,
-              isPendingSetup: false,
-            };
-          }),
+    updateSelectedSession((session) => ({
+      ...session,
+      availableAgents: sortAvailableAgents(
+        (session.availableAgents ?? getInitialAvailableAgents(session, data.palette.agents)).map((agent) =>
+          agent.id === agentId && agent.isPendingSetup ? configuredAgent : agent,
         ),
-      };
+      ),
+    }));
+
+    setCustomAgents((currentAgents) => {
+      const nextAgents = sortAvailableAgents([
+        ...currentAgents.filter((agent) => agent.id !== configuredAgent.id),
+        configuredAgent,
+      ]);
+
+      writeStoredCustomAgents(nextAgents);
+      return nextAgents;
     });
+
     setActivePendingAgentId(null);
   }
 
@@ -504,7 +597,7 @@ export function WorkspacePage({
     setDragSource(null);
   }
 
-  function handleMoveAgentToEvaluation(agentId, edge) {
+  function handleMoveAgentToEvaluation(agentId, edge, insertionIndex) {
     runLayoutTransition(() => {
       updateSelectedSession((session) => {
         const availableAgents = session.availableAgents ?? getInitialAvailableAgents(session, data.palette.agents);
@@ -520,7 +613,12 @@ export function WorkspacePage({
           evaluation: {
             ...session.evaluation,
             layoutBias: edge,
-            agents: insertEvaluationAgentAtEdge(session.evaluation.agents, createEvaluationAgent(movingAgent), edge),
+            agents: insertEvaluationAgentAtEdge(
+              session.evaluation.agents,
+              createEvaluationAgent(movingAgent),
+              edge,
+              insertionIndex,
+            ),
           },
         };
       });
@@ -553,7 +651,7 @@ export function WorkspacePage({
     });
   }
 
-  function handleDropAgentToEvaluation(event, edge = EVALUATION_SIDE_RIGHT) {
+  function handleDropAgentToEvaluation(event, dropTarget = EVALUATION_SIDE_RIGHT) {
     event.preventDefault();
     setDragSource(null);
 
@@ -567,7 +665,10 @@ export function WorkspacePage({
       return;
     }
 
-    handleMoveAgentToEvaluation(payload.agentId, edge);
+    const edge = typeof dropTarget === "string" ? dropTarget : dropTarget.side;
+    const insertionIndex = typeof dropTarget === "string" ? undefined : dropTarget.index;
+
+    handleMoveAgentToEvaluation(payload.agentId, edge, insertionIndex);
   }
 
   function handleDropAgentToPalette(event) {
@@ -585,6 +686,24 @@ export function WorkspacePage({
     }
 
     handleMoveAgentToPalette(payload.agentId);
+  }
+
+  function handleDeleteCustomAgent(agentId) {
+    if (isAgentEditingLocked || !customAgents.some((agent) => agent.id === agentId)) {
+      return;
+    }
+
+    runLayoutTransition(() => {
+      setCustomAgents((currentAgents) => {
+        const nextAgents = currentAgents.filter((agent) => agent.id !== agentId);
+
+        writeStoredCustomAgents(nextAgents);
+        return nextAgents;
+      });
+      setSessions((currentSessions) => removeAgentFromSessions(currentSessions, agentId));
+      setActivePendingAgentId((currentAgentId) => (currentAgentId === agentId ? null : currentAgentId));
+      setDragSource(null);
+    });
   }
 
   function handleReorderPaletteAgent(agentId, targetAgentId, placement) {
@@ -608,6 +727,26 @@ export function WorkspacePage({
     const nextText = text.trim();
     const composerRequests = selectedSession.composerRequests ?? [];
 
+    if (selectedSession.isVerdictComplete) {
+      if (!nextText) {
+        return;
+      }
+
+      updateSelectedSession((session) => ({
+        ...session,
+        consultationMessages: [
+          ...(session.consultationMessages ?? []),
+          {
+            id: `consultation-${Date.now()}`,
+            question: nextText,
+            answer: createConsultationAnswer(nextText, session),
+          },
+        ],
+      }));
+      setDraftMessage("");
+      return;
+    }
+
     if (!nextText && composerRequests.length === 0) {
       return;
     }
@@ -623,9 +762,7 @@ export function WorkspacePage({
     }
 
     const nextQuery = composerRequests.map(formatComposerRequest).join("\n");
-    const nextTitle = composerRequests.length === 1
-      ? formatComposerRequest(composerRequests[0])
-      : `${formatComposerRequest(composerRequests[0])} +${composerRequests.length - 1}`;
+    const nextTitle = createChatTitleFromRequests(composerRequests);
 
     updateSelectedSession((session) => ({
       ...session,
@@ -635,6 +772,9 @@ export function WorkspacePage({
       query: nextQuery,
       launchedRequests: composerRequests,
       hypotheses: createHypothesesFromRequests(composerRequests),
+      answer: createAnswerFromRequests(composerRequests),
+      isVerdictComplete: false,
+      consultationMessages: [],
       composerRequests: [],
     }));
     void handleRenameChat(selectedSession.id, nextTitle);
@@ -670,7 +810,20 @@ export function WorkspacePage({
       composerRequests: restoredRequests,
       hypotheses: [],
       answer: "",
+      isVerdictComplete: false,
+      consultationMessages: [],
     }));
+  }
+
+  function handleVerdictComplete() {
+    updateSelectedSession((session) => (
+      session.isVerdictComplete
+        ? session
+        : {
+            ...session,
+            isVerdictComplete: true,
+          }
+    ));
   }
 
   function handleRemoveComposerRequest(requestId) {
@@ -722,7 +875,7 @@ export function WorkspacePage({
       {sidebar}
 
       <section className="workspace-main">
-        <RequestSummaryRail requests={selectedSession.launchedRequests ?? []} />
+        <RequestSummaryRail requests={selectedSession.launchedRequests ?? []} title={selectedSession.title} />
 
         <div className="workspace-main__scene" ref={sceneScrollRef}>
           <WorkspaceScene
@@ -732,6 +885,7 @@ export function WorkspacePage({
             onDropAgentToEvaluation={handleDropAgentToEvaluation}
             dragSource={dragSource}
             isAgentEditingLocked={isAgentEditingLocked}
+            onVerdictComplete={handleVerdictComplete}
           />
         </div>
 
@@ -743,7 +897,7 @@ export function WorkspacePage({
           draftMessage={draftMessage}
           isAttachmentUploading={isUploadingSessionFile}
           isProcessRunning={isProcessRunning}
-          canEditAttachments={!isProcessRunning}
+          canEditAttachments={!selectedSession.isStarted}
           onDraftMessageChange={setDraftMessage}
           onAttachFiles={handleAttachFiles}
           onRemoveAttachment={handleRemoveAttachment}
@@ -760,7 +914,9 @@ export function WorkspacePage({
         onAgentDragEnd={handleAgentDragEnd}
         onDropAgentToPalette={handleDropAgentToPalette}
         onReorderPaletteAgent={handleReorderPaletteAgent}
+        onDeleteCustomAgent={handleDeleteCustomAgent}
         isDropTargetVisible={dragSource === "evaluation"}
+        isDeleteTargetVisible={customAgents.length > 0 && !isAgentEditingLocked}
         isAddAgentDisabled={isAgentEditingLocked || hasPendingAgent(selectedSession)}
         isAgentEditingLocked={isAgentEditingLocked}
         lockedReason="Агентов можно менять только до старта процесса."

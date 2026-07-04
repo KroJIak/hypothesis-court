@@ -22,7 +22,7 @@ function getRequestIcon(contextValue) {
   return requestIconByContextValue[contextValue] ?? FileText;
 }
 
-export function RequestSummaryRail({ requests }) {
+export function RequestSummaryRail({ requests, title }) {
   const requestButtonRefs = useRef(new Map());
   const [activeRequestId, setActiveRequestId] = useState(null);
   const [tooltipStyle, setTooltipStyle] = useState({ left: "0px", top: "0px" });
@@ -95,6 +95,7 @@ export function RequestSummaryRail({ requests }) {
 
   return (
     <div className="request-summary-group">
+      {title ? <p className="request-summary-group__title">{title}</p> : null}
       <p className="request-summary-group__label">Вводные условия</p>
       <div
         className="request-summary-rail"

@@ -1,6 +1,6 @@
 import { Check, Sparkles, X } from "lucide-react";
 
-import { AgentAvatar, agentAvatarVariantOptions } from "./AgentAvatar";
+import { AgentVariantIcon, agentAvatarVariantOptions } from "./AgentAvatar";
 
 export function AgentSetupPopover({
   agent,
@@ -40,7 +40,7 @@ export function AgentSetupPopover({
             aria-expanded={isIconPickerOpen}
             onClick={onToggleIconPicker}
           >
-            <AgentAvatar variant={selectedVariant} size="regular" />
+            <AgentVariantIcon variant={selectedVariant} className="agent-setup-popover__selected-icon" strokeWidth={1.9} />
           </button>
           {isIconPickerOpen ? (
             <div className="agent-setup-popover__icon-picker" aria-label="Иконки агента">
@@ -60,7 +60,7 @@ export function AgentSetupPopover({
                     onToggleIconPicker(false);
                   }}
                 >
-                  <AgentAvatar variant={option.value} size="compact" />
+                  <AgentVariantIcon variant={option.value} className="agent-setup-popover__option-icon" strokeWidth={1.9} />
                 </button>
               ))}
             </div>

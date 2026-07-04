@@ -209,8 +209,9 @@ const initialPlaybackState = {
 
 function createPlaybackSignature(session) {
   const hypothesisIds = (session.hypotheses ?? []).map((hypothesis) => hypothesis.id).join(",");
+  const evaluationAgentIds = (session.evaluation.agents ?? []).map((agent) => agent.id).join(",");
 
-  return hypothesisIds;
+  return `${hypothesisIds}|${evaluationAgentIds}`;
 }
 
 function getOrCreatePlaybackTimeline(session) {
