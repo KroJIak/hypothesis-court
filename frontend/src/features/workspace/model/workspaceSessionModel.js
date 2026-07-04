@@ -103,16 +103,6 @@ export function createEvaluationAgent(agent) {
   };
 }
 
-export function createPendingAgent() {
-  return {
-    id: `pending-agent-${Date.now()}`,
-    name: "Новый эксперт",
-    variant: "empty",
-    isEmpty: true,
-    isPendingSetup: true,
-  };
-}
-
 export function createComposerRequest(context, text) {
   const requestId =
     typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"

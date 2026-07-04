@@ -40,14 +40,52 @@ class OpenAICompatibleClient:
             raise ValidationError("Selected model is not available from this provider.")
         return models
 
-    def _request_json(self, path: str) -> dict[str, object]:
+    def create_chat_completion(
+        self,
+        *,
+        model: str,
+        messages: list[dict[str, str]],
+        temperature: float = 0.2,
+    ) -> str:
+        payload = self._request_json(
+            "chat/completions",
+            method="POST",
+            body={
+                "model": model,
+                "messages": messages,
+                "temperature": temperature,
+            },
+        )
+        choices = payload.get("choices", [])
+        if not isinstance(choices, list) or not choices:
+            raise ValidationError("Provider returned an empty completion.")
+        first_choice = choices[0]
+        if not isinstance(first_choice, dict):
+            raise ValidationError("Provider returned an invalid completion.")
+        message = first_choice.get("message")
+        if not isinstance(message, dict) or not isinstance(message.get("content"), str):
+            raise ValidationError("Provider returned an invalid completion.")
+        return message["content"]
+
+    def _request_json(
+        self,
+        path: str,
+        *,
+        method: str = "GET",
+        body: dict[str, object] | None = None,
+    ) -> dict[str, object]:
         headers = {"Accept": "application/json"}
         if self._api_token:
             headers["Authorization"] = f"{self._api_token_prefix} {self._api_token}"
         if self._project_id:
             headers[self._project_header_name] = self._project_id
 
-        request = Request(urljoin(self._base_url, path), headers=headers, method="GET")
+        data = None
+        if body is not None:
+            headers["Content-Type"] = "application/json"
+            data = json.dumps(body).encode("utf-8")
+
+        request = Request(urljoin(self._base_url, path), data=data, headers=headers, method=method)
         try:
             with urlopen(request, timeout=_REQUEST_TIMEOUT_SECONDS) as response:
                 return json.loads(response.read().decode("utf-8"))

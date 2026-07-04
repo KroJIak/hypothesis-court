@@ -1954,6 +1954,11 @@
   outline: none;
 }
 
+.agent-setup-popover__generate:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
 .agent-setup-popover__generate svg {
   width: 16px;
   height: 16px;
