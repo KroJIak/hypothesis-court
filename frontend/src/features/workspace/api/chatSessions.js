@@ -33,7 +33,7 @@ export async function listChatSessions({ accessToken, search, signal }) {
   });
 
   if (!response.ok) {
-    const detail = await readWorkspaceApiError(response, "Не удалось загрузить историю чатов.");
+    const detail = await readWorkspaceApiError(response, "Не удалось загрузить историю чатов");
     throw new Error(detail);
   }
 
@@ -58,7 +58,7 @@ export async function createChatSession({ accessToken, title }) {
   });
 
   if (!response.ok) {
-    const detail = await readWorkspaceApiError(response, "Не удалось создать чат.");
+    const detail = await readWorkspaceApiError(response, "Не удалось создать чат");
     throw new Error(detail);
   }
 
@@ -77,7 +77,7 @@ export async function renameChatSession({ accessToken, chatSessionId, title }) {
   });
 
   if (!response.ok) {
-    const detail = await readWorkspaceApiError(response, "Не удалось переименовать чат.");
+    const detail = await readWorkspaceApiError(response, "Не удалось переименовать чат");
     throw new Error(detail);
   }
 
@@ -94,7 +94,7 @@ export async function pinChatSession({ accessToken, chatSessionId }) {
   });
 
   if (!response.ok) {
-    const detail = await readWorkspaceApiError(response, "Не удалось закрепить чат.");
+    const detail = await readWorkspaceApiError(response, "Не удалось закрепить чат");
     throw new Error(detail);
   }
 
@@ -111,7 +111,7 @@ export async function unpinChatSession({ accessToken, chatSessionId }) {
   });
 
   if (!response.ok) {
-    const detail = await readWorkspaceApiError(response, "Не удалось открепить чат.");
+    const detail = await readWorkspaceApiError(response, "Не удалось открепить чат");
     throw new Error(detail);
   }
 
@@ -128,7 +128,7 @@ export async function startChatSession({ accessToken, chatSessionId }) {
   });
 
   if (!response.ok) {
-    const detail = await readWorkspaceApiError(response, "Не удалось запустить чат.");
+    const detail = await readWorkspaceApiError(response, "Не удалось запустить чат");
     throw new Error(detail);
   }
 
@@ -144,7 +144,7 @@ export async function deleteChatSession({ accessToken, chatSessionId }) {
   });
 
   if (!response.ok) {
-    const detail = await readWorkspaceApiError(response, "Не удалось удалить чат.");
+    const detail = await readWorkspaceApiError(response, "Не удалось удалить чат");
     throw new Error(detail);
   }
 }

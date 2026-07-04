@@ -21,6 +21,10 @@ function mapSelectedAgent(dto) {
   };
 }
 
+function mapVariantToApi(variant) {
+  return variant && variant !== "empty" ? variant : null;
+}
+
 async function readJsonResponse(response, fallbackMessage) {
   if (!response.ok) {
     const detail = await readWorkspaceApiError(response, fallbackMessage);
@@ -38,7 +42,7 @@ export async function listAgents({ accessToken, signal }) {
     },
     signal,
   });
-  const payload = await readJsonResponse(response, "Не удалось загрузить агентов.");
+  const payload = await readJsonResponse(response, "Не удалось загрузить агентов");
 
   return (payload.items ?? []).map(mapAgent);
 }
@@ -51,7 +55,7 @@ export async function getAgentGenerationStatus({ accessToken, signal }) {
     },
     signal,
   });
-  const payload = await readJsonResponse(response, "Не удалось проверить доступность генерации.");
+  const payload = await readJsonResponse(response, "Не удалось проверить доступность генерации");
 
   return Boolean(payload.available);
 }
@@ -66,11 +70,11 @@ export async function createAgent({ accessToken, name, variant, systemPrompt }) 
     },
     body: JSON.stringify({
       name,
-      variant,
+      variant: mapVariantToApi(variant),
       system_prompt: systemPrompt,
     }),
   });
-  const payload = await readJsonResponse(response, "Не удалось создать агента.");
+  const payload = await readJsonResponse(response, "Не удалось создать агента");
 
   return mapAgent(payload);
 }
@@ -85,11 +89,11 @@ export async function updateAgent({ accessToken, agentId, name, variant, systemP
     },
     body: JSON.stringify({
       name,
-      variant,
+      variant: mapVariantToApi(variant),
       system_prompt: systemPrompt,
     }),
   });
-  const payload = await readJsonResponse(response, "Не удалось сохранить агента.");
+  const payload = await readJsonResponse(response, "Не удалось сохранить агента");
 
   return mapAgent(payload);
 }
@@ -103,7 +107,7 @@ export async function deleteAgent({ accessToken, agentId }) {
   });
 
   if (!response.ok) {
-    const detail = await readWorkspaceApiError(response, "Не удалось удалить агента.");
+    const detail = await readWorkspaceApiError(response, "Не удалось удалить агента");
     throw new Error(detail);
   }
 }
@@ -121,7 +125,7 @@ export async function generateAgent({ accessToken, agentId, name, systemPrompt }
       system_prompt: systemPrompt,
     }),
   });
-  const payload = await readJsonResponse(response, "Не удалось сгенерировать промпт агента.");
+  const payload = await readJsonResponse(response, "Не удалось сгенерировать промпт агента");
 
   return mapAgent(payload);
 }
@@ -134,7 +138,7 @@ export async function listChatSessionAgents({ accessToken, chatSessionId, signal
     },
     signal,
   });
-  const payload = await readJsonResponse(response, "Не удалось загрузить агентов чата.");
+  const payload = await readJsonResponse(response, "Не удалось загрузить агентов чата");
 
   return (payload.items ?? []).map(mapSelectedAgent);
 }
@@ -153,7 +157,7 @@ export async function attachChatSessionAgent({ accessToken, chatSessionId, agent
       position,
     }),
   });
-  const payload = await readJsonResponse(response, "Не удалось добавить агента в чат.");
+  const payload = await readJsonResponse(response, "Не удалось добавить агента в чат");
 
   return (payload.items ?? []).map(mapSelectedAgent);
 }
@@ -166,7 +170,7 @@ export async function detachChatSessionAgent({ accessToken, chatSessionId, agent
       Authorization: `Bearer ${accessToken}`,
     },
   });
-  const payload = await readJsonResponse(response, "Не удалось убрать агента из чата.");
+  const payload = await readJsonResponse(response, "Не удалось убрать агента из чата");
 
   return (payload.items ?? []).map(mapSelectedAgent);
 }

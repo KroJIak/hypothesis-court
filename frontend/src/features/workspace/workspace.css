@@ -29,6 +29,86 @@
   grid-template-columns: 68px minmax(0, 1fr) 152px;
 }
 
+.workspace-notifications {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 1400;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  width: min(320px, calc(100vw - 32px));
+  pointer-events: none;
+}
+
+.workspace-notification {
+  box-sizing: border-box;
+  width: fit-content;
+  max-width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 9px 11px;
+  color: #f7f7f7;
+  background: rgba(35, 35, 35, 0.96);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28);
+  animation: workspace-notification-lifecycle 4200ms ease both;
+}
+
+.workspace-notification--error {
+  border-color: rgba(255, 111, 97, 0.34);
+  background: linear-gradient(135deg, rgba(70, 28, 25, 0.97), rgba(33, 30, 30, 0.96));
+}
+
+.workspace-notification--info {
+  border-color: rgba(115, 170, 255, 0.32);
+  background: linear-gradient(135deg, rgba(25, 42, 74, 0.97), rgba(30, 31, 35, 0.96));
+}
+
+.workspace-notification--success {
+  border-color: rgba(114, 216, 156, 0.32);
+  background: linear-gradient(135deg, rgba(24, 70, 45, 0.97), rgba(30, 34, 31, 0.96));
+}
+
+.workspace-notification__label,
+.workspace-notification__message {
+  display: block;
+}
+
+.workspace-notification__label {
+  margin-bottom: 3px;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 0.66rem;
+  font-weight: 650;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.055em;
+}
+
+.workspace-notification__message {
+  font-size: 0.78rem;
+  font-weight: 520;
+  line-height: 1.25;
+}
+
+@keyframes workspace-notification-lifecycle {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+
+  9%,
+  86% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+}
+
 .workspace-sidebar,
 .agent-palette {
   box-sizing: border-box;

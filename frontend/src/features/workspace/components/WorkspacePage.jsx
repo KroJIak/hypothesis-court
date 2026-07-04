@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { AgentPalette } from "./AgentPalette";
 import { AgentMessageHistoryModal } from "./AgentMessageHistoryModal";
@@ -7,6 +7,7 @@ import { RequestSummaryRail } from "./RequestSummaryRail";
 import { Sidebar } from "./Sidebar";
 import { WorkspaceScene } from "./WorkspaceScene";
 import { WorkspaceError, WorkspaceSkeleton } from "./WorkspaceStatus";
+import { WorkspaceNotifications } from "./WorkspaceNotifications";
 import {
   attachChatSessionAgent,
   createAgent as createUserAgent,
@@ -55,6 +56,9 @@ import {
 import { readAgentDragPayload } from "../utils/dragPayload";
 import { runLayoutTransition } from "../utils/layoutTransition";
 import "../workspace.css";
+
+const WORKSPACE_NOTIFICATION_TTL_MS = 4200;
+const WORKSPACE_NOTIFICATION_LIMIT = 5;
 
 function getEmptyPaletteAgents(data) {
   return data.palette.agents.filter((agent) => agent.isEmpty);
@@ -125,7 +129,7 @@ export function WorkspacePage({
   const [dragSource, setDragSource] = useState(null);
   const [sessions, setSessions] = useState([]);
   const [chatSearchQuery, setChatSearchQuery] = useState("");
-  const [chatHistoryError, setChatHistoryError] = useState("");
+  const [workspaceNotifications, setWorkspaceNotifications] = useState([]);
   const [isCreatingChat, setIsCreatingChat] = useState(false);
   const [isUploadingSessionFile, setIsUploadingSessionFile] = useState(false);
   const [removedAttachmentIdsBySession, setRemovedAttachmentIdsBySession] = useState({});
@@ -135,6 +139,7 @@ export function WorkspacePage({
   const [activeAgentHistoryTarget, setActiveAgentHistoryTarget] = useState(null);
   const sceneScrollRef = useRef(null);
   const addAgentFrameRef = useRef(null);
+  const notificationTimeoutsRef = useRef(new Map());
   const deferredChatSearchQuery = useDeferredValue(chatSearchQuery);
   const selectedSession = sessions.find((session) => session.id === selectedChatId) ?? sessions[0] ?? null;
   const isAgentEditingLocked = selectedSession
@@ -145,6 +150,44 @@ export function WorkspacePage({
       && (selectedSession.launchedRequests ?? []).length > 0
       && !selectedSession.isVerdictComplete
     : false;
+  const agentEditingLockedReason = selectedSession?.isVerdictComplete
+    ? "Агентов нельзя менять в завершенном чате."
+    : "Агентов можно менять только до старта процесса.";
+
+  const showWorkspaceNotification = useCallback((message, type = "info") => {
+    if (!message) {
+      return;
+    }
+
+    const id = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `workspace-notification-${Date.now()}-${Math.random()}`;
+
+    setWorkspaceNotifications((currentNotifications) => [
+      ...currentNotifications,
+      { id, message, type },
+    ].slice(-WORKSPACE_NOTIFICATION_LIMIT));
+
+    const timeoutId = window.setTimeout(() => {
+      setWorkspaceNotifications((currentNotifications) =>
+        currentNotifications.filter((notification) => notification.id !== id),
+      );
+      notificationTimeoutsRef.current.delete(id);
+    }, WORKSPACE_NOTIFICATION_TTL_MS);
+
+    notificationTimeoutsRef.current.set(id, timeoutId);
+  }, []);
+
+  const showWorkspaceError = useCallback((error, fallbackMessage) => {
+    showWorkspaceNotification(error instanceof Error ? error.message : fallbackMessage, "error");
+  }, [showWorkspaceNotification]);
+
+  useEffect(() => () => {
+    for (const timeoutId of notificationTimeoutsRef.current.values()) {
+      window.clearTimeout(timeoutId);
+    }
+    notificationTimeoutsRef.current.clear();
+  }, []);
 
   useEffect(() => {
     if (status !== "success" || !data) {
@@ -182,18 +225,17 @@ export function WorkspacePage({
             ? currentChatId
             : nextSessions[0]?.id ?? null,
         );
-        setChatHistoryError("");
       })
       .catch((error) => {
         if (error?.name === "AbortError") {
           return;
         }
 
-        setChatHistoryError(error instanceof Error ? error.message : "Не удалось загрузить историю чатов.");
+        showWorkspaceError(error, "Не удалось загрузить историю чатов");
       });
 
     return () => controller.abort();
-  }, [accessToken, data, deferredChatSearchQuery, status]);
+  }, [accessToken, data, deferredChatSearchQuery, showWorkspaceError, status]);
 
   useEffect(() => {
     setActiveAgentHistoryTarget(null);
@@ -225,18 +267,17 @@ export function WorkspacePage({
               : session,
           ),
         );
-        setChatHistoryError("");
       })
       .catch((error) => {
         if (error?.name === "AbortError") {
           return;
         }
 
-        setChatHistoryError(error instanceof Error ? error.message : "Не удалось загрузить файлы чата.");
+        showWorkspaceError(error, "Не удалось загрузить файлы чата");
       });
 
     return () => controller.abort();
-  }, [accessToken, removedAttachmentIdsBySession, selectedChatId, status]);
+  }, [accessToken, removedAttachmentIdsBySession, selectedChatId, showWorkspaceError, status]);
 
   useEffect(() => {
     if (status !== "success" || !selectedChatId || !data) {
@@ -258,18 +299,17 @@ export function WorkspacePage({
               : session,
           ),
         );
-        setChatHistoryError("");
       })
       .catch((error) => {
         if (error?.name === "AbortError") {
           return;
         }
 
-        setChatHistoryError(error instanceof Error ? error.message : "Не удалось загрузить агентов чата.");
+        showWorkspaceError(error, "Не удалось загрузить агентов чата");
       });
 
     return () => controller.abort();
-  }, [accessToken, data, selectedChatId, status, userAgents]);
+  }, [accessToken, data, selectedChatId, showWorkspaceError, status, userAgents]);
 
   useLayoutEffect(() => {
     const sceneElement = sceneScrollRef.current;
@@ -345,8 +385,6 @@ export function WorkspacePage({
     }
 
     setIsCreatingChat(true);
-    setChatHistoryError("");
-
     try {
       const chatSession = await createChatSession({
         accessToken,
@@ -365,7 +403,7 @@ export function WorkspacePage({
       setSelectedChatId(nextSession.id);
       setDraftMessage("");
     } catch (error) {
-      setChatHistoryError(error instanceof Error ? error.message : "Не удалось создать чат.");
+      showWorkspaceError(error, "Не удалось создать чат");
     } finally {
       setIsCreatingChat(false);
     }
@@ -382,8 +420,6 @@ export function WorkspacePage({
       return;
     }
 
-    setChatHistoryError("");
-
     try {
       const chatSession = await renameChatSession({
         accessToken,
@@ -396,7 +432,7 @@ export function WorkspacePage({
         ),
       );
     } catch (error) {
-      setChatHistoryError(error instanceof Error ? error.message : "Не удалось переименовать чат.");
+      showWorkspaceError(error, "Не удалось переименовать чат");
     }
   }
 
@@ -406,8 +442,6 @@ export function WorkspacePage({
     if (!session) {
       return;
     }
-
-    setChatHistoryError("");
 
     try {
       const chatSession = session.isPinned
@@ -420,13 +454,11 @@ export function WorkspacePage({
         ),
       );
     } catch (error) {
-      setChatHistoryError(error instanceof Error ? error.message : "Не удалось изменить закрепление чата.");
+      showWorkspaceError(error, "Не удалось изменить закрепление чата");
     }
   }
 
   async function handleDeleteChat(chatId) {
-    setChatHistoryError("");
-
     try {
       await deleteChatSession({ accessToken, chatSessionId: chatId });
       const nextSessions = sessions.filter((session) => session.id !== chatId);
@@ -437,7 +469,7 @@ export function WorkspacePage({
         setSelectedChatId(nextSessions[0]?.id ?? null);
       }
     } catch (error) {
-      setChatHistoryError(error instanceof Error ? error.message : "Не удалось удалить чат.");
+      showWorkspaceError(error, "Не удалось удалить чат");
     }
   }
 
@@ -449,8 +481,6 @@ export function WorkspacePage({
     }
 
     setIsUploadingSessionFile(true);
-    setChatHistoryError("");
-
     try {
       for (const file of files) {
         const uploadedFile = await uploadSessionFile({
@@ -474,7 +504,7 @@ export function WorkspacePage({
         );
       }
     } catch (error) {
-      setChatHistoryError(error instanceof Error ? error.message : "Не удалось загрузить файл.");
+      showWorkspaceError(error, "Не удалось загрузить файл");
     } finally {
       setIsUploadingSessionFile(false);
     }
@@ -508,8 +538,6 @@ export function WorkspacePage({
       addAgentFrameRef.current = null;
     });
 
-    setChatHistoryError("");
-
     try {
       const createdAgent = await createUserAgent({ accessToken });
       setUserAgents((currentAgents) => sortAvailableAgents([...currentAgents, createdAgent]));
@@ -526,7 +554,7 @@ export function WorkspacePage({
       );
       setActivePendingAgentId(createdAgent.id);
     } catch (error) {
-      setChatHistoryError(error instanceof Error ? error.message : "Не удалось создать агента.");
+      showWorkspaceError(error, "Не удалось создать агента");
     }
   }
 
@@ -578,8 +606,6 @@ export function WorkspacePage({
       return;
     }
 
-    setChatHistoryError("");
-
     try {
       const generatedAgent = await generateUserAgent({
         accessToken,
@@ -592,7 +618,7 @@ export function WorkspacePage({
       );
       setSessions((currentSessions) => updateAgentInSessions(currentSessions, generatedAgent));
     } catch (error) {
-      setChatHistoryError(error instanceof Error ? error.message : "Не удалось сгенерировать промпт агента.");
+      showWorkspaceError(error, "Не удалось сгенерировать промпт агента");
     }
   }
 
@@ -613,8 +639,6 @@ export function WorkspacePage({
       return;
     }
 
-    setChatHistoryError("");
-
     try {
       const updatedAgent = await updateUserAgent({
         accessToken,
@@ -629,7 +653,7 @@ export function WorkspacePage({
       setSessions((currentSessions) => updateAgentInSessions(currentSessions, updatedAgent));
       setActivePendingAgentId(null);
     } catch (error) {
-      setChatHistoryError(error instanceof Error ? error.message : "Не удалось сохранить агента.");
+      showWorkspaceError(error, "Не удалось сохранить агента");
     }
   }
 
@@ -648,8 +672,6 @@ export function WorkspacePage({
       return;
     }
 
-    setChatHistoryError("");
-
     try {
       await deleteUserAgent({ accessToken, agentId });
       setUserAgents((currentAgents) => currentAgents.filter((currentAgent) => currentAgent.id !== agentId));
@@ -657,7 +679,7 @@ export function WorkspacePage({
       setActivePendingAgentId(null);
       setDragSource(null);
     } catch (error) {
-      setChatHistoryError(error instanceof Error ? error.message : "Не удалось удалить агента.");
+      showWorkspaceError(error, "Не удалось удалить агента");
     }
   }
 
@@ -720,7 +742,7 @@ export function WorkspacePage({
         );
       })
       .catch((error) => {
-        setChatHistoryError(error instanceof Error ? error.message : "Не удалось добавить агента в чат.");
+        showWorkspaceError(error, "Не удалось добавить агента в чат");
       });
   }
 
@@ -763,7 +785,7 @@ export function WorkspacePage({
         );
       })
       .catch((error) => {
-        setChatHistoryError(error instanceof Error ? error.message : "Не удалось убрать агента из чата.");
+        showWorkspaceError(error, "Не удалось убрать агента из чата");
       });
   }
 
@@ -870,7 +892,7 @@ export function WorkspacePage({
         );
       })
       .catch((error) => {
-        setChatHistoryError(error instanceof Error ? error.message : "Не удалось запустить чат.");
+        showWorkspaceError(error, "Не удалось запустить чат");
       });
 
     setDraftMessage("");
@@ -933,7 +955,6 @@ export function WorkspacePage({
       isCollapsed={isSidebarCollapsed}
       isNewChatDisabled={isCreatingChat}
       chatSearchQuery={chatSearchQuery}
-      chatHistoryError={chatHistoryError}
       onLogout={onLogout}
       onLogoutAll={onLogoutAll}
       onUpdateCurrentUserProfile={onUpdateCurrentUserProfile}
@@ -955,6 +976,7 @@ export function WorkspacePage({
         {sidebar}
         <section className="workspace-main workspace-main--empty" />
         <aside className="agent-palette" aria-hidden="true" />
+        <WorkspaceNotifications notifications={workspaceNotifications} />
       </main>
     );
   }
@@ -1006,7 +1028,7 @@ export function WorkspacePage({
         isDropTargetVisible={dragSource === "evaluation"}
         isAddAgentDisabled={isAgentEditingLocked}
         isAgentEditingLocked={isAgentEditingLocked}
-        lockedReason="Агентов можно менять только до старта процесса."
+        lockedReason={agentEditingLockedReason}
         activePendingAgentId={activePendingAgentId}
         onOpenPendingAgentSetup={handleOpenPendingAgentSetup}
         onChangePendingAgentSetup={handleChangePendingAgentSetup}
@@ -1024,6 +1046,7 @@ export function WorkspacePage({
           onClose={handleCloseAgentHistory}
         />
       ) : null}
+      <WorkspaceNotifications notifications={workspaceNotifications} />
     </main>
   );
 }

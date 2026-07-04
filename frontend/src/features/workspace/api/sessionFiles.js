@@ -27,7 +27,7 @@ export async function listSessionFiles({ accessToken, chatSessionId, signal }) {
   });
 
   if (!response.ok) {
-    const detail = await readWorkspaceApiError(response, "Не удалось загрузить файлы чата.");
+    const detail = await readWorkspaceApiError(response, "Не удалось загрузить файлы чата");
     throw new Error(detail);
   }
 
@@ -54,7 +54,7 @@ export async function uploadSessionFile({ accessToken, chatSessionId, file }) {
   });
 
   if (!response.ok) {
-    const detail = await readWorkspaceApiError(response, "Не удалось загрузить файл.");
+    const detail = await readWorkspaceApiError(response, "Не удалось загрузить файл");
     throw new Error(detail);
   }
 

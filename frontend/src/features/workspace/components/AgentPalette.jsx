@@ -33,6 +33,7 @@ export function AgentPalette({
   onAddAgent,
 }) {
   const itemRefs = useRef(new Map());
+  const isClosingSetupRef = useRef(false);
   const [iconPickerAgentId, setIconPickerAgentId] = useState(null);
   const [setupPopoverStyle, setSetupPopoverStyle] = useState({ left: "0px", top: "0px" });
   const sortedAgents = sortAvailableAgents(agents);
@@ -40,6 +41,17 @@ export function AgentPalette({
     sortedAgents.find((agent) =>
       agent.id === activePendingAgentId && (agent.isPendingSetup || !agent.isEmpty),
     ) ?? null;
+
+  const requestCloseSetupPopover = useCallback(() => {
+    if (!activePendingAgentId || isClosingSetupRef.current) {
+      return;
+    }
+
+    isClosingSetupRef.current = true;
+    Promise.resolve(onSavePendingAgentSetup(activePendingAgentId)).finally(() => {
+      isClosingSetupRef.current = false;
+    });
+  }, [activePendingAgentId, onSavePendingAgentSetup]);
 
   const setItemRef = useCallback((agentId, node) => {
     if (node) {
@@ -91,6 +103,43 @@ export function AgentPalette({
       window.removeEventListener("scroll", updateSetupPopoverPosition, true);
     };
   }, [activePendingAgent, updateSetupPopoverPosition]);
+
+  useEffect(() => {
+    isClosingSetupRef.current = false;
+  }, [activePendingAgentId]);
+
+  useEffect(() => {
+    if (!activePendingAgent) {
+      return undefined;
+    }
+
+    function handleKeyDown(event) {
+      if (event.key !== "Escape") {
+        return;
+      }
+
+      event.preventDefault();
+      requestCloseSetupPopover();
+    }
+
+    function handlePointerDown(event) {
+      if (event.target instanceof Element && event.target.closest(".agent-setup-popover")) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      requestCloseSetupPopover();
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("mousedown", handlePointerDown, true);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("mousedown", handlePointerDown, true);
+    };
+  }, [activePendingAgent, requestCloseSetupPopover]);
 
   function handlePendingAgentClick(agent) {
     if (isAgentEditingLocked || (!agent.isPendingSetup && agent.isEmpty)) {

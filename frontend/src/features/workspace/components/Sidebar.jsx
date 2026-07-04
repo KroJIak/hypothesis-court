@@ -31,7 +31,6 @@ export function Sidebar({
   onUploadAvatar,
   onChangePassword,
   chatSearchQuery,
-  chatHistoryError,
   onSelectChat,
   onCreateChat,
   onToggleSidebar,
@@ -299,9 +298,6 @@ export function Sidebar({
           ))}
           {filteredSessions.length === 0 ? (
             <span className="chat-list__empty">Ничего не найдено</span>
-          ) : null}
-          {chatHistoryError ? (
-            <span className="chat-list__error">{chatHistoryError}</span>
           ) : null}
         </div>
       )}
