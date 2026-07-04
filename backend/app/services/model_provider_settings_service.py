@@ -181,6 +181,24 @@ class ModelProviderSettingsService:
             api_token=settings.model_provider_api_key,
         )
 
+    def get_model_client(self, settings: Settings) -> tuple[OpenAICompatibleClient, str]:
+        provider_settings = self.get_model_settings(settings)
+        if provider_settings is None:
+            raise ValidationError("LLM model provider is not configured.")
+        api_token = provider_settings.api_token or settings.model_provider_api_key
+        model = self._normalize_model(provider_settings.model)
+        if not provider_settings.base_url or api_token is None or model is None:
+            raise ValidationError("LLM model provider is not configured.")
+        return (
+            self._create_provider_client(
+                provider_type=provider_settings.provider_type,
+                base_url=provider_settings.base_url,
+                api_token=api_token,
+                project_id=provider_settings.project_id,
+            ),
+            model,
+        )
+
     def _resolve_api_token(self, *, provider: str, api_token: str | None, settings: Settings) -> str | None:
         normalized_api_token = self._normalize_api_token(api_token)
         if normalized_api_token is not None:

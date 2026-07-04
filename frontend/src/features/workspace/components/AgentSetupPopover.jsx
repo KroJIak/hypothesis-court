@@ -8,6 +8,7 @@ export function AgentSetupPopover({
   onToggleIconPicker,
   onChange,
   onGeneratePrompt,
+  isGenerateDisabled,
   onDelete,
   onSave,
   style,
@@ -99,6 +100,7 @@ export function AgentSetupPopover({
       <button
         type="button"
         className="agent-setup-popover__generate"
+        disabled={isGenerateDisabled}
         onClick={() => onGeneratePrompt(agent.id)}
       >
         <Sparkles aria-hidden="true" strokeWidth={1.8} />

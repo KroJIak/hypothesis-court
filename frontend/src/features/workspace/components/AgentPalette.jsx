@@ -27,6 +27,7 @@ export function AgentPalette({
   onOpenPendingAgentSetup,
   onChangePendingAgentSetup,
   onGeneratePendingAgentPrompt,
+  isAgentGenerationDisabled,
   onDeletePendingAgentSetup,
   onSavePendingAgentSetup,
   onAddAgent,
@@ -189,6 +190,7 @@ export function AgentPalette({
               }}
               onChange={onChangePendingAgentSetup}
               onGeneratePrompt={onGeneratePendingAgentPrompt}
+              isGenerateDisabled={isAgentGenerationDisabled}
               onDelete={onDeletePendingAgentSetup}
               onSave={onSavePendingAgentSetup}
               style={setupPopoverStyle}
