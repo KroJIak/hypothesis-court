@@ -81,6 +81,9 @@ class ResearchInputKind(str, Enum):
 class DocumentProcessingStatus(str, Enum):
     UPLOADED = "uploaded"
     PROCESSING = "processing"
+    PARSING = "parsing"
+    CHUNKED = "chunked"
+    INDEXED = "indexed"
     PROCESSED = "processed"
     FAILED = "failed"
     UNSUPPORTED = "unsupported"

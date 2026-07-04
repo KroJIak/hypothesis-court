@@ -19,7 +19,7 @@ const attachmentProcessingMetaByStatus = {
   },
   [DOCUMENT_PROCESSING_STATUS_PROCESSING]: {
     badgeStatus: PROCESSING_STATUS_PROCESSING,
-    label: "Обрабатывается: парсинг, разбиение и индексация",
+    label: "Подготовка к обработке",
   },
   [DOCUMENT_PROCESSING_STATUS_PARSING]: {
     badgeStatus: PROCESSING_STATUS_PROCESSING,
@@ -31,7 +31,7 @@ const attachmentProcessingMetaByStatus = {
   },
   [DOCUMENT_PROCESSING_STATUS_INDEXED]: {
     badgeStatus: PROCESSING_STATUS_PROCESSING,
-    label: "Фрагменты индексируются",
+    label: "Индексация фрагментов",
   },
   [DOCUMENT_PROCESSING_STATUS_PROCESSED]: {
     badgeStatus: PROCESSING_STATUS_PROCESSED,

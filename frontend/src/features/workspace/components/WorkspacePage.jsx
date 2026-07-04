@@ -47,6 +47,7 @@ import {
   DOCUMENT_PROCESSING_STATUS_PROCESSING,
   DOCUMENT_PROCESSING_STATUS_UPLOADED,
   EVALUATION_SIDE_RIGHT,
+  PROCESSING_STATUS_PROCESSING,
   PROCESSING_STATUS_PROCESSED,
 } from "../constants";
 import { useWorkspaceScene } from "../hooks/useWorkspaceScene";
@@ -73,6 +74,7 @@ import "../workspace.css";
 
 const WORKSPACE_NOTIFICATION_TTL_MS = 4200;
 const WORKSPACE_NOTIFICATION_LIMIT = 5;
+const SESSION_FILE_STATUS_POLL_INTERVAL_MS = 1600;
 const LOCAL_PENDING_AGENT_ID_PREFIX = "pending-agent-";
 
 function createLocalPendingAgent() {
@@ -180,9 +182,12 @@ function refreshAvailableAgentsForSession(session, userAgents, data) {
 }
 
 function markAttachmentsAsProcessing(attachments) {
+  const processingStartedAt = new Date().toISOString();
+
   return (attachments ?? []).map((attachment) => ({
     ...attachment,
     ...createAttachmentProcessingView(DOCUMENT_PROCESSING_STATUS_PROCESSING),
+    processingStartedAt,
   }));
 }
 
@@ -194,7 +199,30 @@ function markAttachmentsAsUploaded(attachments) {
     processingBadgeStatus: PROCESSING_STATUS_PROCESSED,
     processingStatusLabel: "Файл загружен",
     processingError: null,
+    processingStartedAt: null,
   }));
+}
+
+function mergeAttachmentProcessingState(previousAttachments, nextAttachments) {
+  const previousById = new Map((previousAttachments ?? []).map((attachment) => [attachment.id, attachment]));
+
+  return (nextAttachments ?? []).map((attachment) => {
+    const previousAttachment = previousById.get(attachment.id);
+    const isProcessing = attachment.processingBadgeStatus === PROCESSING_STATUS_PROCESSING;
+
+    return {
+      ...attachment,
+      processingStartedAt: isProcessing
+        ? previousAttachment?.processingStartedAt ?? new Date().toISOString()
+        : null,
+    };
+  });
+}
+
+function hasProcessingAttachments(session) {
+  return (session?.attachments ?? []).some((attachment) =>
+    attachment.processingBadgeStatus === PROCESSING_STATUS_PROCESSING,
+  );
 }
 
 function applyRunVersion(session, version, { isComplete = true } = {}) {
@@ -331,6 +359,7 @@ export function WorkspacePage({
       && (selectedSession.launchedRequests ?? []).length > 0
       && !selectedSession.isVerdictComplete
     : false;
+  const shouldPollSessionFiles = isProcessRunning && (selectedSession?.attachments ?? []).length > 0;
   const agentEditingLockedReason = selectedSession?.isVerdictComplete
     ? "Агентов нельзя выставлять в завершенном чате."
     : "Агентов можно выставлять только до старта процесса.";
@@ -486,7 +515,7 @@ export function WorkspacePage({
             session.id === selectedChatId
               ? {
                   ...session,
-                  attachments: payload.items,
+                  attachments: mergeAttachmentProcessingState(session.attachments, payload.items),
                   maxFiles: payload.maxFiles,
                 }
               : session,
@@ -503,6 +532,52 @@ export function WorkspacePage({
 
     return () => controller.abort();
   }, [accessToken, selectedChatId, showWorkspaceError, status]);
+
+  useEffect(() => {
+    if (status !== "success" || !selectedChatId || !shouldPollSessionFiles) {
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    let didReportError = false;
+
+    async function pollSessionFiles() {
+      try {
+        const payload = await listSessionFiles({
+          accessToken,
+          chatSessionId: selectedChatId,
+          signal: controller.signal,
+        });
+
+        setSessions((currentSessions) =>
+          currentSessions.map((session) =>
+            session.id === selectedChatId
+              ? {
+                  ...session,
+                  attachments: mergeAttachmentProcessingState(session.attachments, payload.items),
+                  maxFiles: payload.maxFiles,
+                }
+              : session,
+          ),
+        );
+      } catch (error) {
+        if (error?.name === "AbortError" || didReportError) {
+          return;
+        }
+
+        didReportError = true;
+        showWorkspaceError(error, "Не удалось обновить этап обработки файлов");
+      }
+    }
+
+    void pollSessionFiles();
+    const intervalId = window.setInterval(pollSessionFiles, SESSION_FILE_STATUS_POLL_INTERVAL_MS);
+
+    return () => {
+      controller.abort();
+      window.clearInterval(intervalId);
+    };
+  }, [accessToken, selectedChatId, shouldPollSessionFiles, showWorkspaceError, status]);
 
   useEffect(() => {
     if (status !== "success" || !selectedChatId || !data) {
@@ -659,7 +734,7 @@ export function WorkspacePage({
         session.id === chatSessionId
           ? {
               ...session,
-              attachments: payload.items,
+              attachments: mergeAttachmentProcessingState(session.attachments, payload.items),
               maxFiles: payload.maxFiles,
             }
           : session,

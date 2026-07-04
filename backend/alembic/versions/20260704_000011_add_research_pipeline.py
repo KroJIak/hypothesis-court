@@ -22,6 +22,9 @@ def upgrade() -> None:
     document_processing_status = sa.Enum(
         "uploaded",
         "processing",
+        "parsing",
+        "chunked",
+        "indexed",
         "processed",
         "failed",
         "unsupported",
@@ -59,6 +62,9 @@ def upgrade() -> None:
             postgresql.ENUM(
                 "uploaded",
                 "processing",
+                "parsing",
+                "chunked",
+                "indexed",
                 "processed",
                 "failed",
                 "unsupported",

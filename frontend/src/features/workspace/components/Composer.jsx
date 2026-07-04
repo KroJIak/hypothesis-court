@@ -39,12 +39,29 @@ const attachmentIconByKind = {
   zip: FileArchive,
 };
 
+const LONG_ATTACHMENT_PROCESSING_MS = 30000;
+
 function getAttachmentIcon(kind) {
   return attachmentIconByKind[kind?.toLocaleLowerCase()] ?? FileBox;
 }
 
 function getAttachmentTypeLabel(attachment) {
   return (attachment.shortLabel ?? attachment.kind ?? "file").toLocaleUpperCase();
+}
+
+function getAttachmentProcessingLabel(attachment) {
+  const baseLabel = attachment.processingError
+    ? `${attachment.processingStatusLabel ?? "Ошибка обработки"}: ${attachment.processingError}`
+    : attachment.processingStatusLabel;
+  const processingStartedAt = Date.parse(attachment.processingStartedAt ?? "");
+  const isLongProcessing = Number.isFinite(processingStartedAt)
+    && Date.now() - processingStartedAt >= LONG_ATTACHMENT_PROCESSING_MS;
+
+  if (!isLongProcessing || attachment.processingError) {
+    return baseLabel;
+  }
+
+  return `${baseLabel}. Файл большой, обработка может занять несколько минут`;
 }
 
 function AttachmentChip({
@@ -57,9 +74,7 @@ function AttachmentChip({
 }) {
   const AttachmentIcon = getAttachmentIcon(attachment.kind);
   const attachmentTypeLabel = getAttachmentTypeLabel(attachment);
-  const processingLabel = attachment.processingError
-    ? `${attachment.processingStatusLabel ?? "Ошибка обработки"}: ${attachment.processingError}`
-    : attachment.processingStatusLabel;
+  const processingLabel = getAttachmentProcessingLabel(attachment);
 
   return (
     <div
@@ -296,9 +311,7 @@ export function Composer({
             <span className="attachment-tooltip" style={attachmentTooltipStyle}>
               <strong>{activeAttachment.tooltip}</strong>
               <span>
-                {activeAttachment.processingError
-                  ? `${activeAttachment.processingStatusLabel ?? "Ошибка обработки"}: ${activeAttachment.processingError}`
-                  : activeAttachment.processingStatusLabel ?? "Ожидает обработки"}
+                {getAttachmentProcessingLabel(activeAttachment) ?? "Файл загружен"}
               </span>
             </span>,
             document.body,

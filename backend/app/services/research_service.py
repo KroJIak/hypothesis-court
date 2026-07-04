@@ -620,6 +620,7 @@ class ResearchService:
                 run=run,
                 research_brief=research_brief,
                 chunks=chunks,
+                files=files,
                 retrieval_limit=pipeline_settings.retrieval_limit,
             )
             self._check_cancelled(run)
@@ -699,19 +700,21 @@ class ResearchService:
                 if existing_chunks:
                     chunks.extend(existing_chunks)
                     if session_file.processing_status != DocumentProcessingStatus.PROCESSED:
-                        session_file.processing_status = DocumentProcessingStatus.PROCESSED
-                        session_file.processing_error = None
+                        self._set_file_processing_status(session_file, DocumentProcessingStatus.PROCESSED)
                     continue
 
-                session_file.processing_status = DocumentProcessingStatus.PROCESSING
+                self._set_file_processing_status(session_file, DocumentProcessingStatus.PARSING)
                 extracted = self._text_extractor.extract(
                     path=self._settings.uploads_dir / session_file.object_key,
                     kind=session_file.kind,
                     content_type=session_file.content_type,
                 )
                 if extracted is None or not extracted.text.strip():
-                    session_file.processing_status = DocumentProcessingStatus.UNSUPPORTED
-                    session_file.processing_error = "Для этого формата пока нет текстового парсера."
+                    self._set_file_processing_status(
+                        session_file,
+                        DocumentProcessingStatus.UNSUPPORTED,
+                        error="Для этого формата пока нет текстового парсера.",
+                    )
                     continue
 
                 for position, content in enumerate(self._split_text(extracted.text)):
@@ -729,12 +732,17 @@ class ResearchService:
                         ),
                     )
                     chunks.append(chunk)
-                session_file.processing_status = DocumentProcessingStatus.PROCESSED
-                session_file.processing_error = None
-                session_file.text_extracted_at = datetime.now(UTC)
+                self._set_file_processing_status(
+                    session_file,
+                    DocumentProcessingStatus.CHUNKED,
+                    text_extracted_at=datetime.now(UTC),
+                )
             except (OSError, UnicodeDecodeError, ValidationError) as exc:
-                session_file.processing_status = DocumentProcessingStatus.FAILED
-                session_file.processing_error = str(exc)[:500]
+                self._set_file_processing_status(
+                    session_file,
+                    DocumentProcessingStatus.FAILED,
+                    error=str(exc)[:500],
+                )
         return chunks
 
     @staticmethod
@@ -761,13 +769,25 @@ class ResearchService:
         research_brief: str,
         chunks: list[DocumentChunk],
         retrieval_limit: int,
+        files: list[SessionFile] | None = None,
     ) -> tuple[list[EvidenceDraft], list[DocumentChunk]]:
         orchestrator = self._require_llm_orchestrator()
         if not chunks:
             return orchestrator.extract_evidence(research_brief=research_brief, fragments=[], limit=8), []
         retrieval_service = self._require_retrieval_service()
-        retrieval_service.ensure_chunk_embeddings(chunks)
+        files_with_chunks = self._files_for_chunks(files=files or [], chunks=chunks)
+        self._set_files_processing_status(files_with_chunks, DocumentProcessingStatus.INDEXED)
+        try:
+            retrieval_service.ensure_chunk_embeddings(chunks)
+        except Exception as exc:
+            self._set_files_processing_status(
+                files_with_chunks,
+                DocumentProcessingStatus.FAILED,
+                error=f"Ошибка индексации файла: {str(exc)[:450]}",
+            )
+            raise
         self._session.flush()
+        self._set_files_processing_status(files_with_chunks, DocumentProcessingStatus.PROCESSED)
         query_vector = retrieval_service.embed_query(research_brief)
         if len(query_vector) == 3072 and any(chunk.embedding_vector is not None for chunk in chunks):
             retrieval_results = [
@@ -793,6 +813,39 @@ class ResearchService:
             limit=12,
         )
         return drafts, source_chunks
+
+    def _set_file_processing_status(
+        self,
+        session_file: SessionFile,
+        status: DocumentProcessingStatus,
+        *,
+        error: str | None = None,
+        text_extracted_at: datetime | None = None,
+    ) -> None:
+        session_file.processing_status = status
+        session_file.processing_error = error
+        if text_extracted_at is not None:
+            session_file.text_extracted_at = text_extracted_at
+        self._session.commit()
+
+    def _set_files_processing_status(
+        self,
+        files: list[SessionFile],
+        status: DocumentProcessingStatus,
+        *,
+        error: str | None = None,
+    ) -> None:
+        if not files:
+            return
+        for session_file in files:
+            session_file.processing_status = status
+            session_file.processing_error = error
+        self._session.commit()
+
+    @staticmethod
+    def _files_for_chunks(*, files: list[SessionFile], chunks: list[DocumentChunk]) -> list[SessionFile]:
+        file_ids_with_chunks = {chunk.session_file_id for chunk in chunks}
+        return [session_file for session_file in files if session_file.id in file_ids_with_chunks]
 
     def _persist_evidence(
         self,
