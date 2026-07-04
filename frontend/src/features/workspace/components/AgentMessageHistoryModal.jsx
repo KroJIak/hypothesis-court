@@ -10,29 +10,53 @@ const DEBATE_ROLE_ORDER = ["defender", "attacker", "manufacturer"];
 const DEBATE_CYCLE_COUNT = 3;
 const SOURCE_TOOLTIP_GAP = 10;
 const SOURCE_TOOLTIP_EDGE_OFFSET = 14;
+const SOURCE_QUOTE_FALLBACK = "фрагмент связан с доказательством в графе";
 
 function getAgentDisplayName(agent) {
   return agent?.name || "Агент";
+}
+
+function createSourceQuote(excerpt) {
+  const words = excerpt.split(/\s+/u).filter(Boolean);
+
+  if (words.length < 8) {
+    return {
+      quote: SOURCE_QUOTE_FALLBACK,
+      contextBefore: "Цитата:",
+      contextAfter: excerpt,
+    };
+  }
+
+  return {
+    quote: words.slice(2, Math.min(words.length, 10)).join(" "),
+    contextBefore: words.slice(0, 2).join(" "),
+    contextAfter: words.slice(10, 18).join(" "),
+  };
 }
 
 function getPrimarySource(session, salt = 0) {
   const attachments = session.attachments ?? [];
 
   if (attachments.length === 0) {
+    const excerpt = "Фрагмент появится здесь после подключения источников к графу знаний.";
+
     return {
       nodeId: "source-fallback-1",
       title: "Материалы дела",
-      excerpt: "Фрагмент появится здесь после подключения источников к графу знаний.",
+      excerpt,
+      ...createSourceQuote(excerpt),
     };
   }
 
   const attachment = attachments[salt % attachments.length];
+  const excerpt = attachment.summary ?? "Выдержка из файла будет подставляться из API вместе с привязкой к графу.";
 
   return {
     attachmentId: attachment.id,
     nodeId: `source-${attachment.id}`,
     title: attachment.fileName ?? attachment.name ?? "Файл",
-    excerpt: attachment.summary ?? "Выдержка из файла будет подставляться из API вместе с привязкой к графу.",
+    excerpt,
+    ...createSourceQuote(excerpt),
   };
 }
 
@@ -336,7 +360,11 @@ export function AgentMessageHistoryModal({
           ? createPortal(
               <div className="agent-history-source-tooltip" style={sourceTooltip.style}>
                 <strong>{sourceTooltip.source.title}</strong>
-                <span>{sourceTooltip.source.excerpt}</span>
+                <p className="agent-history-source-tooltip__quote">
+                  {sourceTooltip.source.contextBefore ? <span>{sourceTooltip.source.contextBefore} </span> : null}
+                  <b>{sourceTooltip.source.quote}</b>
+                  {sourceTooltip.source.contextAfter ? <span> {sourceTooltip.source.contextAfter}</span> : null}
+                </p>
               </div>,
               document.body,
             )

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { BrainCircuit } from "lucide-react";
+import { BrainCircuit, Network } from "lucide-react";
 
 import { ProcessingStatusBadge } from "./ProcessingStatusBadge";
 import { clampNumber } from "../utils/format";
@@ -10,6 +10,8 @@ const HYPOTHESIS_PREVIEW_HEIGHT = 126;
 const HYPOTHESIS_VISIBLE_COUNT = 3;
 const HYPOTHESIS_FALLBACK_CARD_WIDTH = 220;
 const HYPOTHESIS_SKELETON_COUNT = 3;
+const SYSTEM_AGENT_TOOLTIP_EDGE_OFFSET = 12;
+const SYSTEM_AGENT_TOOLTIP_GAP = 6;
 
 export function HypothesisCandidates({
   hypotheses,
@@ -22,9 +24,12 @@ export function HypothesisCandidates({
     : visibleHypotheses;
   const hypothesisCount = displayedHypotheses.length;
   const sectionRef = useRef(null);
+  const systemAgentRef = useRef(null);
   const cardRefs = useRef(new Map());
   const hidePreviewTimeoutRef = useRef(null);
   const [activeHypothesisId, setActiveHypothesisId] = useState(null);
+  const [isSystemAgentNameVisible, setIsSystemAgentNameVisible] = useState(false);
+  const [systemAgentTooltipStyle, setSystemAgentTooltipStyle] = useState({ left: "0px", top: "0px" });
   const [cardWidth, setCardWidth] = useState(HYPOTHESIS_FALLBACK_CARD_WIDTH);
   const [previewStyle, setPreviewStyle] = useState({ left: "0px", top: "0px", width: "0px" });
   const activeHypothesis = visibleHypotheses.find((hypothesis) => hypothesis.id === activeHypothesisId) ?? null;
@@ -94,6 +99,36 @@ export function HypothesisCandidates({
     window.clearTimeout(hidePreviewTimeoutRef.current);
   }, []);
 
+  const updateSystemAgentTooltip = useCallback(() => {
+    const agentElement = systemAgentRef.current;
+
+    if (!agentElement) {
+      return;
+    }
+
+    const agentRect = agentElement.getBoundingClientRect();
+    const tooltipLeft = clampNumber(
+      agentRect.left + agentRect.width / 2,
+      SYSTEM_AGENT_TOOLTIP_EDGE_OFFSET,
+      window.innerWidth - SYSTEM_AGENT_TOOLTIP_EDGE_OFFSET,
+    );
+    const tooltipTop = Math.max(agentRect.top - SYSTEM_AGENT_TOOLTIP_GAP, SYSTEM_AGENT_TOOLTIP_EDGE_OFFSET);
+
+    setSystemAgentTooltipStyle({
+      left: `${tooltipLeft}px`,
+      top: `${tooltipTop}px`,
+    });
+  }, []);
+
+  const showSystemAgentName = useCallback(() => {
+    setIsSystemAgentNameVisible(true);
+    window.requestAnimationFrame(updateSystemAgentTooltip);
+  }, [updateSystemAgentTooltip]);
+
+  const hideSystemAgentName = useCallback(() => {
+    setIsSystemAgentNameVisible(false);
+  }, []);
+
   useEffect(() => {
     const sectionElement = sectionRef.current;
 
@@ -135,6 +170,20 @@ export function HypothesisCandidates({
     };
   }, [activeHypothesisId, hidePreview]);
 
+  useEffect(() => {
+    if (!isSystemAgentNameVisible) {
+      return undefined;
+    }
+
+    window.addEventListener("scroll", hideSystemAgentName, true);
+    window.addEventListener("resize", hideSystemAgentName);
+
+    return () => {
+      window.removeEventListener("scroll", hideSystemAgentName, true);
+      window.removeEventListener("resize", hideSystemAgentName);
+    };
+  }, [hideSystemAgentName, isSystemAgentNameVisible]);
+
   return (
     <section
       ref={sectionRef}
@@ -143,17 +192,28 @@ export function HypothesisCandidates({
       aria-label="Сформулированные гипотезы"
     >
       <div className="hypothesis-candidates__content">
-        <button
-          type="button"
+        <div
+          ref={systemAgentRef}
           className="hypothesis-candidates__agent"
-          aria-label="Открыть граф доказательств"
-          onClick={() => onOpenKnowledgeGraph?.({ source: "system-agent" })}
+          aria-label="Системный агент"
+          onMouseEnter={showSystemAgentName}
+          onMouseLeave={hideSystemAgentName}
+          onFocus={showSystemAgentName}
+          onBlur={hideSystemAgentName}
+          tabIndex={0}
         >
-          <span className="hypothesis-candidates__agent-name">Картограф</span>
           <span className="hypothesis-candidates__agent-icon">
             <BrainCircuit aria-hidden="true" strokeWidth={1.75} />
           </span>
-          <span className="hypothesis-candidates__agent-caption">Граф</span>
+        </div>
+        <button
+          type="button"
+          className="hypothesis-candidates__graph-trigger"
+          aria-label="Открыть граф доказательств"
+          onClick={() => onOpenKnowledgeGraph?.({ source: "graph-trigger" })}
+        >
+          <Network aria-hidden="true" strokeWidth={1.8} />
+          <span>Граф</span>
         </button>
 
         {hypothesisCount > 0 ? (
@@ -188,6 +248,14 @@ export function HypothesisCandidates({
           </div>
         ) : null}
       </div>
+      {isSystemAgentNameVisible && typeof document !== "undefined"
+        ? createPortal(
+            <span className="scene-agent__name" style={systemAgentTooltipStyle}>
+              Системный агент
+            </span>,
+            document.body,
+          )
+        : null}
       {activeHypothesis && typeof document !== "undefined"
         ? createPortal(
             <article
