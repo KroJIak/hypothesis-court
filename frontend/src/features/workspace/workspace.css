@@ -2247,12 +2247,12 @@
   padding-bottom: 3px;
 }
 
-.palette-list__item--pending {
+.palette-list__item--editable {
   cursor: pointer;
 }
 
-.palette-list__item--pending:hover .agent-avatar__plate,
-.palette-list__item--pending:focus-visible .agent-avatar__plate {
+.palette-list__item--editable:hover .agent-avatar__plate,
+.palette-list__item--editable:focus-visible .agent-avatar__plate {
   background: #333333;
 }
 

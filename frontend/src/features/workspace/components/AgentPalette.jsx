@@ -142,7 +142,7 @@ export function AgentPalette({
   }, [activePendingAgent, requestCloseSetupPopover]);
 
   function handlePendingAgentClick(agent) {
-    if (isAgentEditingLocked || (!agent.isPendingSetup && agent.isEmpty)) {
+    if (!agent.isPendingSetup && agent.isEmpty) {
       return;
     }
 
@@ -185,7 +185,7 @@ export function AgentPalette({
           onAddAgent();
         }}
         aria-label={palette.addAgentLabel}
-        title={isAgentEditingLocked ? lockedReason : palette.addAgentLabel}
+        title={palette.addAgentLabel}
       >
         <Plus aria-hidden="true" strokeWidth={2.1} />
       </button>
@@ -195,30 +195,35 @@ export function AgentPalette({
       ) : null}
 
       <div className="palette-list">
-        {sortedAgents.map((agent) => (
-          <div
-            key={agent.id}
-            ref={(node) => setItemRef(agent.id, node)}
-            className={
-              agent.isPendingSetup
-                ? "palette-list__item palette-list__item--pending"
-                : agent.isEmpty
-                  ? "palette-list__item"
-                : "palette-list__item palette-list__item--draggable"
-            }
-            style={{ viewTransitionName: getAgentViewTransitionName(agent.id) }}
-            role={(agent.isPendingSetup || !agent.isEmpty) && !isAgentEditingLocked ? "button" : undefined}
-            tabIndex={(agent.isPendingSetup || !agent.isEmpty) && !isAgentEditingLocked ? 0 : undefined}
-            draggable={!isAgentEditingLocked && !agent.isEmpty && !agent.isPendingSetup}
-            onClick={() => handlePendingAgentClick(agent)}
-            onKeyDown={(event) => handlePendingAgentKeyDown(event, agent)}
-            onDragStart={(event) => onAgentDragStart(event, "palette", agent.id)}
-            onDragEnd={onAgentDragEnd}
-          >
-            <AgentAvatar variant={agent.variant} size="regular" />
-            <span className="palette-list__label">{agent.name}</span>
-          </div>
-        ))}
+        {sortedAgents.map((agent) => {
+          const isEditableAgent = agent.isPendingSetup || !agent.isEmpty;
+          const isDraggableAgent = !isAgentEditingLocked && !agent.isEmpty && !agent.isPendingSetup;
+          const className = [
+            "palette-list__item",
+            isEditableAgent ? "palette-list__item--editable" : "",
+            agent.isPendingSetup ? "palette-list__item--pending" : "",
+            isDraggableAgent ? "palette-list__item--draggable" : "",
+          ].filter(Boolean).join(" ");
+
+          return (
+            <div
+              key={agent.id}
+              ref={(node) => setItemRef(agent.id, node)}
+              className={className}
+              style={{ viewTransitionName: getAgentViewTransitionName(agent.id) }}
+              role={isEditableAgent ? "button" : undefined}
+              tabIndex={isEditableAgent ? 0 : undefined}
+              draggable={isDraggableAgent}
+              onClick={() => handlePendingAgentClick(agent)}
+              onKeyDown={(event) => handlePendingAgentKeyDown(event, agent)}
+              onDragStart={(event) => onAgentDragStart(event, "palette", agent.id)}
+              onDragEnd={onAgentDragEnd}
+            >
+              <AgentAvatar variant={agent.variant} size="regular" />
+              <span className="palette-list__label">{agent.name}</span>
+            </div>
+          );
+        })}
       </div>
       {activePendingAgent && typeof document !== "undefined"
         ? createPortal(
