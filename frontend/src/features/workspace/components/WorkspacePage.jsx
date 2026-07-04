@@ -39,7 +39,6 @@ import {
   formatComposerRequest,
   getInitialAvailableAgents,
   insertEvaluationAgentAtEdge,
-  reorderAvailableAgents,
   sortAvailableAgents,
 } from "../model/workspaceSessionModel";
 import { readAgentDragPayload } from "../utils/dragPayload";
@@ -787,23 +786,6 @@ export function WorkspacePage({
     });
   }
 
-  function handleReorderPaletteAgent(agentId, targetAgentId, placement) {
-    if (isAgentEditingLocked) {
-      return;
-    }
-
-    runLayoutTransition(() => {
-      updateSelectedSession((session) => {
-        const availableAgents = session.availableAgents ?? getInitialAvailableAgents(session, data.palette.agents);
-
-        return {
-          ...session,
-          availableAgents: reorderAvailableAgents(availableAgents, agentId, targetAgentId, placement),
-        };
-      });
-    });
-  }
-
   function handleSend({ context, text }) {
     const nextText = text.trim();
     const composerRequests = selectedSession.composerRequests ?? [];
@@ -994,7 +976,6 @@ export function WorkspacePage({
         onAgentDragStart={handleAgentDragStart}
         onAgentDragEnd={handleAgentDragEnd}
         onDropAgentToPalette={handleDropAgentToPalette}
-        onReorderPaletteAgent={handleReorderPaletteAgent}
         isDropTargetVisible={dragSource === "evaluation"}
         isAddAgentDisabled={isAgentEditingLocked}
         isAgentEditingLocked={isAgentEditingLocked}

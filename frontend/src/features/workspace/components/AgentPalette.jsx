@@ -19,7 +19,6 @@ export function AgentPalette({
   onAgentDragStart,
   onAgentDragEnd,
   onDropAgentToPalette,
-  onReorderPaletteAgent,
   isDropTargetVisible,
   isAddAgentDisabled,
   isAgentEditingLocked,
@@ -118,31 +117,6 @@ export function AgentPalette({
     event.dataTransfer.dropEffect = "move";
   }
 
-  function handlePaletteItemDragOver(event, agent) {
-    if (isAgentEditingLocked || agent.isEmpty) {
-      return;
-    }
-
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "move";
-  }
-
-  function handlePaletteItemDrop(event, targetAgent) {
-    const payload = readAgentDragPayload(event);
-
-    if (isAgentEditingLocked || payload?.source !== "palette" || targetAgent.isEmpty) {
-      return;
-    }
-
-    event.preventDefault();
-    event.stopPropagation();
-
-    const itemRect = event.currentTarget.getBoundingClientRect();
-    const placement = event.clientX > itemRect.left + itemRect.width / 2 ? "after" : "before";
-
-    onReorderPaletteAgent(payload.agentId, targetAgent.id, placement);
-  }
-
   return (
     <aside
       className={`agent-palette${isDropTargetVisible ? " agent-palette--drop-ready" : ""}`}
@@ -190,8 +164,6 @@ export function AgentPalette({
             onKeyDown={(event) => handlePendingAgentKeyDown(event, agent)}
             onDragStart={(event) => onAgentDragStart(event, "palette", agent.id)}
             onDragEnd={onAgentDragEnd}
-            onDragOver={(event) => handlePaletteItemDragOver(event, agent)}
-            onDrop={(event) => handlePaletteItemDrop(event, agent)}
           >
             <AgentAvatar variant={agent.variant} size="regular" />
             <span className="palette-list__label">{agent.name}</span>
