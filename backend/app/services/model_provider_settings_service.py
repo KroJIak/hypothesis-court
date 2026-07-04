@@ -184,11 +184,29 @@ class ModelProviderSettingsService:
     def get_model_client(self, settings: Settings) -> tuple[OpenAICompatibleClient, str]:
         provider_settings = self.get_model_settings(settings)
         if provider_settings is None:
-            raise ValidationError("LLM model provider is not configured.")
+            raise ValidationError("LLM-провайдер не настроен")
         api_token = provider_settings.api_token or settings.model_provider_api_key
         model = self._normalize_model(provider_settings.model)
         if not provider_settings.base_url or api_token is None or model is None:
-            raise ValidationError("LLM model provider is not configured.")
+            raise ValidationError("LLM-провайдер не настроен")
+        return (
+            self._create_provider_client(
+                provider_type=provider_settings.provider_type,
+                base_url=provider_settings.base_url,
+                api_token=api_token,
+                project_id=provider_settings.project_id,
+            ),
+            model,
+        )
+
+    def get_embedding_client(self, settings: Settings) -> tuple[OpenAICompatibleClient, str]:
+        provider_settings = self.get_embedding_settings(settings)
+        if provider_settings is None:
+            raise ValidationError("Embedding-провайдер не настроен")
+        api_token = provider_settings.api_token or settings.embedding_api_key
+        model = self._normalize_model(provider_settings.model)
+        if not provider_settings.base_url or api_token is None or model is None:
+            raise ValidationError("Embedding-провайдер не настроен")
         return (
             self._create_provider_client(
                 provider_type=provider_settings.provider_type,
@@ -217,13 +235,13 @@ class ModelProviderSettingsService:
     @staticmethod
     def _validate_provider(provider: str) -> None:
         if provider not in {OPENAI_PROVIDER, EMBEDDING_PROVIDER}:
-            raise ValidationError("Unknown model provider.")
+            raise ValidationError("Неизвестный провайдер модели")
 
     @staticmethod
     def _normalize_provider_type(provider_type: str) -> str:
         normalized = provider_type.strip()
         if normalized not in {OPENAI_PROVIDER_TYPE, YANDEX_AI_STUDIO_PROVIDER_TYPE}:
-            raise ValidationError("Unknown provider type.")
+            raise ValidationError("Неизвестный тип провайдера")
         return normalized
 
     @staticmethod
@@ -235,7 +253,7 @@ class ModelProviderSettingsService:
         normalized = base_url.strip().rstrip("/")
         parsed = urlparse(normalized)
         if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-            raise ValidationError("Base URL must be a valid http or https URL.")
+            raise ValidationError("Base URL должен быть корректным http или https адресом")
         return normalized
 
     @staticmethod
@@ -254,12 +272,12 @@ class ModelProviderSettingsService:
         if provider_type != YANDEX_AI_STUDIO_PROVIDER_TYPE:
             return None
         if project_id is None:
-            raise ValidationError("Folder ID is required for Yandex AI Studio.")
+            raise ValidationError("Folder ID обязателен для Yandex AI Studio")
         normalized = project_id.strip()
         if not normalized:
-            raise ValidationError("Folder ID is required for Yandex AI Studio.")
+            raise ValidationError("Folder ID обязателен для Yandex AI Studio")
         if len(normalized) > 255:
-            raise ValidationError("Folder ID must contain at most 255 characters.")
+            raise ValidationError("Folder ID должен быть не длиннее 255 символов")
         return normalized
 
     @staticmethod

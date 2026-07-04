@@ -8,6 +8,7 @@ class ChatSessionResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
+    active_research_run_id: uuid.UUID | None
     title: str
     is_started: bool
     is_pinned: bool

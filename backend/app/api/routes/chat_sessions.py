@@ -220,6 +220,28 @@ async def upload_session_file(
     return SessionFileResponse.model_validate(session_file)
 
 
+@router.delete("/{chat_session_id}/files/{session_file_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_session_file(
+    chat_session_id: uuid.UUID,
+    session_file_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    service = _get_session_file_service(session)
+    storage = SessionFileStorage(uploads_dir=settings.uploads_dir)
+    try:
+        service.delete_file(
+            user=current_user,
+            chat_session_id=chat_session_id,
+            session_file_id=session_file_id,
+            storage=storage,
+        )
+    except ServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.get("/{chat_session_id}/agents", response_model=ChatSessionAgentsListResponse)
 def list_chat_session_agents(
     chat_session_id: uuid.UUID,

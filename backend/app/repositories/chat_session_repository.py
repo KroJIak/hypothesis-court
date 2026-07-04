@@ -1,9 +1,13 @@
 import uuid
 
-from sqlalchemy import Select, func, select
+from sqlalchemy import Select, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.chat_session import ChatSession
+from app.models.evidence_item import EvidenceItem
+from app.models.hypothesis_candidate import HypothesisCandidate
+from app.models.research_input_item import ResearchInputItem
+from app.models.research_run import ResearchRun
 
 
 class ChatSessionRepository:
@@ -52,7 +56,28 @@ class ChatSessionRepository:
         )
 
         if search:
-            stmt = stmt.where(ChatSession.title.ilike(f"%{search}%"))
+            pattern = f"%{search}%"
+            content_chat_ids = (
+                select(ResearchRun.chat_session_id)
+                .outerjoin(ResearchInputItem, ResearchInputItem.run_id == ResearchRun.id)
+                .outerjoin(HypothesisCandidate, HypothesisCandidate.run_id == ResearchRun.id)
+                .outerjoin(EvidenceItem, EvidenceItem.run_id == ResearchRun.id)
+                .where(
+                    ResearchRun.user_id == user_id,
+                    or_(
+                        ResearchRun.title.ilike(pattern),
+                        ResearchInputItem.text.ilike(pattern),
+                        HypothesisCandidate.statement.ilike(pattern),
+                        EvidenceItem.summary.ilike(pattern),
+                    ),
+                )
+            )
+            stmt = stmt.where(
+                or_(
+                    ChatSession.title.ilike(pattern),
+                    ChatSession.id.in_(content_chat_ids),
+                )
+            )
 
         count_stmt = select(func.count()).select_from(stmt.subquery())
         total = session.execute(count_stmt).scalar_one()

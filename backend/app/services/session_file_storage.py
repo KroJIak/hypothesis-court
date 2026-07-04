@@ -35,16 +35,17 @@ class SessionFileStorage:
 
         return object_key, size_bytes
 
-    def delete(self, object_key: str | None) -> None:
+    def delete(self, object_key: str | None) -> bool:
         if not object_key:
-            return
+            return True
 
         path = self._uploads_dir / object_key
         try:
             if path.is_file():
                 path.unlink()
+            return True
         except OSError:
-            return
+            return False
 
     @staticmethod
     def normalize_filename(filename: str | None) -> str:
