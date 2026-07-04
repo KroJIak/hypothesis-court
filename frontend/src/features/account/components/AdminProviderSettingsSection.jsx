@@ -68,7 +68,7 @@ export function AdminProviderSettingsSection({
           return;
         }
 
-        setErrorMessage(error instanceof Error ? error.message : "Не удалось загрузить настройки провайдера.");
+        setErrorMessage(error instanceof Error ? error.message : "Не удалось загрузить настройки провайдера");
       })
       .finally(() => {
         if (isActive) {
@@ -120,9 +120,8 @@ export function AdminProviderSettingsSection({
       setModel(settings.model ?? "");
       setApiToken(settings.api_token ?? nextApiToken ?? "");
       setHasApiToken(Boolean(settings.has_api_token));
-      setSuccessMessage("Сохранено.");
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Не удалось сохранить настройки провайдера.");
+      setErrorMessage(error instanceof Error ? error.message : "Не удалось сохранить настройки провайдера");
     } finally {
       setIsSaving(false);
     }
@@ -148,12 +147,12 @@ export function AdminProviderSettingsSection({
         : await refreshModels();
 
       if (nextModels.length === 0) {
-        throw new Error("Провайдер не вернул список моделей.");
+        throw new Error("Провайдер не вернул список моделей");
       }
       setAvailableModels(mergeModelOptions(nextModels, [nextModel]));
-      setSuccessMessage("Подключение работает.");
+      setSuccessMessage("Подключение работает");
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Не удалось проверить подключение.");
+      setErrorMessage(error instanceof Error ? error.message : "Не удалось проверить подключение");
     } finally {
       setIsTesting(false);
     }
@@ -229,31 +228,21 @@ export function AdminProviderSettingsSection({
         ) : null}
 
         <label className="account-admin-field">
-          <span>Модель</span>
-          <select
-            value={model ?? ""}
-            disabled={isLoading}
-            onFocus={handleModelSelectFocus}
-            onChange={(event) => setModel(event.target.value)}
-          >
-            <option value="">
-              {modelOptions.length === 0 ? "Сначала проверьте подключение" : "Не выбрана"}
-            </option>
-            {modelOptions.map((modelOption) => (
-              <option key={modelOption} value={modelOption}>
-                {modelOption}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="account-admin-field">
           <span>{isYandexProvider ? "API ключ" : "API токен"}</span>
           <span className="account-admin-password-input">
             <input
-              type={isApiTokenVisible ? "text" : "password"}
+              type="text"
+              name={`${provider}-api-token`}
+              className={isApiTokenVisible ? "" : "account-admin-token-input--masked"}
               value={apiToken ?? ""}
               placeholder={hasApiToken ? "Ключ уже сохранён" : "Введите ключ"}
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck="false"
+              data-1p-ignore="true"
+              data-bwignore="true"
+              data-lpignore="true"
               disabled={isLoading}
               onChange={(event) => setApiToken(event.target.value)}
             />
@@ -266,6 +255,23 @@ export function AdminProviderSettingsSection({
               {isApiTokenVisible ? <EyeOff strokeWidth={1.9} /> : <Eye strokeWidth={1.9} />}
             </button>
           </span>
+        </label>
+
+        <label className="account-admin-field">
+          <span>Модель</span>
+          <select
+            value={model ?? ""}
+            disabled={isLoading}
+            onFocus={handleModelSelectFocus}
+            onChange={(event) => setModel(event.target.value)}
+          >
+            <option value="">Не выбрана</option>
+            {modelOptions.map((modelOption) => (
+              <option key={modelOption} value={modelOption}>
+                {modelOption}
+              </option>
+            ))}
+          </select>
         </label>
 
         <div className="account-admin-actions">

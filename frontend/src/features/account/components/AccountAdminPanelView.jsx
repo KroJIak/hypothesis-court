@@ -15,7 +15,7 @@ export function AccountAdminPanelView({ accessToken, currentUser, onClose }) {
         <AdminProviderSettingsSection
           accessToken={accessToken}
           provider="openai"
-          title="Провайдер модели"
+          title="LLM модель"
           providerLabel="OpenAI-compatible"
         />
         <AdminProviderSettingsSection
