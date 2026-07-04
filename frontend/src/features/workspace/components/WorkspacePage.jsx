@@ -22,6 +22,7 @@ import {
 import {
   AGENT_DRAG_MIME_TYPE,
   EVALUATION_SIDE_RIGHT,
+  PENDING_AGENT_NAME,
 } from "../constants";
 import { useWorkspaceScene } from "../hooks/useWorkspaceScene";
 import { resetScenePlayback } from "../hooks/useScenePlayback";
@@ -65,6 +66,7 @@ export function WorkspacePage({
   const [isCreatingChat, setIsCreatingChat] = useState(false);
   const [isUploadingSessionFile, setIsUploadingSessionFile] = useState(false);
   const [removedAttachmentIdsBySession, setRemovedAttachmentIdsBySession] = useState({});
+  const [activePendingAgentId, setActivePendingAgentId] = useState(null);
   const sceneScrollRef = useRef(null);
   const deferredChatSearchQuery = useDeferredValue(chatSearchQuery);
   const selectedSession = sessions.find((session) => session.id === selectedChatId) ?? sessions[0] ?? null;
@@ -184,6 +186,10 @@ export function WorkspacePage({
       document.title = "Hypothesis Court";
     };
   }, [selectedSession?.title]);
+
+  useEffect(() => {
+    setActivePendingAgentId(null);
+  }, [selectedSession?.id, isAgentEditingLocked]);
 
   if (status === "loading") {
     return <WorkspaceSkeleton />;
@@ -383,6 +389,103 @@ export function WorkspacePage({
         availableAgents: sortAvailableAgents([...availableAgents, createPendingAgent()]),
       };
     });
+  }
+
+  function handleOpenPendingAgentSetup(agentId) {
+    if (isAgentEditingLocked) {
+      return;
+    }
+
+    setActivePendingAgentId(agentId);
+  }
+
+  function handleClosePendingAgentSetup() {
+    setActivePendingAgentId(null);
+  }
+
+  function handleChangePendingAgentSetup(agentId, changes) {
+    if (isAgentEditingLocked) {
+      return;
+    }
+
+    updateSelectedSession((session) => ({
+      ...session,
+      availableAgents: (session.availableAgents ?? getInitialAvailableAgents(session, data.palette.agents)).map((agent) =>
+        agent.id === agentId && agent.isPendingSetup
+          ? {
+              ...agent,
+              ...changes,
+            }
+          : agent,
+      ),
+    }));
+  }
+
+  function handleGeneratePendingAgentPrompt(agentId) {
+    if (isAgentEditingLocked) {
+      return;
+    }
+
+    const availableAgents = selectedSession.availableAgents ?? getInitialAvailableAgents(selectedSession, data.palette.agents);
+    const pendingAgent = availableAgents.find((agent) => agent.id === agentId);
+
+    if (!pendingAgent?.isPendingSetup) {
+      return;
+    }
+
+    const nextName = pendingAgent.name?.trim() && pendingAgent.name !== PENDING_AGENT_NAME
+      ? pendingAgent.name.trim()
+      : "Новый эксперт";
+    const prompt = [
+      `Ты агент "${nextName}" в проверке гипотез.`,
+      "Сфокусируйся на своей зоне ответственности, формулируй выводы коротко и проверяемо.",
+      "Отмечай риски, недостающие данные и условия, при которых гипотеза становится сильнее или слабее.",
+      "Не повторяй выводы других агентов без добавления новой оценки.",
+    ].join("\n\n");
+
+    handleChangePendingAgentSetup(agentId, {
+      name: nextName,
+      variant: pendingAgent.variant === "empty" ? "risk" : pendingAgent.variant,
+      systemPrompt: prompt,
+    });
+  }
+
+  function handleSavePendingAgentSetup(agentId) {
+    if (isAgentEditingLocked) {
+      return;
+    }
+
+    updateSelectedSession((session) => {
+      const availableAgents = session.availableAgents ?? getInitialAvailableAgents(session, data.palette.agents);
+
+      return {
+        ...session,
+        availableAgents: sortAvailableAgents(
+          availableAgents.map((agent) => {
+            if (agent.id !== agentId || !agent.isPendingSetup) {
+              return agent;
+            }
+
+            const nextName = agent.name?.trim() || "Новый эксперт";
+            const nextSystemPrompt = agent.systemPrompt?.trim() ?? "";
+
+            if (!nextSystemPrompt) {
+              return agent;
+            }
+
+            return {
+              ...agent,
+              name: nextName,
+              variant: agent.variant === "empty" ? "risk" : agent.variant,
+              systemPrompt: nextSystemPrompt,
+              isEmpty: false,
+              isPendingSetup: false,
+            };
+          }),
+        ),
+      };
+    });
+    setActivePendingAgentId(null);
   }
 
   function handleAgentDragStart(event, source, agentId) {
@@ -661,6 +764,12 @@ export function WorkspacePage({
         isAddAgentDisabled={isAgentEditingLocked || hasPendingAgent(selectedSession)}
         isAgentEditingLocked={isAgentEditingLocked}
         lockedReason="Агентов можно менять только до старта процесса."
+        activePendingAgentId={activePendingAgentId}
+        onOpenPendingAgentSetup={handleOpenPendingAgentSetup}
+        onClosePendingAgentSetup={handleClosePendingAgentSetup}
+        onChangePendingAgentSetup={handleChangePendingAgentSetup}
+        onGeneratePendingAgentPrompt={handleGeneratePendingAgentPrompt}
+        onSavePendingAgentSetup={handleSavePendingAgentSetup}
         onAddAgent={handleAddAgent}
       />
     </main>

@@ -12,7 +12,19 @@ import {
   UserRound,
 } from "lucide-react";
 
-const accessoryByVariant = {
+export const agentAvatarVariantOptions = [
+  { value: "attacker", label: "Атакующий" },
+  { value: "defender", label: "Защитник" },
+  { value: "ecology", label: "Экология" },
+  { value: "finance", label: "Финансы" },
+  { value: "manufacturer", label: "Производство" },
+  { value: "patent", label: "Патенты" },
+  { value: "risk", label: "Риски" },
+  { value: "safety", label: "Безопасность" },
+  { value: "scaling", label: "Масштабирование" },
+];
+
+export const accessoryByVariant = {
   attacker: Swords,
   defender: Shield,
   ecology: Leaf,

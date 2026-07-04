@@ -1,0 +1,109 @@
+import { Check, Sparkles, X } from "lucide-react";
+
+import { AgentAvatar, agentAvatarVariantOptions } from "./AgentAvatar";
+
+export function AgentSetupPopover({
+  agent,
+  isIconPickerOpen,
+  onToggleIconPicker,
+  onChange,
+  onGeneratePrompt,
+  onSave,
+  onClose,
+  style,
+}) {
+  const agentName = agent.name ?? "";
+  const selectedVariant = agent.variant === "empty" ? "risk" : agent.variant;
+  const systemPrompt = agent.systemPrompt ?? "";
+  const canSave = agentName.trim().length > 0 && systemPrompt.trim().length > 0;
+
+  return (
+    <div className="agent-setup-popover" role="dialog" aria-label="Настройка нового агента" style={style}>
+      <div className="agent-setup-popover__header">
+        <span className="agent-setup-popover__title">Новый агент</span>
+        <button
+          type="button"
+          className="agent-setup-popover__close"
+          aria-label="Закрыть настройку агента"
+          onClick={onClose}
+        >
+          <X aria-hidden="true" strokeWidth={1.9} />
+        </button>
+      </div>
+
+      <div className="agent-setup-popover__identity">
+        <div className="agent-setup-popover__icon-wrap">
+          <button
+            type="button"
+            className="agent-setup-popover__icon-button"
+            aria-label="Выбрать иконку агента"
+            aria-expanded={isIconPickerOpen}
+            onClick={onToggleIconPicker}
+          >
+            <AgentAvatar variant={selectedVariant} size="regular" />
+          </button>
+          {isIconPickerOpen ? (
+            <div className="agent-setup-popover__icon-picker" aria-label="Иконки агента">
+              {agentAvatarVariantOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={
+                    option.value === selectedVariant
+                      ? "agent-setup-popover__icon-option agent-setup-popover__icon-option--active"
+                      : "agent-setup-popover__icon-option"
+                  }
+                  aria-label={option.label}
+                  title={option.label}
+                  onClick={() => {
+                    onChange(agent.id, { variant: option.value });
+                    onToggleIconPicker(false);
+                  }}
+                >
+                  <AgentAvatar variant={option.value} size="compact" />
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+
+        <label className="agent-setup-popover__name-field">
+          <span className="sr-only">Название агента</span>
+          <input
+            value={agentName}
+            onChange={(event) => onChange(agent.id, { name: event.target.value })}
+            placeholder="Название агента"
+          />
+        </label>
+      </div>
+
+      <button
+        type="button"
+        className="agent-setup-popover__generate"
+        onClick={() => onGeneratePrompt(agent.id)}
+      >
+        <Sparkles aria-hidden="true" strokeWidth={1.8} />
+        Сгенерировать
+      </button>
+
+      <label className="agent-setup-popover__prompt-field">
+        <span>Системный промт</span>
+        <textarea
+          value={systemPrompt}
+          onChange={(event) => onChange(agent.id, { systemPrompt: event.target.value })}
+          placeholder="Опишите роль, стиль рассуждений и критерии оценки агента."
+        />
+      </label>
+
+      <button
+        type="button"
+        className="agent-setup-popover__save"
+        disabled={!canSave}
+        onClick={() => onSave(agent.id)}
+      >
+        <Check aria-hidden="true" strokeWidth={1.9} />
+        Сохранить
+      </button>
+    </div>
+  );
+}
