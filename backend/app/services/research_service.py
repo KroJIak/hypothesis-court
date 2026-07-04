@@ -674,7 +674,8 @@ class ResearchService:
             run.status = ResearchRunStatus.COMPLETED
             run.completed_at = datetime.now(UTC)
             chat_session.is_started = True
-            chat_session.title = run.title
+            if trigger != ResearchRunTrigger.REGENERATE:
+                chat_session.title = run.title
             chat_session.active_research_run_id = run.id
             self._append_event(run=run, stage=ResearchRunStage.COMPLETED, progress_percent=100, message="Исследовательский запуск завершён.")
             self._session.commit()

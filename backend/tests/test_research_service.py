@@ -473,6 +473,7 @@ def test_create_run_persists_complete_research_artifacts(service_bundle, user, c
     assert response.verdict is not None
     assert chat_session.active_research_run_id == response.id
     assert chat_session.is_started is True
+    assert chat_session.title == "Проверка хвостов обогащения"
     assert session.commits == 2
     assert repository.runs[0].completed_at is not None
     assert repository.events[-1].stage.value == "completed"
@@ -549,6 +550,7 @@ def test_regenerate_run_creates_new_version_with_parent(service_bundle, user, ch
         input_requests=input_requests(),
         hypothesis_count=3,
     )
+    chat_session.title = "Название, выбранное пользователем"
 
     second = service.regenerate_run(
         user=user,
@@ -562,6 +564,7 @@ def test_regenerate_run_creates_new_version_with_parent(service_bundle, user, ch
     assert second.hypothesis_count == 5
     assert len(second.hypotheses) == 5
     assert chat_session.active_research_run_id == second.id
+    assert chat_session.title == "Название, выбранное пользователем"
 
 
 def test_edit_run_creates_new_version_from_updated_inputs(service_bundle, user, chat_session):
@@ -590,6 +593,7 @@ def test_edit_run_creates_new_version_from_updated_inputs(service_bundle, user, 
     assert edited.hypothesis_count == 4
     assert edited.inputs[0].text == "Снизить себестоимость на 8%"
     assert chat_session.active_research_run_id == edited.id
+    assert chat_session.title == "Новая ветка проверки"
 
 
 def test_graph_contains_inputs_evidence_hypotheses_and_verdict(service_bundle, user, chat_session):

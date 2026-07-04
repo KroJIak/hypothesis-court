@@ -44,8 +44,10 @@ import {
 } from "../api/researchRuns";
 import {
   AGENT_DRAG_MIME_TYPE,
-  EVALUATION_SIDE_RIGHT,
   DOCUMENT_PROCESSING_STATUS_PROCESSING,
+  DOCUMENT_PROCESSING_STATUS_UPLOADED,
+  EVALUATION_SIDE_RIGHT,
+  PROCESSING_STATUS_PROCESSED,
 } from "../constants";
 import { useWorkspaceScene } from "../hooks/useWorkspaceScene";
 import { resetScenePlayback } from "../hooks/useScenePlayback";
@@ -184,6 +186,17 @@ function markAttachmentsAsProcessing(attachments) {
   }));
 }
 
+function markAttachmentsAsUploaded(attachments) {
+  return (attachments ?? []).map((attachment) => ({
+    ...attachment,
+    rawProcessingStatus: DOCUMENT_PROCESSING_STATUS_UPLOADED,
+    processingStatus: PROCESSING_STATUS_PROCESSED,
+    processingBadgeStatus: PROCESSING_STATUS_PROCESSED,
+    processingStatusLabel: "Файл загружен",
+    processingError: null,
+  }));
+}
+
 function applyRunVersion(session, version, { isComplete = true } = {}) {
   return {
     ...session,
@@ -204,6 +217,16 @@ function applyRunVersion(session, version, { isComplete = true } = {}) {
     isVerdictComplete: isComplete,
     activeRunVersionId: version.id,
   };
+}
+
+function isReusableEmptyDraftSession(session) {
+  return !session.isStarted
+    && !session.activeResearchRunId
+    && (session.runVersions ?? []).length === 0
+    && (session.composerRequests ?? []).length === 0
+    && (session.launchedRequests ?? []).length === 0
+    && (session.attachments ?? []).length === 0
+    && (session.evaluation?.agents ?? []).length === 0;
 }
 
 function getRunVersionContext(session) {
@@ -673,7 +696,7 @@ export function WorkspacePage({
   }
 
   async function handleCreateChat() {
-    const unstartedSession = sessions.find((session) => !session.isStarted);
+    const unstartedSession = sessions.find(isReusableEmptyDraftSession);
     if (unstartedSession) {
       setChatSearchQuery("");
       setSelectedChatId(unstartedSession.id);
@@ -1349,6 +1372,7 @@ export function WorkspacePage({
       answer: "",
       isVerdictComplete: false,
       consultationMessages: [],
+      attachments: markAttachmentsAsUploaded(session.attachments),
     }));
 
     if (selectedSession.activeResearchRunId) {
