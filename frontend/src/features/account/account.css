@@ -401,17 +401,41 @@
 .account-admin-form,
 .account-admin-create-user {
   display: grid;
-  grid-template-columns:
-    minmax(150px, 0.85fr)
-    minmax(160px, 0.95fr)
-    minmax(280px, 1.65fr)
-    minmax(220px, 1.25fr);
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr) minmax(0, 1.55fr) minmax(0, 1.15fr);
   align-items: end;
   gap: 18px 16px;
 }
 
+.account-admin-form {
+  grid-template-areas:
+    "provider base-url token model"
+    "api-mode . . ."
+    "actions actions actions actions";
+}
+
+.account-admin-form--embedding {
+  grid-template-areas:
+    "provider base-url token model"
+    ". project-id . ."
+    "actions actions actions actions";
+}
+
+.account-admin-form--embedding.account-admin-form--openai {
+  grid-template-areas:
+    "provider base-url token model"
+    "actions actions actions actions";
+}
+
+.account-admin-form--llm.account-admin-form--yandex {
+  grid-template-areas:
+    "provider base-url token model"
+    "api-mode project-id . ."
+    "actions actions actions actions";
+}
+
 .account-admin-create-user {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 160px auto;
+  grid-template-areas: none;
 }
 
 .account-admin-field {
@@ -421,32 +445,29 @@
   font-size: 0.84rem;
 }
 
-.account-admin-provider-row {
-  display: contents;
-}
-
 .account-admin-field--provider-type {
+  grid-area: provider;
   min-width: 0;
 }
 
 .account-admin-field--api-mode {
-  grid-column: 1;
+  grid-area: api-mode;
 }
 
 .account-admin-field--base-url {
-  grid-column: 2;
+  grid-area: base-url;
 }
 
 .account-admin-field--project-id {
-  grid-column: 2;
+  grid-area: project-id;
 }
 
 .account-admin-field--token {
-  grid-column: 3;
+  grid-area: token;
 }
 
 .account-admin-field--model {
-  grid-column: 4;
+  grid-area: model;
 }
 
 .account-admin-field input,
@@ -600,7 +621,7 @@
 }
 
 .account-admin-actions {
-  grid-column: 1 / -1;
+  grid-area: actions;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -860,6 +881,50 @@
   .account-admin-form,
   .account-admin-create-user {
     grid-template-columns: 1fr;
+  }
+
+  .account-admin-form {
+    grid-template-areas:
+      "provider"
+      "base-url"
+      "api-mode"
+      "token"
+      "model"
+      "actions";
+  }
+
+  .account-admin-form--llm.account-admin-form--yandex {
+    grid-template-areas:
+      "provider"
+      "base-url"
+      "api-mode"
+      "project-id"
+      "token"
+      "model"
+      "actions";
+  }
+
+  .account-admin-form--embedding {
+    grid-template-areas:
+      "provider"
+      "base-url"
+      "project-id"
+      "token"
+      "model"
+      "actions";
+  }
+
+  .account-admin-form--embedding.account-admin-form--openai {
+    grid-template-areas:
+      "provider"
+      "base-url"
+      "token"
+      "model"
+      "actions";
+  }
+
+  .account-admin-create-user {
+    grid-template-areas: none;
   }
 
   .account-settings__profile-layout {

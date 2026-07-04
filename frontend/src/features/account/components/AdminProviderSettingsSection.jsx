@@ -60,6 +60,11 @@ export function AdminProviderSettingsSection({
   const canChooseApiMode = supportsApiMode && !isYandexProvider;
   const effectiveApiMode = canChooseApiMode ? apiMode : "chat_completions";
   const canUseProvider = Boolean(baseUrl.trim()) && (!isYandexProvider || Boolean(projectId.trim()));
+  const formClassName = [
+    "account-admin-form",
+    supportsApiMode ? "account-admin-form--llm" : "account-admin-form--embedding",
+    isYandexProvider ? "account-admin-form--yandex" : "account-admin-form--openai",
+  ].join(" ");
 
   useEffect(() => {
     let isActive = true;
@@ -209,31 +214,29 @@ export function AdminProviderSettingsSection({
         <span>{providerLabel}</span>
       </div>
 
-      <form className="account-admin-form" onSubmit={handleSubmit}>
-        <div className="account-admin-provider-row">
-          <label className="account-admin-field account-admin-field--provider-type">
-            <span>Провайдер</span>
-            <select value={providerType} disabled={isLoading} onChange={handleProviderTypeChange}>
-              {PROVIDER_TYPE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
+      <form className={formClassName} onSubmit={handleSubmit}>
+        <label className="account-admin-field account-admin-field--provider-type">
+          <span>Провайдер</span>
+          <select value={providerType} disabled={isLoading} onChange={handleProviderTypeChange}>
+            {PROVIDER_TYPE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
 
-          <label className="account-admin-field account-admin-field--base-url">
-            <span>Base URL</span>
-            <input
-              type="url"
-              value={baseUrl}
-              placeholder={isYandexProvider ? "Введите Base URL" : "https://api.openai.com/v1"}
-              disabled={isLoading}
-              onChange={(event) => setBaseUrl(event.target.value)}
-              required
-            />
-          </label>
-        </div>
+        <label className="account-admin-field account-admin-field--base-url">
+          <span>Base URL</span>
+          <input
+            type="url"
+            value={baseUrl}
+            placeholder={isYandexProvider ? "Введите Base URL" : "https://api.openai.com/v1"}
+            disabled={isLoading}
+            onChange={(event) => setBaseUrl(event.target.value)}
+            required
+          />
+        </label>
 
         {supportsApiMode ? (
           <label className="account-admin-field account-admin-field--api-mode">
