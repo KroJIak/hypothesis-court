@@ -32,6 +32,19 @@ class SessionFileService:
             chat_session_id=chat_session_id,
         )
 
+    def get_downloadable_file(self, *, user: User, object_key: str) -> SessionFile:
+        normalized_key = object_key.strip().lstrip("/")
+        if not normalized_key or ".." in normalized_key.split("/"):
+            raise NotFoundError("Session file not found.")
+        session_file = self._session_files.get_active_by_object_key(
+            self._session,
+            user_id=user.id,
+            object_key=normalized_key,
+        )
+        if session_file is None:
+            raise NotFoundError("Session file not found.")
+        return session_file
+
     async def upload_file(
         self,
         *,

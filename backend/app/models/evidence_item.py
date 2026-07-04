@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import CheckConstraint, DateTime, Enum, ForeignKey, Index, Numeric, String, Text, func, text
+from sqlalchemy import CheckConstraint, DateTime, Enum, ForeignKey, Index, Integer, Numeric, String, Text, func, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -19,6 +19,8 @@ class EvidenceItem(Base):
         CheckConstraint("btrim(summary) = summary and char_length(summary) between 1 and 2000", name="summary_trimmed_length"),
         CheckConstraint("quote is null or char_length(quote) <= 2000", name="quote_max_length"),
         CheckConstraint("confidence >= 0 and confidence <= 1", name="confidence_unit_range"),
+        CheckConstraint("relevance_score is null or (relevance_score >= 0 and relevance_score <= 1)", name="relevance_score_unit_range"),
+        CheckConstraint("rank is null or rank >= 1", name="rank_positive"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -52,5 +54,7 @@ class EvidenceItem(Base):
     summary: Mapped[str] = mapped_column(Text, nullable=False)
     quote: Mapped[str | None] = mapped_column(Text, nullable=True)
     confidence: Mapped[Decimal] = mapped_column(Numeric(5, 4), nullable=False)
+    relevance_score: Mapped[Decimal | None] = mapped_column(Numeric(7, 6), nullable=True)
+    rank: Mapped[int | None] = mapped_column(Integer, nullable=True)
     item_metadata: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())

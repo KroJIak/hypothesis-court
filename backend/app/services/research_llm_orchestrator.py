@@ -125,7 +125,7 @@ class ResearchLlmOrchestrator:
                     summary=summary,
                     quote=self._optional_text(raw_item.get("quote"), limit=2000),
                     confidence=self._decimal_unit(raw_item.get("confidence"), default="0.6500"),
-                    metadata={"source": "llm"},
+                    metadata={"source": "llm", "retrieval_score": self._fragment_score(fragments, source_index)},
                 )
             )
         if not drafts:
@@ -295,6 +295,12 @@ class ResearchLlmOrchestrator:
             "score": fragment.score,
             "text": fragment.text,
         }
+
+    @staticmethod
+    def _fragment_score(fragments: list[SourceFragment], source_index: int | None) -> float | None:
+        if source_index is None or source_index < 0 or source_index >= len(fragments):
+            return None
+        return fragments[source_index].score
 
     @staticmethod
     def _evidence_payload(index: int, item: EvidenceDraft) -> dict[str, object]:

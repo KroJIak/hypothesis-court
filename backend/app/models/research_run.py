@@ -16,6 +16,12 @@ class ResearchRun(Base):
         UniqueConstraint("chat_session_id", "version_number", name="uq_research_runs__chat_session_id_version_number"),
         Index("ix_research_runs__chat_session_id_created_at", "chat_session_id", "created_at"),
         Index("ix_research_runs__chat_session_id_status", "chat_session_id", "status"),
+        Index(
+            "uq_research_runs__one_running_per_chat",
+            "chat_session_id",
+            unique=True,
+            postgresql_where=text("status = 'running'"),
+        ),
         CheckConstraint("version_number >= 1", name="version_number_positive"),
         CheckConstraint("hypothesis_count between 3 and 5", name="hypothesis_count_supported"),
         CheckConstraint("btrim(title) = title and char_length(title) between 1 and 200", name="title_trimmed_length"),
@@ -25,6 +31,11 @@ class ResearchRun(Base):
             "completed_at is null or started_at is null or completed_at >= started_at",
             name="completed_after_started",
         ),
+        CheckConstraint(
+            "((status = 'running' and completed_at is null) or (status <> 'running' and completed_at is not null))",
+            name="terminal_completed_at_consistency",
+        ),
+        CheckConstraint("(status <> 'failed' or error_message is not null)", name="failed_error_message_required"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(

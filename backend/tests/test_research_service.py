@@ -15,12 +15,15 @@ from app.models.hypothesis_candidate import HypothesisCandidate
 from app.models.hypothesis_evidence_link import HypothesisEvidenceLink
 from app.models.hypothesis_version import HypothesisVersion
 from app.models.judge_verdict import JudgeVerdict
+from app.models.pipeline_settings import PipelineSettings
+from app.models.research_feedback import ResearchFeedback
 from app.models.research_input_item import ResearchInputItem
 from app.models.research_run import ResearchRun
+from app.models.research_run_event import ResearchRunEvent
 from app.models.session_file import SessionFile
 from app.models.user import User
 from app.models.enums import DebateRole, EvidenceKind, EvidenceRelationKind, ResearchInputKind, ResearchRunStatus
-from app.schemas.research import ResearchInputRequest
+from app.schemas.research import ResearchFeedbackCreateRequest, ResearchInputRequest
 from app.services.exceptions import ConflictError, NotFoundError, ValidationError
 from app.services.research_llm_orchestrator import (
     DebateDraft,
@@ -60,6 +63,17 @@ class FakeResearchRepository:
         self.messages: list[DebateMessage] = []
         self.evaluations: list[EvaluationResult] = []
         self.verdicts: list[JudgeVerdict] = []
+        self.events: list[ResearchRunEvent] = []
+        self.feedback: list[ResearchFeedback] = []
+        self.pipeline_settings = PipelineSettings(
+            settings_key="global",
+            default_hypothesis_count=3,
+            debate_round_limit=2,
+            retrieval_limit=16,
+            evaluator_weights={},
+            excluded_directions="",
+            domain_constraints="",
+        )
 
     def _store(self, collection, item):
         now = datetime.now(UTC)
@@ -90,9 +104,25 @@ class FakeResearchRepository:
         del session
         return self._store(self.runs, run)
 
+    def get_pipeline_settings(self, session):
+        del session
+        return self.pipeline_settings
+
     def create_input_item(self, session, item):
         del session
         return self._store(self.inputs, item)
+
+    def next_event_sequence_number(self, session, *, run_id):
+        del session
+        return len([item for item in self.events if item.run_id == run_id]) + 1
+
+    def create_run_event(self, session, event):
+        del session
+        return self._store(self.events, event)
+
+    def list_run_events(self, session, *, run_id):
+        del session
+        return [item for item in self.events if item.run_id == run_id]
 
     def list_runs(self, session, *, user_id, chat_session_id):
         del session
@@ -167,6 +197,14 @@ class FakeResearchRepository:
     def create_judge_verdict(self, session, verdict):
         del session
         return self._store(self.verdicts, verdict)
+
+    def create_feedback(self, session, feedback):
+        del session
+        return self._store(self.feedback, feedback)
+
+    def list_feedback(self, session, *, run_id):
+        del session
+        return [item for item in self.feedback if item.run_id == run_id]
 
     def list_input_items(self, session, *, run_id):
         del session
@@ -316,6 +354,12 @@ class FailingLlmOrchestrator(FakeLlmOrchestrator):
         raise ValidationError("LLM недоступна")
 
 
+class CrashingLlmOrchestrator(FakeLlmOrchestrator):
+    def extract_evidence(self, *, research_brief, fragments, limit):
+        del research_brief, fragments, limit
+        raise RuntimeError("raw sql or secret should not leak")
+
+
 def make_settings(tmp_path: Path):
     return SimpleNamespace(
         cors_allow_origins=(),
@@ -393,14 +437,16 @@ def test_create_run_persists_complete_research_artifacts(service_bundle, user, c
     assert response.inputs[0].kind == ResearchInputKind.KPI
     assert len(response.evidence) >= 1
     assert len(response.hypotheses) == 3
-    assert all(len(hypothesis.versions) == 2 for hypothesis in response.hypotheses)
-    assert all(len(hypothesis.debate_messages) == 3 for hypothesis in response.hypotheses)
+    assert all(len(hypothesis.versions) == 3 for hypothesis in response.hypotheses)
+    assert all(len(hypothesis.debate_messages) == 6 for hypothesis in response.hypotheses)
     assert all(len(hypothesis.evaluations) == 2 for hypothesis in response.hypotheses)
     assert response.verdict is not None
     assert chat_session.active_research_run_id == response.id
     assert chat_session.is_started is True
     assert session.commits == 2
     assert repository.runs[0].completed_at is not None
+    assert repository.events[-1].stage.value == "completed"
+    assert repository.events[-1].progress_percent == 100
 
 
 def test_create_run_blocks_when_another_run_is_running(service_bundle, user, chat_session):
@@ -440,6 +486,29 @@ def test_create_run_marks_run_failed_when_pipeline_dependency_fails(tmp_path, us
     assert repository.runs[0].status == ResearchRunStatus.FAILED
     assert repository.runs[0].error_message == "LLM недоступна"
     assert repository.runs[0].completed_at is not None
+
+
+def test_create_run_sanitizes_unexpected_pipeline_failure(tmp_path, user, chat_session):
+    session = DummySession()
+    repository = FakeResearchRepository(chat_session)
+    service = ResearchService(
+        session=session,
+        repository=repository,
+        settings=make_settings(tmp_path),
+        retrieval_service=FakeRetrievalService(),
+        llm_orchestrator=CrashingLlmOrchestrator(),
+    )
+
+    with pytest.raises(RuntimeError):
+        service.create_run(
+            user=user,
+            chat_session_id=chat_session.id,
+            input_requests=input_requests(),
+            hypothesis_count=3,
+        )
+
+    assert repository.runs[0].status == ResearchRunStatus.FAILED
+    assert repository.runs[0].error_message == "Внутренняя ошибка исследовательского пайплайна"
 
 
 def test_regenerate_run_creates_new_version_with_parent(service_bundle, user, chat_session):
@@ -510,6 +579,74 @@ def test_graph_contains_inputs_evidence_hypotheses_and_verdict(service_bundle, u
     assert "generates" in edge_types
     assert "synthesizes" in edge_types
     assert any(edge.source.startswith("evidence:") and edge.target.startswith("hypothesis:") for edge in graph.edges)
+    assert "hypothesis_version" in node_types
+    assert "debate_message" in node_types
+    assert "evaluation" in node_types
+
+
+def test_progress_lists_pipeline_events(service_bundle, user, chat_session):
+    service, _, _ = service_bundle
+    run = service.create_run(
+        user=user,
+        chat_session_id=chat_session.id,
+        input_requests=input_requests(),
+        hypothesis_count=3,
+    )
+
+    progress = service.get_progress(user=user, chat_session_id=chat_session.id, run_id=run.id)
+
+    stages = [event.stage.value for event in progress.events]
+    assert progress.progress_percent == 100
+    assert stages[0] == "queued"
+    assert "ingestion" in stages
+    assert "judge" in stages
+    assert stages[-1] == "completed"
+
+
+def test_feedback_is_persisted_for_hypothesis(service_bundle, user, chat_session):
+    service, _, _ = service_bundle
+    run = service.create_run(
+        user=user,
+        chat_session_id=chat_session.id,
+        input_requests=input_requests(),
+        hypothesis_count=3,
+    )
+    hypothesis_id = run.hypotheses[0].id
+
+    feedback = service.create_feedback(
+        user=user,
+        chat_session_id=chat_session.id,
+        run_id=run.id,
+        payload=ResearchFeedbackCreateRequest(
+            target_type="hypothesis",
+            target_id=hypothesis_id,
+            outcome="needs_more_data",
+            rating=3,
+            comment="Нужно больше экспериментов.",
+        ),
+    )
+    feedback_list = service.list_feedback(user=user, chat_session_id=chat_session.id, run_id=run.id)
+
+    assert feedback.target_id == hypothesis_id
+    assert feedback_list.items[0].comment == "Нужно больше экспериментов."
+
+
+def test_export_run_returns_json_and_markdown(service_bundle, user, chat_session):
+    service, _, _ = service_bundle
+    run = service.create_run(
+        user=user,
+        chat_session_id=chat_session.id,
+        input_requests=input_requests(),
+        hypothesis_count=3,
+    )
+
+    json_export = service.export_run(user=user, chat_session_id=chat_session.id, run_id=run.id, export_format="json")
+    markdown_export = service.export_run(user=user, chat_session_id=chat_session.id, run_id=run.id, export_format="md")
+
+    assert json_export.content_type == "application/json"
+    assert '"hypotheses"' in json_export.content
+    assert markdown_export.content_type.startswith("text/markdown")
+    assert "## Вердикт" in markdown_export.content
 
 
 def test_activate_run_switches_active_version(service_bundle, user, chat_session):

@@ -12,8 +12,11 @@ from app.models.hypothesis_candidate import HypothesisCandidate
 from app.models.hypothesis_evidence_link import HypothesisEvidenceLink
 from app.models.hypothesis_version import HypothesisVersion
 from app.models.judge_verdict import JudgeVerdict
+from app.models.pipeline_settings import PipelineSettings
+from app.models.research_feedback import ResearchFeedback
 from app.models.research_input_item import ResearchInputItem
 from app.models.research_run import ResearchRun
+from app.models.research_run_event import ResearchRunEvent
 from app.models.session_file import SessionFile
 from app.models.user_agent import UserAgent
 
@@ -54,10 +57,37 @@ class ResearchRepository:
         session.flush()
         return run
 
+    def get_pipeline_settings(self, session: Session) -> PipelineSettings:
+        settings = session.get(PipelineSettings, "global")
+        if settings is None:
+            settings = PipelineSettings(settings_key="global")
+            session.add(settings)
+            session.flush()
+        return settings
+
     def create_input_item(self, session: Session, item: ResearchInputItem) -> ResearchInputItem:
         session.add(item)
         session.flush()
         return item
+
+    def next_event_sequence_number(self, session: Session, *, run_id: uuid.UUID) -> int:
+        stmt = select(func.coalesce(func.max(ResearchRunEvent.sequence_number), 0) + 1).where(
+            ResearchRunEvent.run_id == run_id,
+        )
+        return int(session.execute(stmt).scalar_one())
+
+    def create_run_event(self, session: Session, event: ResearchRunEvent) -> ResearchRunEvent:
+        session.add(event)
+        session.flush()
+        return event
+
+    def list_run_events(self, session: Session, *, run_id: uuid.UUID) -> list[ResearchRunEvent]:
+        stmt = (
+            select(ResearchRunEvent)
+            .where(ResearchRunEvent.run_id == run_id)
+            .order_by(ResearchRunEvent.sequence_number.asc())
+        )
+        return session.execute(stmt).scalars().all()
 
     def list_runs(self, session: Session, *, user_id: uuid.UUID, chat_session_id: uuid.UUID) -> list[ResearchRun]:
         stmt = (
@@ -195,6 +225,19 @@ class ResearchRepository:
         session.add(verdict)
         session.flush()
         return verdict
+
+    def create_feedback(self, session: Session, feedback: ResearchFeedback) -> ResearchFeedback:
+        session.add(feedback)
+        session.flush()
+        return feedback
+
+    def list_feedback(self, session: Session, *, run_id: uuid.UUID) -> list[ResearchFeedback]:
+        stmt = (
+            select(ResearchFeedback)
+            .where(ResearchFeedback.run_id == run_id)
+            .order_by(ResearchFeedback.created_at.asc(), ResearchFeedback.id.asc())
+        )
+        return session.execute(stmt).scalars().all()
 
     def list_input_items(self, session: Session, *, run_id: uuid.UUID) -> list[ResearchInputItem]:
         stmt = (

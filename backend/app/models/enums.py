@@ -44,6 +44,33 @@ class ResearchRunTrigger(str, Enum):
     REGENERATE = "regenerate"
 
 
+class ResearchRunStage(str, Enum):
+    QUEUED = "queued"
+    INGESTION = "ingestion"
+    RETRIEVAL = "retrieval"
+    EVIDENCE = "evidence"
+    HYPOTHESIS_GENERATION = "hypothesis_generation"
+    DEBATE = "debate"
+    EVALUATION = "evaluation"
+    JUDGE = "judge"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class ResearchFeedbackTarget(str, Enum):
+    RUN = "run"
+    HYPOTHESIS = "hypothesis"
+    VERDICT = "verdict"
+
+
+class ResearchFeedbackOutcome(str, Enum):
+    CONFIRMED = "confirmed"
+    REJECTED = "rejected"
+    NEEDS_MORE_DATA = "needs_more_data"
+    UNKNOWN = "unknown"
+
+
 class ResearchInputKind(str, Enum):
     KPI = "kpi"
     CONSTRAINTS = "constraints"

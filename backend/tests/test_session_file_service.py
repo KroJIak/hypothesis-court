@@ -49,6 +49,12 @@ class FakeSessionFileRepository:
             return self.session_file
         return None
 
+    def get_active_by_object_key(self, session, *, user_id, object_key):
+        del session
+        if self.session_file.user_id == user_id and self.session_file.object_key == object_key and self.session_file.deleted_at is None:
+            return self.session_file
+        return None
+
 
 class FakeStorage:
     def __init__(self, *, delete_result: bool) -> None:
@@ -116,3 +122,23 @@ def test_delete_file_keeps_soft_delete_when_storage_cleanup_fails() -> None:
     assert storage.deleted_keys == [session_file.object_key]
     assert db_session.commits == 2
     assert db_session.rollbacks == 0
+
+
+def test_get_downloadable_file_requires_owner_and_active_file() -> None:
+    service, user, _, session_file, _, _ = make_service_bundle()
+
+    downloadable = service.get_downloadable_file(user=user, object_key=session_file.object_key)
+
+    assert downloadable.id == session_file.id
+
+
+def test_get_downloadable_file_rejects_other_user() -> None:
+    service, _, _, session_file, _, _ = make_service_bundle()
+    other_user = User(id=uuid.uuid4(), username="other", password_hash="hash")
+
+    try:
+        service.get_downloadable_file(user=other_user, object_key=session_file.object_key)
+    except Exception as exc:
+        assert exc.detail == "Session file not found."
+    else:
+        raise AssertionError("Expected not found for another user")

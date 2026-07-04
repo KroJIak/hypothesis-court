@@ -9,8 +9,11 @@ from app.models.enums import (
     DocumentProcessingStatus,
     EvidenceKind,
     EvidenceRelationKind,
+    ResearchFeedbackOutcome,
+    ResearchFeedbackTarget,
     ResearchInputKind,
     ResearchRunStatus,
+    ResearchRunStage,
     ResearchRunTrigger,
 )
 
@@ -33,6 +36,25 @@ class ResearchRunRegenerateRequest(BaseModel):
 class ResearchRunEditRequest(BaseModel):
     inputs: list[ResearchInputRequest] = Field(min_length=1, max_length=20)
     hypothesis_count: int | None = Field(default=None, ge=3, le=5)
+
+
+class PipelineSettingsResponse(BaseModel):
+    default_hypothesis_count: int
+    debate_round_limit: int
+    retrieval_limit: int
+    evaluator_weights: dict[str, object]
+    excluded_directions: str
+    domain_constraints: str
+
+
+class ResearchFeedbackCreateRequest(BaseModel):
+    target_type: ResearchFeedbackTarget
+    target_id: uuid.UUID | None = None
+    outcome: ResearchFeedbackOutcome = ResearchFeedbackOutcome.UNKNOWN
+    rating: int | None = Field(default=None, ge=1, le=5)
+    comment: str | None = Field(default=None, max_length=4000)
+    correction: str | None = Field(default=None, max_length=4000)
+    metadata: dict[str, object] = Field(default_factory=dict)
 
 
 class ResearchInputResponse(BaseModel):
@@ -72,6 +94,8 @@ class EvidenceItemResponse(BaseModel):
     summary: str
     quote: str | None
     confidence: Decimal
+    relevance_score: Decimal | None = None
+    rank: int | None = None
     item_metadata: dict[str, object]
     created_at: datetime
 
@@ -185,6 +209,52 @@ class ResearchRunDetailResponse(ResearchRunSummaryResponse):
     evidence: list[EvidenceItemResponse]
     hypotheses: list[HypothesisCandidateResponse]
     verdict: JudgeVerdictResponse | None
+
+
+class ResearchRunEventResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    run_id: uuid.UUID
+    stage: ResearchRunStage
+    sequence_number: int
+    progress_percent: int
+    message: str
+    event_metadata: dict[str, object]
+    created_at: datetime
+
+
+class ResearchRunProgressResponse(BaseModel):
+    run: ResearchRunSummaryResponse
+    current_stage: ResearchRunStage | None
+    progress_percent: int
+    events: list[ResearchRunEventResponse]
+
+
+class ResearchFeedbackResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    run_id: uuid.UUID
+    user_id: uuid.UUID
+    target_type: ResearchFeedbackTarget
+    target_id: uuid.UUID | None
+    outcome: ResearchFeedbackOutcome
+    rating: int | None
+    comment: str | None
+    correction: str | None
+    feedback_metadata: dict[str, object]
+    created_at: datetime
+
+
+class ResearchFeedbackListResponse(BaseModel):
+    items: list[ResearchFeedbackResponse]
+
+
+class ResearchExportResponse(BaseModel):
+    filename: str
+    content_type: str
+    content: str
 
 
 class ResearchGraphNodeResponse(BaseModel):

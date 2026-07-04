@@ -41,6 +41,20 @@ class SessionFileRepository:
         )
         return session.execute(stmt).scalar_one_or_none()
 
+    def get_active_by_object_key(
+        self,
+        session: Session,
+        *,
+        user_id: uuid.UUID,
+        object_key: str,
+    ) -> SessionFile | None:
+        stmt = select(SessionFile).where(
+            SessionFile.object_key == object_key,
+            SessionFile.user_id == user_id,
+            SessionFile.deleted_at.is_(None),
+        )
+        return session.execute(stmt).scalar_one_or_none()
+
     def count_active_for_chat(
         self,
         session: Session,

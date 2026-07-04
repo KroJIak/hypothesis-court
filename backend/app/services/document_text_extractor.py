@@ -79,7 +79,10 @@ class DocumentTextExtractor:
 
     @staticmethod
     def _read_json(path: Path) -> str:
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise ValidationError("JSON-файл повреждён или имеет неподдерживаемый формат") from exc
         return json.dumps(payload, ensure_ascii=False, indent=2)
 
     @staticmethod
@@ -87,7 +90,10 @@ class DocumentTextExtractor:
         raw = path.read_text(encoding="utf-8")
         if len(raw) > _XML_TEXT_LIMIT:
             raise ValidationError("XML-файл слишком большой для синхронной обработки")
-        root = ElementTree.fromstring(raw)
+        try:
+            root = ElementTree.fromstring(raw)
+        except ElementTree.ParseError as exc:
+            raise ValidationError("XML-файл повреждён или имеет неподдерживаемый формат") from exc
         fragments = [text.strip() for text in root.itertext() if text and text.strip()]
         return "\n".join(fragments)
 

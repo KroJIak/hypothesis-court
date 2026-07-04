@@ -13,8 +13,11 @@ from app.models.hypothesis_evidence_link import HypothesisEvidenceLink
 from app.models.hypothesis_version import HypothesisVersion
 from app.models.judge_verdict import JudgeVerdict
 from app.models.model_provider_settings import ModelProviderSettings
+from app.models.pipeline_settings import PipelineSettings
+from app.models.research_feedback import ResearchFeedback
 from app.models.research_input_item import ResearchInputItem
 from app.models.research_run import ResearchRun
+from app.models.research_run_event import ResearchRunEvent
 from app.models.session_file import SessionFile
 from app.models.user_agent import UserAgent
 from app.models.user import User
@@ -35,8 +38,11 @@ __all__ = [
     "HypothesisVersion",
     "JudgeVerdict",
     "ModelProviderSettings",
+    "PipelineSettings",
+    "ResearchFeedback",
     "ResearchInputItem",
     "ResearchRun",
+    "ResearchRunEvent",
     "SessionFile",
     "UserAgent",
     "User",

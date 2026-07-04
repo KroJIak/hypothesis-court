@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps.auth import get_current_user
@@ -10,10 +10,16 @@ from app.models.user import User
 from app.repositories.research_repository import ResearchRepository
 from app.repositories.model_provider_settings_repository import ModelProviderSettingsRepository
 from app.schemas.research import (
+    PipelineSettingsResponse,
+    ResearchExportResponse,
+    ResearchFeedbackCreateRequest,
+    ResearchFeedbackListResponse,
+    ResearchFeedbackResponse,
     ResearchGraphResponse,
     ResearchRunCreateRequest,
     ResearchRunDetailResponse,
     ResearchRunEditRequest,
+    ResearchRunProgressResponse,
     ResearchRunListResponse,
     ResearchRunRegenerateRequest,
     ResearchRunSummaryResponse,
@@ -61,6 +67,17 @@ def list_research_runs(
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
+@router.get("/settings", response_model=PipelineSettingsResponse)
+def get_research_pipeline_settings(
+    session: Session = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+    current_user: User = Depends(get_current_user),
+) -> PipelineSettingsResponse:
+    del current_user
+    service = _get_research_service(session, settings)
+    return service.get_pipeline_settings()
+
+
 @router.post("", response_model=ResearchRunDetailResponse, status_code=status.HTTP_201_CREATED)
 def create_research_run(
     chat_session_id: uuid.UUID,
@@ -95,17 +112,74 @@ def get_active_research_run(
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
-@router.get("/{run_id}", response_model=ResearchRunDetailResponse)
-def get_research_run(
+@router.get("/{run_id}/progress", response_model=ResearchRunProgressResponse)
+def get_research_run_progress(
     chat_session_id: uuid.UUID,
     run_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
     settings: Settings = Depends(get_settings),
-) -> ResearchRunDetailResponse:
+) -> ResearchRunProgressResponse:
     service = _get_research_service(session, settings)
     try:
-        return service.get_run(user=current_user, chat_session_id=chat_session_id, run_id=run_id)
+        return service.get_progress(user=current_user, chat_session_id=chat_session_id, run_id=run_id)
+    except ServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+
+@router.get("/{run_id}/export", response_model=ResearchExportResponse)
+def export_research_run(
+    chat_session_id: uuid.UUID,
+    run_id: uuid.UUID,
+    export_format: str = Query(default="json", alias="format", pattern="^(json|md|markdown)$"),
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> ResearchExportResponse:
+    service = _get_research_service(session, settings)
+    try:
+        return service.export_run(
+            user=current_user,
+            chat_session_id=chat_session_id,
+            run_id=run_id,
+            export_format=export_format,
+        )
+    except ServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+
+@router.get("/{run_id}/feedback", response_model=ResearchFeedbackListResponse)
+def list_research_feedback(
+    chat_session_id: uuid.UUID,
+    run_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> ResearchFeedbackListResponse:
+    service = _get_research_service(session, settings)
+    try:
+        return service.list_feedback(user=current_user, chat_session_id=chat_session_id, run_id=run_id)
+    except ServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+
+@router.post("/{run_id}/feedback", response_model=ResearchFeedbackResponse, status_code=status.HTTP_201_CREATED)
+def create_research_feedback(
+    chat_session_id: uuid.UUID,
+    run_id: uuid.UUID,
+    payload: ResearchFeedbackCreateRequest,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> ResearchFeedbackResponse:
+    service = _get_research_service(session, settings)
+    try:
+        return service.create_feedback(
+            user=current_user,
+            chat_session_id=chat_session_id,
+            run_id=run_id,
+            payload=payload,
+        )
     except ServiceError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
@@ -194,5 +268,20 @@ def get_research_graph(
     service = _get_research_service(session, settings)
     try:
         return service.get_graph(user=current_user, chat_session_id=chat_session_id, run_id=run_id)
+    except ServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+
+@router.get("/{run_id}", response_model=ResearchRunDetailResponse)
+def get_research_run(
+    chat_session_id: uuid.UUID,
+    run_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> ResearchRunDetailResponse:
+    service = _get_research_service(session, settings)
+    try:
+        return service.get_run(user=current_user, chat_session_id=chat_session_id, run_id=run_id)
     except ServiceError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
