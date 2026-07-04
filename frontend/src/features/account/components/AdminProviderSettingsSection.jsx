@@ -200,7 +200,7 @@ export function AdminProviderSettingsSection({
             </select>
           </label>
 
-          <label className="account-admin-field">
+          <label className="account-admin-field account-admin-field--base-url">
             <span>Base URL</span>
             <input
               type="url"
@@ -214,7 +214,7 @@ export function AdminProviderSettingsSection({
         </div>
 
         {isYandexProvider ? (
-          <label className="account-admin-field">
+          <label className="account-admin-field account-admin-field--project-id">
             <span>Folder ID</span>
             <input
               type="text"
@@ -227,7 +227,7 @@ export function AdminProviderSettingsSection({
           </label>
         ) : null}
 
-        <label className="account-admin-field">
+        <label className="account-admin-field account-admin-field--token">
           <span>{isYandexProvider ? "API ключ" : "API токен"}</span>
           <span className="account-admin-password-input">
             <input
@@ -257,7 +257,7 @@ export function AdminProviderSettingsSection({
           </span>
         </label>
 
-        <label className="account-admin-field">
+        <label className="account-admin-field account-admin-field--model">
           <span>Модель</span>
           <select
             value={model ?? ""}

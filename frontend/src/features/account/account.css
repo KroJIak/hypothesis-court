@@ -401,9 +401,13 @@
 .account-admin-form,
 .account-admin-create-user {
   display: grid;
-  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.3fr) auto;
+  grid-template-columns:
+    minmax(150px, 0.85fr)
+    minmax(160px, 0.95fr)
+    minmax(280px, 1.65fr)
+    minmax(220px, 1.25fr);
   align-items: end;
-  gap: 12px;
+  gap: 18px 16px;
 }
 
 .account-admin-create-user {
@@ -418,13 +422,27 @@
 }
 
 .account-admin-provider-row {
-  display: grid;
-  grid-template-columns: minmax(150px, 0.38fr) minmax(0, 1fr);
-  gap: 12px;
+  display: contents;
 }
 
 .account-admin-field--provider-type {
   min-width: 0;
+}
+
+.account-admin-field--base-url {
+  grid-column: 2;
+}
+
+.account-admin-field--project-id {
+  grid-column: 2;
+}
+
+.account-admin-field--token {
+  grid-column: 3;
+}
+
+.account-admin-field--model {
+  grid-column: 4;
 }
 
 .account-admin-field input,
@@ -518,6 +536,7 @@
 }
 
 .account-admin-actions {
+  grid-column: 1 / -1;
   display: flex;
   align-items: center;
   gap: 10px;
