@@ -1,11 +1,13 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import BigInteger, CheckConstraint, DateTime, ForeignKey, String, func, text
+from sqlalchemy import BigInteger, CheckConstraint, DateTime, Enum, ForeignKey, String, Text, func, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
+from app.models.enums import DocumentProcessingStatus
+from app.models.user import ENUM_VALUES
 
 
 class SessionFile(Base):
@@ -51,6 +53,16 @@ class SessionFile(Base):
     content_type: Mapped[str | None] = mapped_column(String(255), nullable=True)
     kind: Mapped[str | None] = mapped_column(String(32), nullable=True)
     size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    processing_status: Mapped[DocumentProcessingStatus] = mapped_column(
+        Enum(DocumentProcessingStatus, name="document_processing_status", values_callable=ENUM_VALUES),
+        nullable=False,
+        default=DocumentProcessingStatus.UPLOADED,
+        server_default=DocumentProcessingStatus.UPLOADED.value,
+    )
+    processing_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    text_extracted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    storage_deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    storage_delete_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

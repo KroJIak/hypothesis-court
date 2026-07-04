@@ -1,4 +1,5 @@
 import uuid
+from datetime import UTC, datetime
 
 from fastapi import UploadFile
 from sqlalchemy.orm import Session
@@ -77,6 +78,63 @@ class SessionFileService:
             self._session.rollback()
             storage.delete(object_key)
             raise
+
+    def delete_file(
+        self,
+        *,
+        user: User,
+        chat_session_id: uuid.UUID,
+        session_file_id: uuid.UUID,
+        storage: SessionFileStorage,
+    ) -> None:
+        try:
+            self._get_owned_session(user=user, chat_session_id=chat_session_id)
+            session_file = self._session_files.get_active_for_chat(
+                self._session,
+                user_id=user.id,
+                chat_session_id=chat_session_id,
+                session_file_id=session_file_id,
+            )
+            if session_file is None:
+                raise NotFoundError("Session file not found.")
+            session_file.deleted_at = datetime.now(UTC)
+            session_file.storage_deleted_at = None
+            session_file.storage_delete_error = None
+            object_key = session_file.object_key
+            self._session.commit()
+        except Exception:
+            self._session.rollback()
+            raise
+
+        if not storage.delete(object_key):
+            self._record_storage_delete_error(
+                session_file_id=session_file_id,
+                error_message="Could not delete file from storage.",
+            )
+            return
+
+        self._record_storage_deleted(session_file_id=session_file_id)
+
+    def _record_storage_deleted(self, *, session_file_id: uuid.UUID) -> None:
+        try:
+            session_file = self._session.get(SessionFile, session_file_id)
+            if session_file is None:
+                return
+            session_file.storage_deleted_at = datetime.now(UTC)
+            session_file.storage_delete_error = None
+            self._session.commit()
+        except Exception:
+            self._session.rollback()
+
+    def _record_storage_delete_error(self, *, session_file_id: uuid.UUID, error_message: str) -> None:
+        try:
+            session_file = self._session.get(SessionFile, session_file_id)
+            if session_file is None:
+                return
+            session_file.storage_delete_error = error_message[:500]
+            self._session.commit()
+        except Exception:
+            self._session.rollback()
 
     def _get_owned_session(
         self,

@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, String, func, text
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, String, func, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -23,6 +23,7 @@ class ChatSession(Base):
             "deleted_at is null or not is_pinned",
             name="deleted_sessions_not_pinned",
         ),
+        Index("ix_chat_sessions__active_research_run_id", "active_research_run_id"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -35,6 +36,11 @@ class ChatSession(Base):
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
+    )
+    active_research_run_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("research_runs.id", ondelete="SET NULL", use_alter=True),
+        nullable=True,
     )
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     is_started: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
