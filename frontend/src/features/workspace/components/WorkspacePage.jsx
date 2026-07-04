@@ -401,7 +401,7 @@ export function WorkspacePage({
       signal: controller.signal,
     })
       .then((payload) => {
-        const paletteAgents = getPaletteAgents([], data);
+        const paletteAgents = getPaletteAgents(userAgents, data);
         const nextSessions = payload.items.map((chatSession) =>
           createWorkspaceSessionFromChatSession(chatSession, paletteAgents),
         );
@@ -416,7 +416,7 @@ export function WorkspacePage({
 
             return refreshAvailableAgentsForSession(
               applyChatSessionMetadata(currentSession, nextSession),
-              [],
+              userAgents,
               data,
             );
           }),
@@ -436,7 +436,7 @@ export function WorkspacePage({
       });
 
     return () => controller.abort();
-  }, [accessToken, data, deferredChatSearchQuery, showWorkspaceError, status]);
+  }, [accessToken, data, deferredChatSearchQuery, showWorkspaceError, status, userAgents]);
 
   useEffect(() => {
     setActiveAgentHistoryTarget(null);
