@@ -104,7 +104,7 @@ export function useAuthSession() {
       setState({
         status: "guest",
         session: null,
-        errorMessage: error instanceof Error ? error.message : "Не удалось выполнить вход.",
+        errorMessage: error instanceof Error ? error.message : "Не удалось выполнить вход",
         isSubmitting: false,
       });
       return false;

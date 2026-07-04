@@ -16,7 +16,7 @@ export async function updateOwnProfile({ accessToken, firstName, lastName }) {
   });
 
   if (!response.ok) {
-    const detail = await readApiError(response, "Не удалось сохранить профиль.");
+    const detail = await readApiError(response, "Не удалось сохранить профиль");
     throw new Error(detail);
   }
 

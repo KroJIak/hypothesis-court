@@ -15,7 +15,7 @@ export async function uploadOwnAvatar({ accessToken, file }) {
   });
 
   if (!response.ok) {
-    const detail = await readApiError(response, "Не удалось загрузить изображение.");
+    const detail = await readApiError(response, "Не удалось загрузить изображение");
     throw new Error(detail);
   }
 

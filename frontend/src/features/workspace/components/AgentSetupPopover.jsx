@@ -60,7 +60,9 @@ export function AgentSetupPopover({
             aria-expanded={isIconPickerOpen}
             onClick={onToggleIconPicker}
           >
-            <AgentVariantIcon variant={selectedVariant} className="agent-setup-popover__selected-icon" strokeWidth={1.9} />
+            <span className="agent-setup-popover__selected-icon-slot" aria-hidden="true">
+              <AgentVariantIcon variant={selectedVariant} className="agent-setup-popover__selected-icon" strokeWidth={1.9} />
+            </span>
           </button>
           {isIconPickerOpen ? (
             <div className="agent-setup-popover__icon-picker" aria-label="Иконки агента">
@@ -80,7 +82,9 @@ export function AgentSetupPopover({
                     onToggleIconPicker(false);
                   }}
                 >
-                  <AgentVariantIcon variant={option.value} className="agent-setup-popover__option-icon" strokeWidth={1.9} />
+                  <span className="agent-setup-popover__option-icon-slot" aria-hidden="true">
+                    <AgentVariantIcon variant={option.value} className="agent-setup-popover__option-icon" strokeWidth={1.9} />
+                  </span>
                 </button>
               ))}
             </div>

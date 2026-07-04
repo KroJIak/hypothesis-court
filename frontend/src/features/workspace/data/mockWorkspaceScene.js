@@ -622,44 +622,7 @@ export const mockWorkspaceSceneDto = {
   ],
   palette: {
     addAgentLabel: "Добавить агента",
-    agents: [
-      {
-        id: "agent-finance",
-        name: "Финансовый",
-        variant: "finance",
-        isEmpty: false,
-      },
-      {
-        id: "agent-risk",
-        name: "Риск-агент",
-        variant: "risk",
-        isEmpty: false,
-      },
-      {
-        id: "agent-empty-1",
-        name: "Пустой агент",
-        variant: "empty",
-        isEmpty: true,
-      },
-      {
-        id: "agent-empty-2",
-        name: "Пустой агент",
-        variant: "empty",
-        isEmpty: true,
-      },
-      {
-        id: "agent-empty-3",
-        name: "Пустой агент",
-        variant: "empty",
-        isEmpty: true,
-      },
-      {
-        id: "agent-empty-4",
-        name: "Пустой агент",
-        variant: "empty",
-        isEmpty: true,
-      },
-    ],
+    agents: [],
   },
   composer: {
     placeholder: "Сообщите Hypothesis Court...",

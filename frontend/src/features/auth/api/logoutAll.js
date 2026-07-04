@@ -10,6 +10,6 @@ export async function logoutAll(accessToken) {
   });
 
   if (!response.ok) {
-    throw new Error("Не удалось завершить все сессии.");
+    throw new Error("Не удалось завершить все сессии");
   }
 }

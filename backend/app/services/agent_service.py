@@ -19,30 +19,6 @@ from app.repositories.model_provider_settings_repository import ModelProviderSet
 from app.services.exceptions import ConflictError, NotFoundError, ValidationError
 from app.services.model_provider_settings_service import ModelProviderSettingsService
 
-DEFAULT_AGENTS = (
-    {
-        "default_key": "finance",
-        "name": "Финансовый",
-        "icon_key": "finance",
-        "system_prompt": (
-            "Ты финансовый оценочный агент Hypothesis Court. Оценивай гипотезы через стоимость "
-            "проверки, экономический эффект, чувствительность к масштабу и риск бессмысленных затрат. "
-            "Возвращай краткий вывод, ключевые допущения, слабые места экономики и первый дешёвый шаг проверки."
-        ),
-    },
-    {
-        "default_key": "risk",
-        "name": "Риск-агент",
-        "icon_key": "risk",
-        "system_prompt": (
-            "Ты риск-агент Hypothesis Court. Оценивай неопределённость, вероятность провала, критичные "
-            "unknowns, противоречия evidence и условия, при которых гипотеза должна быть остановлена. "
-            "Возвращай краткий риск-профиль, хрупкие места и первый тест, который быстрее всего снижает неопределённость."
-        ),
-    },
-)
-
-
 class AgentService:
     def __init__(
         self,
@@ -58,7 +34,6 @@ class AgentService:
         return self._agents.list_icons(self._session)
 
     def list_agents(self, *, user: User) -> list[UserAgent]:
-        self._ensure_default_agents(user=user)
         return self._agents.list_active_agents_for_user(self._session, user_id=user.id)
 
     def can_generate_agent_prompt(self, *, settings: Settings) -> bool:
@@ -233,31 +208,6 @@ class AgentService:
             if selected_agent is None:
                 raise NotFoundError("Selected agent not found.")
             self._agents.delete_selected_agent(self._session, selected_agent)
-            self._session.commit()
-        except Exception:
-            self._session.rollback()
-            raise
-
-    def _ensure_default_agents(self, *, user: User) -> None:
-        try:
-            for default_agent in DEFAULT_AGENTS:
-                existing_agent = self._agents.get_agent_by_default_key(
-                    self._session,
-                    user_id=user.id,
-                    default_key=default_agent["default_key"],
-                )
-                if existing_agent is not None:
-                    continue
-                self._agents.create_agent(
-                    self._session,
-                    UserAgent(
-                        user_id=user.id,
-                        name=default_agent["name"],
-                        icon_key=default_agent["icon_key"],
-                        system_prompt=default_agent["system_prompt"],
-                        default_key=default_agent["default_key"],
-                    ),
-                )
             self._session.commit()
         except Exception:
             self._session.rollback()

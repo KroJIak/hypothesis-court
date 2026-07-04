@@ -51,7 +51,7 @@ export function AccountSettingsView({
     })
       .then(() => true)
       .catch((error) => {
-        setProfileError(error instanceof Error ? error.message : "Не удалось сохранить профиль.");
+        setProfileError(error instanceof Error ? error.message : "Не удалось сохранить профиль");
         return false;
       })
       .finally(() => {
@@ -105,7 +105,7 @@ export function AccountSettingsView({
         newPasswordRepeat,
       });
     } catch (error) {
-      setPasswordError(error instanceof Error ? error.message : "Не удалось сменить пароль.");
+      setPasswordError(error instanceof Error ? error.message : "Не удалось сменить пароль");
       setIsPasswordSubmitting(false);
     }
   }

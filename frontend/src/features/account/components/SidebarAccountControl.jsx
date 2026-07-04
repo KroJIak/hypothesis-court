@@ -117,7 +117,7 @@ export function SidebarAccountControl({
       setErrorMessage("");
       event.target.value = "";
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Не удалось загрузить изображение.");
+      setErrorMessage(error instanceof Error ? error.message : "Не удалось загрузить изображение");
       event.target.value = "";
     }
   }
