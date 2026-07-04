@@ -18,6 +18,7 @@ export function EvaluationStage({
   answer,
   consultationMessages = [],
   isAnswerVisible,
+  isVerdictTypewriterReady,
   hideAgentStatus,
   onVerdictComplete,
   onAgentAvatarRef,
@@ -206,7 +207,12 @@ export function EvaluationStage({
 
       {isAnswerVisible && answer ? (
         <>
-          <JudgeVerdict answer={answer} sessionId={sessionId} onComplete={onVerdictComplete} />
+          <JudgeVerdict
+            answer={answer}
+            sessionId={sessionId}
+            onComplete={onVerdictComplete}
+            isReadyToType={isVerdictTypewriterReady}
+          />
           {verdictActions ? <JudgeVerdictActions {...verdictActions} /> : null}
           {consultationMessages.length > 0 ? (
             <div className="consultation-thread" aria-label="Консультация по гипотезам">

@@ -22,10 +22,15 @@ function getInitialVisibleAnswer(sessionId, answer) {
   return answer.slice(0, cachedLength);
 }
 
-export function JudgeVerdict({ answer, sessionId, onComplete }) {
+export function JudgeVerdict({ answer, sessionId, onComplete, isReadyToType = true }) {
   const [visibleAnswer, setVisibleAnswer] = useState(() => getInitialVisibleAnswer(sessionId, answer));
 
   useEffect(() => {
+    if (!isReadyToType) {
+      setVisibleAnswer(getInitialVisibleAnswer(sessionId, answer));
+      return undefined;
+    }
+
     if (!answer) {
       setVisibleAnswer("");
       return undefined;
@@ -54,7 +59,7 @@ export function JudgeVerdict({ answer, sessionId, onComplete }) {
     }, TYPEWRITER_INTERVAL_MS);
 
     return () => window.clearInterval(intervalId);
-  }, [answer, sessionId]);
+  }, [answer, isReadyToType, sessionId]);
 
   return (
     <div className="judge-verdict" aria-live="polite">

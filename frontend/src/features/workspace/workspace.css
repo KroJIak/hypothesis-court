@@ -916,6 +916,10 @@
   padding-top: 4px;
 }
 
+.workspace-scene__verdict-scroll-spacer {
+  pointer-events: none;
+}
+
 .workspace-scene--empty {
   display: grid;
   align-content: center;
