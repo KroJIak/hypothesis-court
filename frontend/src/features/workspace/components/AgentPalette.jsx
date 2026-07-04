@@ -31,6 +31,7 @@ export function AgentPalette({
   onClosePendingAgentSetup,
   onChangePendingAgentSetup,
   onGeneratePendingAgentPrompt,
+  onDeletePendingAgentSetup,
   onSavePendingAgentSetup,
   onAddAgent,
 }) {
@@ -39,7 +40,9 @@ export function AgentPalette({
   const [setupPopoverStyle, setSetupPopoverStyle] = useState({ left: "0px", top: "0px" });
   const sortedAgents = sortAvailableAgents(agents);
   const activePendingAgent =
-    sortedAgents.find((agent) => agent.id === activePendingAgentId && agent.isPendingSetup) ?? null;
+    sortedAgents.find((agent) =>
+      agent.id === activePendingAgentId && (agent.isPendingSetup || agent.isCustom),
+    ) ?? null;
 
   const setItemRef = useCallback((agentId, node) => {
     if (node) {
@@ -93,7 +96,7 @@ export function AgentPalette({
   }, [activePendingAgent, updateSetupPopoverPosition]);
 
   function handlePendingAgentClick(agent) {
-    if (isAgentEditingLocked || !agent.isPendingSetup) {
+    if (isAgentEditingLocked || (!agent.isPendingSetup && !agent.isCustom)) {
       return;
     }
 
@@ -206,8 +209,8 @@ export function AgentPalette({
                 : "palette-list__item palette-list__item--draggable"
             }
             style={{ viewTransitionName: getAgentViewTransitionName(agent.id) }}
-            role={agent.isPendingSetup && !isAgentEditingLocked ? "button" : undefined}
-            tabIndex={agent.isPendingSetup && !isAgentEditingLocked ? 0 : undefined}
+            role={(agent.isPendingSetup || agent.isCustom) && !isAgentEditingLocked ? "button" : undefined}
+            tabIndex={(agent.isPendingSetup || agent.isCustom) && !isAgentEditingLocked ? 0 : undefined}
             draggable={!isAgentEditingLocked && !agent.isEmpty && !agent.isPendingSetup}
             onClick={() => handlePendingAgentClick(agent)}
             onKeyDown={(event) => handlePendingAgentKeyDown(event, agent)}
@@ -252,6 +255,7 @@ export function AgentPalette({
               }}
               onChange={onChangePendingAgentSetup}
               onGeneratePrompt={onGeneratePendingAgentPrompt}
+              onDelete={onDeletePendingAgentSetup}
               onSave={onSavePendingAgentSetup}
               onClose={() => {
                 setIconPickerAgentId(null);

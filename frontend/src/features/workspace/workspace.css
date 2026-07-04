@@ -1826,7 +1826,15 @@
   white-space: nowrap;
 }
 
+.agent-setup-popover__actions {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 4px;
+}
+
 .agent-setup-popover__close,
+.agent-setup-popover__delete,
 .agent-setup-popover__icon-button,
 .agent-setup-popover__icon-option,
 .agent-setup-popover__generate {
@@ -1835,7 +1843,8 @@
   cursor: pointer;
 }
 
-.agent-setup-popover__close {
+.agent-setup-popover__close,
+.agent-setup-popover__delete {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1853,7 +1862,15 @@
   outline: none;
 }
 
-.agent-setup-popover__close svg {
+.agent-setup-popover__delete:hover,
+.agent-setup-popover__delete:focus-visible {
+  background: rgba(255, 255, 255, 0.065);
+  color: #ffffff;
+  outline: none;
+}
+
+.agent-setup-popover__close svg,
+.agent-setup-popover__delete svg {
   width: 16px;
   height: 16px;
 }

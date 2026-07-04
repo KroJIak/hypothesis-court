@@ -58,7 +58,17 @@ function readStoredCustomAgents() {
     const rawValue = window.localStorage.getItem(CUSTOM_AGENTS_STORAGE_KEY);
     const parsedValue = rawValue ? JSON.parse(rawValue) : [];
 
-    return Array.isArray(parsedValue) ? parsedValue : [];
+    if (!Array.isArray(parsedValue)) {
+      return [];
+    }
+
+    return parsedValue.map((agent) => ({
+      ...agent,
+      variant: agent.variant ?? "empty",
+      isCustom: true,
+      isEmpty: false,
+      isPendingSetup: false,
+    }));
   } catch {
     return [];
   }
@@ -107,6 +117,23 @@ function removeAgentFromSessions(sessions, agentId) {
     evaluation: {
       ...session.evaluation,
       agents: (session.evaluation?.agents ?? []).filter((agent) => agent.id !== agentId),
+    },
+  }));
+}
+
+function updateAgentInSessions(sessions, updatedAgent) {
+  return sessions.map((session) => ({
+    ...session,
+    availableAgents: (session.availableAgents ?? []).map((agent) =>
+      agent.id === updatedAgent.id ? updatedAgent : agent,
+    ),
+    evaluation: {
+      ...session.evaluation,
+      agents: (session.evaluation?.agents ?? []).map((agent) =>
+        agent.id === updatedAgent.id
+          ? createEvaluationAgent(updatedAgent)
+          : agent,
+      ),
     },
   }));
 }
@@ -481,9 +508,12 @@ export function WorkspacePage({
     }
 
     const availableAgents = selectedSession.availableAgents ?? getInitialAvailableAgents(selectedSession, data.palette.agents);
-    const pendingAgent = availableAgents.find((agent) => agent.id === agentId && agent.isPendingSetup);
+    const editableAgent = availableAgents.find((agent) => (
+      agent.id === agentId
+        && (agent.isPendingSetup || agent.isCustom)
+    ));
 
-    if (!pendingAgent) {
+    if (!editableAgent) {
       return;
     }
 
@@ -502,7 +532,7 @@ export function WorkspacePage({
     updateSelectedSession((session) => ({
       ...session,
       availableAgents: (session.availableAgents ?? getInitialAvailableAgents(session, data.palette.agents)).map((agent) =>
-        agent.id === agentId && agent.isPendingSetup
+        agent.id === agentId && (agent.isPendingSetup || agent.isCustom)
           ? {
               ...agent,
               ...changes,
@@ -518,9 +548,9 @@ export function WorkspacePage({
     }
 
     const availableAgents = selectedSession.availableAgents ?? getInitialAvailableAgents(selectedSession, data.palette.agents);
-    const pendingAgent = availableAgents.find((agent) => agent.id === agentId);
+    const pendingAgent = availableAgents.find((agent) => agent.id === agentId && (agent.isPendingSetup || agent.isCustom));
 
-    if (!pendingAgent?.isPendingSetup) {
+    if (!pendingAgent) {
       return;
     }
 
@@ -545,7 +575,10 @@ export function WorkspacePage({
     }
 
     const availableAgents = selectedSession.availableAgents ?? getInitialAvailableAgents(selectedSession, data.palette.agents);
-    const pendingAgent = availableAgents.find((agent) => agent.id === agentId && agent.isPendingSetup);
+    const pendingAgent = availableAgents.find((agent) => (
+      agent.id === agentId
+        && (agent.isPendingSetup || agent.isCustom)
+    ));
     const nextName = pendingAgent?.name?.trim() || "Новый эксперт";
     const nextSystemPrompt = pendingAgent?.systemPrompt?.trim() ?? "";
 
@@ -563,14 +596,25 @@ export function WorkspacePage({
       isPendingSetup: false,
     };
 
-    updateSelectedSession((session) => ({
-      ...session,
-      availableAgents: sortAvailableAgents(
-        (session.availableAgents ?? getInitialAvailableAgents(session, data.palette.agents)).map((agent) =>
-          agent.id === agentId && agent.isPendingSetup ? configuredAgent : agent,
-        ),
+    setSessions((currentSessions) =>
+      updateAgentInSessions(
+        currentSessions.map((session) => {
+          if (session.id !== selectedSession.id) {
+            return session;
+          }
+
+          return {
+            ...session,
+            availableAgents: sortAvailableAgents(
+              (session.availableAgents ?? getInitialAvailableAgents(session, data.palette.agents)).map((agent) =>
+                agent.id === agentId && (agent.isPendingSetup || agent.isCustom) ? configuredAgent : agent,
+              ),
+            ),
+          };
+        }),
+        configuredAgent,
       ),
-    }));
+    );
 
     setCustomAgents((currentAgents) => {
       const nextAgents = sortAvailableAgents([
@@ -582,6 +626,35 @@ export function WorkspacePage({
       return nextAgents;
     });
 
+    setActivePendingAgentId(null);
+  }
+
+  function handleDeletePendingAgentSetup(agentId) {
+    if (isAgentEditingLocked) {
+      return;
+    }
+
+    const availableAgents = selectedSession.availableAgents ?? getInitialAvailableAgents(selectedSession, data.palette.agents);
+    const agent = availableAgents.find((availableAgent) => (
+      availableAgent.id === agentId
+        && (availableAgent.isPendingSetup || availableAgent.isCustom)
+    ));
+
+    if (!agent) {
+      return;
+    }
+
+    if (agent.isCustom) {
+      handleDeleteCustomAgent(agentId);
+      return;
+    }
+
+    updateSelectedSession((session) => ({
+      ...session,
+      availableAgents: (session.availableAgents ?? getInitialAvailableAgents(session, data.palette.agents)).filter(
+        (availableAgent) => availableAgent.id !== agentId,
+      ),
+    }));
     setActivePendingAgentId(null);
   }
 
@@ -929,6 +1002,7 @@ export function WorkspacePage({
         onClosePendingAgentSetup={handleClosePendingAgentSetup}
         onChangePendingAgentSetup={handleChangePendingAgentSetup}
         onGeneratePendingAgentPrompt={handleGeneratePendingAgentPrompt}
+        onDeletePendingAgentSetup={handleDeletePendingAgentSetup}
         onSavePendingAgentSetup={handleSavePendingAgentSetup}
         onAddAgent={handleAddAgent}
       />

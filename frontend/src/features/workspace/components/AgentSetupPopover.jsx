@@ -1,4 +1,4 @@
-import { Sparkles, X } from "lucide-react";
+import { Sparkles, Trash2, X } from "lucide-react";
 
 import { AgentVariantIcon, agentAvatarVariantOptions } from "./AgentAvatar";
 
@@ -8,15 +8,16 @@ export function AgentSetupPopover({
   onToggleIconPicker,
   onChange,
   onGeneratePrompt,
+  onDelete,
   onSave,
   onClose,
   style,
 }) {
   const agentName = agent.name ?? "";
-  const popoverTitle = agentName.trim();
+  const popoverTitle = agentName.trim() || "Новый эксперт";
   const selectedVariant = agent.variant ?? "empty";
   const systemPrompt = agent.systemPrompt ?? "";
-  const canSave = agentName.trim().length > 0 && systemPrompt.trim().length > 0;
+  const canSave = systemPrompt.trim().length > 0;
 
   function handleClose() {
     if (canSave) {
@@ -36,14 +37,24 @@ export function AgentSetupPopover({
     >
       <div className="agent-setup-popover__header">
         <span className="agent-setup-popover__title">{popoverTitle}</span>
-        <button
-          type="button"
-          className="agent-setup-popover__close"
-          aria-label="Закрыть настройку агента"
-          onClick={handleClose}
-        >
-          <X aria-hidden="true" strokeWidth={1.9} />
-        </button>
+        <div className="agent-setup-popover__actions">
+          <button
+            type="button"
+            className="agent-setup-popover__delete"
+            aria-label="Удалить агента"
+            onClick={() => onDelete(agent.id)}
+          >
+            <Trash2 aria-hidden="true" strokeWidth={1.9} />
+          </button>
+          <button
+            type="button"
+            className="agent-setup-popover__close"
+            aria-label="Закрыть настройку агента"
+            onClick={handleClose}
+          >
+            <X aria-hidden="true" strokeWidth={1.9} />
+          </button>
+        </div>
       </div>
 
       <div className="agent-setup-popover__identity">
