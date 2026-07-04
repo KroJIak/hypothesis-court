@@ -18,7 +18,7 @@ const statusMeta = {
   },
 };
 
-export function ProcessingStatusBadge({ status }) {
+export function ProcessingStatusBadge({ status, label: labelOverride }) {
   const meta = statusMeta[status];
 
   if (!meta) {
@@ -26,9 +26,10 @@ export function ProcessingStatusBadge({ status }) {
   }
 
   const { className, label, Icon } = meta;
+  const accessibleLabel = labelOverride ?? label;
 
   return (
-    <span className={className} aria-label={label} title={label}>
+    <span className={className} aria-label={accessibleLabel} title={accessibleLabel}>
       <Icon aria-hidden="true" strokeWidth={2} />
     </span>
   );

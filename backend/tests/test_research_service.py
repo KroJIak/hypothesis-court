@@ -404,6 +404,7 @@ def make_settings(tmp_path: Path):
         superadmin_last_name=None,
         chat_max_pinned_sessions=5,
         session_max_files=100,
+        session_file_upload_max_bytes=100 * 1024 * 1024,
         user_max_agents=50,
         model_provider_base_url="https://example.com/v1",
         model_provider_api_key=None,

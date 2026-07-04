@@ -45,6 +45,7 @@ import {
 import {
   AGENT_DRAG_MIME_TYPE,
   EVALUATION_SIDE_RIGHT,
+  DOCUMENT_PROCESSING_STATUS_PROCESSING,
 } from "../constants";
 import { useWorkspaceScene } from "../hooks/useWorkspaceScene";
 import { resetScenePlayback } from "../hooks/useScenePlayback";
@@ -64,10 +65,34 @@ import {
 } from "../model/workspaceSessionModel";
 import { readAgentDragPayload } from "../utils/dragPayload";
 import { runLayoutTransition } from "../utils/layoutTransition";
+import { createAttachmentProcessingView } from "../utils/processingStatus";
 import "../workspace.css";
 
 const WORKSPACE_NOTIFICATION_TTL_MS = 4200;
 const WORKSPACE_NOTIFICATION_LIMIT = 5;
+const LOCAL_PENDING_AGENT_ID_PREFIX = "pending-agent-";
+
+function createLocalPendingAgent() {
+  const id =
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random()}`;
+
+  return {
+    id: `${LOCAL_PENDING_AGENT_ID_PREFIX}${id}`,
+    name: "Новый эксперт",
+    variant: "empty",
+    systemPrompt: "",
+    isCustom: true,
+    isEmpty: false,
+    isPendingSetup: true,
+  };
+}
+
+function isLocalPendingAgentId(agentId) {
+  return typeof agentId === "string" && agentId.startsWith(LOCAL_PENDING_AGENT_ID_PREFIX);
+}
+
 function getEmptyPaletteAgents(data) {
   return data.palette.agents.filter((agent) => agent.isEmpty);
 }
@@ -104,6 +129,23 @@ function updateAgentInSessions(sessions, updatedAgent) {
   }));
 }
 
+function replaceAgentInSessions(sessions, previousAgentId, nextAgent) {
+  return sessions.map((session) => ({
+    ...session,
+    availableAgents: (session.availableAgents ?? []).map((agent) =>
+      agent.id === previousAgentId ? nextAgent : agent,
+    ),
+    evaluation: {
+      ...session.evaluation,
+      agents: (session.evaluation?.agents ?? []).map((agent) =>
+        agent.id === previousAgentId
+          ? createEvaluationAgent(nextAgent)
+          : agent,
+      ),
+    },
+  }));
+}
+
 function applySelectedAgentsToSession(session, selectedAgents, userAgents, data) {
   const selectedAgentIds = new Set(selectedAgents.map((agent) => agent.id));
 
@@ -122,14 +164,23 @@ function applySelectedAgentsToSession(session, selectedAgents, userAgents, data)
 
 function refreshAvailableAgentsForSession(session, userAgents, data) {
   const selectedAgentIds = new Set((session.evaluation?.agents ?? []).map((agent) => agent.id));
+  const localPendingAgents = (session.availableAgents ?? []).filter((agent) => isLocalPendingAgentId(agent.id));
 
   return {
     ...session,
     availableAgents: sortAvailableAgents([
       ...userAgents.filter((agent) => !selectedAgentIds.has(agent.id)),
+      ...localPendingAgents,
       ...getEmptyPaletteAgents(data),
     ]),
   };
+}
+
+function markAttachmentsAsProcessing(attachments) {
+  return (attachments ?? []).map((attachment) => ({
+    ...attachment,
+    ...createAttachmentProcessingView(DOCUMENT_PROCESSING_STATUS_PROCESSING),
+  }));
 }
 
 function applyRunVersion(session, version, { isComplete = true } = {}) {
@@ -231,6 +282,7 @@ export function WorkspacePage({
   const [isUploadingSessionFile, setIsUploadingSessionFile] = useState(false);
   const [userAgents, setUserAgents] = useState([]);
   const [isAgentGenerationAvailable, setIsAgentGenerationAvailable] = useState(false);
+  const [generatingAgentId, setGeneratingAgentId] = useState(null);
   const [activePendingAgentId, setActivePendingAgentId] = useState(null);
   const [activeAgentHistoryTarget, setActiveAgentHistoryTarget] = useState(null);
   const [activeKnowledgeGraphTarget, setActiveKnowledgeGraphTarget] = useState(null);
@@ -571,6 +623,27 @@ export function WorkspacePage({
     );
   }
 
+  async function refreshSessionFiles(chatSessionId) {
+    const payload = await listSessionFiles({
+      accessToken,
+      chatSessionId,
+    });
+
+    setSessions((currentSessions) =>
+      currentSessions.map((session) =>
+        session.id === chatSessionId
+          ? {
+              ...session,
+              attachments: payload.items,
+              maxFiles: payload.maxFiles,
+            }
+          : session,
+      ),
+    );
+
+    return payload;
+  }
+
   async function loadResearchRunDetail(chatSessionId, runId) {
     const requestKey = `${chatSessionId}:${runId}`;
     const existingRequest = runDetailRequestsRef.current.get(requestKey);
@@ -749,6 +822,10 @@ export function WorkspacePage({
   }
 
   async function handleAddAgent() {
+    if (!selectedSession) {
+      return;
+    }
+
     if (unchangedNewAgent) {
       setActivePendingAgentId(unchangedNewAgent.id);
       return;
@@ -762,25 +839,19 @@ export function WorkspacePage({
       addAgentFrameRef.current = null;
     });
 
-    try {
-      const createdAgent = await createUserAgent({ accessToken });
-      newAgentBaselineByIdRef.current.set(createdAgent.id, createAgentDraftSnapshot(createdAgent));
-      setUserAgents((currentAgents) => sortAvailableAgents([...currentAgents, createdAgent]));
-      setSessions((currentSessions) =>
-        currentSessions.map((session) => ({
-          ...session,
-          availableAgents: sortAvailableAgents([
-            ...((session.availableAgents ?? getInitialAvailableAgents(session, getPaletteAgents(userAgents, data)))
-              .filter((agent) => !agent.isEmpty)),
-            createdAgent,
-            ...getEmptyPaletteAgents(data),
-          ]),
-        })),
-      );
-      setActivePendingAgentId(createdAgent.id);
-    } catch (error) {
-      showWorkspaceError(error, "Не удалось создать агента");
-    }
+    const pendingAgent = createLocalPendingAgent();
+    newAgentBaselineByIdRef.current.set(pendingAgent.id, createAgentDraftSnapshot(pendingAgent));
+
+    updateSelectedSession((session) => ({
+      ...session,
+      availableAgents: sortAvailableAgents([
+        ...(session.availableAgents ?? getInitialAvailableAgents(session, getPaletteAgents(userAgents, data)))
+          .filter((agent) => !agent.isEmpty && agent.id !== pendingAgent.id),
+        pendingAgent,
+        ...getEmptyPaletteAgents(data),
+      ]),
+    }));
+    setActivePendingAgentId(pendingAgent.id);
   }
 
   function handleOpenPendingAgentSetup(agentId) {
@@ -825,6 +896,10 @@ export function WorkspacePage({
   }
 
   async function handleGeneratePendingAgentPrompt(agentId) {
+    if (generatingAgentId) {
+      return;
+    }
+
     const availableAgents = selectedSession.availableAgents ?? getInitialAvailableAgents(selectedSession, getPaletteAgents(userAgents, data));
     const pendingAgent = availableAgents.find((agent) => agent.id === agentId && (agent.isPendingSetup || !agent.isEmpty));
 
@@ -832,20 +907,49 @@ export function WorkspacePage({
       return;
     }
 
+    setGeneratingAgentId(agentId);
+
     try {
+      let generationAgentId = agentId;
+
+      if (isLocalPendingAgentId(agentId)) {
+        const createdAgent = await createUserAgent({
+          accessToken,
+          name: pendingAgent.name?.trim() || "Новый эксперт",
+          variant: pendingAgent.variant ?? "empty",
+          systemPrompt: pendingAgent.systemPrompt ?? "",
+        });
+
+        generationAgentId = createdAgent.id;
+        setGeneratingAgentId(createdAgent.id);
+        newAgentBaselineByIdRef.current.delete(agentId);
+        newAgentBaselineByIdRef.current.set(createdAgent.id, createAgentDraftSnapshot(createdAgent));
+        setActivePendingAgentId(createdAgent.id);
+        setUserAgents((currentAgents) => sortAvailableAgents([
+          ...currentAgents.filter((agent) => agent.id !== createdAgent.id),
+          createdAgent,
+        ]));
+        setSessions((currentSessions) => replaceAgentInSessions(currentSessions, agentId, createdAgent));
+      }
+
       const generatedAgent = await generateUserAgent({
         accessToken,
-        agentId,
+        agentId: generationAgentId,
         name: pendingAgent.name?.trim() || "Новый эксперт",
         systemPrompt: pendingAgent.systemPrompt ?? "",
       });
       setUserAgents((currentAgents) =>
-        sortAvailableAgents(currentAgents.map((agent) => (agent.id === agentId ? generatedAgent : agent))),
+        sortAvailableAgents([
+          ...currentAgents.filter((agent) => agent.id !== generationAgentId),
+          generatedAgent,
+        ]),
       );
       setSessions((currentSessions) => updateAgentInSessions(currentSessions, generatedAgent));
-      newAgentBaselineByIdRef.current.delete(agentId);
+      newAgentBaselineByIdRef.current.delete(generationAgentId);
     } catch (error) {
       showWorkspaceError(error, "Не удалось сгенерировать промпт агента");
+    } finally {
+      setGeneratingAgentId(null);
     }
   }
 
@@ -863,20 +967,33 @@ export function WorkspacePage({
     }
 
     try {
-      const updatedAgent = await updateUserAgent({
-        accessToken,
-        agentId,
-        name: nextName,
-        variant: pendingAgent.variant ?? "empty",
-        systemPrompt: nextSystemPrompt,
-      });
+      const updatedAgent = isLocalPendingAgentId(agentId)
+        ? await createUserAgent({
+            accessToken,
+            name: nextName,
+            variant: pendingAgent.variant ?? "empty",
+            systemPrompt: nextSystemPrompt,
+          })
+        : await updateUserAgent({
+            accessToken,
+            agentId,
+            name: nextName,
+            variant: pendingAgent.variant ?? "empty",
+            systemPrompt: nextSystemPrompt,
+          });
       setUserAgents((currentAgents) =>
-        sortAvailableAgents(currentAgents.map((agent) => (agent.id === agentId ? updatedAgent : agent))),
+        sortAvailableAgents([
+          ...currentAgents.filter((agent) => agent.id !== agentId && agent.id !== updatedAgent.id),
+          updatedAgent,
+        ]),
       );
-      setSessions((currentSessions) => updateAgentInSessions(currentSessions, updatedAgent));
-      if (!areAgentDraftSnapshotsEqual(createAgentDraftSnapshot(updatedAgent), newAgentBaselineByIdRef.current.get(agentId) ?? {})) {
-        newAgentBaselineByIdRef.current.delete(agentId);
-      }
+      setSessions((currentSessions) =>
+        isLocalPendingAgentId(agentId)
+          ? replaceAgentInSessions(currentSessions, agentId, updatedAgent)
+          : updateAgentInSessions(currentSessions, updatedAgent),
+      );
+      newAgentBaselineByIdRef.current.delete(agentId);
+      newAgentBaselineByIdRef.current.delete(updatedAgent.id);
       setActivePendingAgentId(null);
     } catch (error) {
       showWorkspaceError(error, "Не удалось сохранить агента");
@@ -891,6 +1008,17 @@ export function WorkspacePage({
     ));
 
     if (!agent) {
+      return;
+    }
+
+    if (isLocalPendingAgentId(agentId)) {
+      updateSelectedSession((session) => ({
+        ...session,
+        availableAgents: (session.availableAgents ?? getInitialAvailableAgents(session, getPaletteAgents(userAgents, data)))
+          .filter((availableAgent) => availableAgent.id !== agentId),
+      }));
+      newAgentBaselineByIdRef.current.delete(agentId);
+      setActivePendingAgentId(null);
       return;
     }
 
@@ -1103,6 +1231,7 @@ export function WorkspacePage({
       isVerdictComplete: false,
       consultationMessages: [],
       composerRequests: [],
+      attachments: markAttachmentsAsProcessing(session.attachments),
     }));
     resetJudgeVerdict(selectedSession.id);
     setDraftMessage("");
@@ -1130,9 +1259,15 @@ export function WorkspacePage({
               : session,
           ),
         );
+        void refreshSessionFiles(selectedSession.id).catch((error) => {
+          showWorkspaceError(error, "Не удалось обновить статусы файлов");
+        });
       })
       .catch((error) => {
         showWorkspaceError(error, "Не удалось выполнить исследовательский запуск");
+        void refreshSessionFiles(selectedSession.id).catch((refreshError) => {
+          showWorkspaceError(refreshError, "Не удалось обновить статусы файлов");
+        });
         setSessions((currentSessions) =>
           currentSessions.map((session) =>
             session.id === selectedSession.id
@@ -1479,7 +1614,7 @@ export function WorkspacePage({
         onAgentDragEnd={handleAgentDragEnd}
         onDropAgentToPalette={handleDropAgentToPalette}
         isDropTargetVisible={dragSource === "evaluation"}
-        isAddAgentDisabled={Boolean(unchangedNewAgent)}
+        isAddAgentDisabled={Boolean(unchangedNewAgent) || Boolean(generatingAgentId)}
         isAgentEditingLocked={isAgentEditingLocked}
         lockedReason={agentEditingLockedReason}
         activePendingAgentId={activePendingAgentId}
@@ -1487,6 +1622,7 @@ export function WorkspacePage({
         onChangePendingAgentSetup={handleChangePendingAgentSetup}
         onGeneratePendingAgentPrompt={handleGeneratePendingAgentPrompt}
         isAgentGenerationDisabled={!isAgentGenerationAvailable}
+        generatingAgentId={generatingAgentId}
         onDeletePendingAgentSetup={handleDeletePendingAgentSetup}
         onSavePendingAgentSetup={handleSavePendingAgentSetup}
         onAddAgent={handleAddAgent}

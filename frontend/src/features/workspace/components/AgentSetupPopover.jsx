@@ -1,4 +1,4 @@
-import { Sparkles, Trash2, X } from "lucide-react";
+import { LoaderCircle, Sparkles, Trash2, X } from "lucide-react";
 
 import { AgentVariantIcon, agentAvatarVariantOptions } from "./AgentAvatar";
 
@@ -9,6 +9,7 @@ export function AgentSetupPopover({
   onChange,
   onGeneratePrompt,
   isGenerateDisabled,
+  isGeneratingPrompt = false,
   onDelete,
   onSave,
   style,
@@ -104,11 +105,15 @@ export function AgentSetupPopover({
       <button
         type="button"
         className="agent-setup-popover__generate"
-        disabled={isGenerateDisabled}
+        disabled={isGenerateDisabled || isGeneratingPrompt}
         onClick={() => onGeneratePrompt(agent.id)}
       >
-        <Sparkles aria-hidden="true" strokeWidth={1.8} />
-        Сгенерировать
+        {isGeneratingPrompt ? (
+          <LoaderCircle className="agent-setup-popover__generate-spinner" aria-hidden="true" strokeWidth={1.8} />
+        ) : (
+          <Sparkles aria-hidden="true" strokeWidth={1.8} />
+        )}
+        {isGeneratingPrompt ? "Генерируем..." : "Сгенерировать"}
       </button>
 
       <label className="agent-setup-popover__prompt-field">

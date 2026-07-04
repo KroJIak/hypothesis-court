@@ -28,6 +28,7 @@ export function AgentPalette({
   onChangePendingAgentSetup,
   onGeneratePendingAgentPrompt,
   isAgentGenerationDisabled,
+  generatingAgentId,
   onDeletePendingAgentSetup,
   onSavePendingAgentSetup,
   onAddAgent,
@@ -47,11 +48,15 @@ export function AgentPalette({
       return;
     }
 
+    if (generatingAgentId === activePendingAgentId) {
+      return;
+    }
+
     isClosingSetupRef.current = true;
     Promise.resolve(onSavePendingAgentSetup(activePendingAgentId)).finally(() => {
       isClosingSetupRef.current = false;
     });
-  }, [activePendingAgentId, onSavePendingAgentSetup]);
+  }, [activePendingAgentId, generatingAgentId, onSavePendingAgentSetup]);
 
   const setItemRef = useCallback((agentId, node) => {
     if (node) {
@@ -242,6 +247,7 @@ export function AgentPalette({
               onChange={onChangePendingAgentSetup}
               onGeneratePrompt={onGeneratePendingAgentPrompt}
               isGenerateDisabled={isAgentGenerationDisabled}
+              isGeneratingPrompt={generatingAgentId === activePendingAgent.id}
               onDelete={onDeletePendingAgentSetup}
               onSave={onSavePendingAgentSetup}
               style={setupPopoverStyle}

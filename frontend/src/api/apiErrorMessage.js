@@ -66,6 +66,10 @@ const API_ERROR_PATTERNS = [
     pattern: /^Only (\d+) files can be attached to a chat\.$/,
     buildMessage: ([count]) => `К чату можно прикрепить не больше ${count} файлов`,
   },
+  {
+    pattern: /^Session file is too large\. Maximum size is (\d+) bytes\.$/,
+    buildMessage: ([bytes]) => `Файл слишком большой. Максимальный размер: ${formatBytes(Number(bytes))}`,
+  },
 ];
 
 export function formatApiErrorMessage(message, fallbackMessage) {
@@ -93,4 +97,20 @@ function trimFinalDot(message) {
   }
 
   return message.replace(/\.$/, "");
+}
+
+function formatBytes(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return "100 МБ";
+  }
+
+  const megabytes = bytes / (1024 * 1024);
+
+  if (megabytes >= 1) {
+    return `${Math.round(megabytes)} МБ`;
+  }
+
+  const kilobytes = bytes / 1024;
+
+  return `${Math.max(1, Math.round(kilobytes))} КБ`;
 }

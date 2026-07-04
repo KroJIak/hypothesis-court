@@ -57,6 +57,9 @@ function AttachmentChip({
 }) {
   const AttachmentIcon = getAttachmentIcon(attachment.kind);
   const attachmentTypeLabel = getAttachmentTypeLabel(attachment);
+  const processingLabel = attachment.processingError
+    ? `${attachment.processingStatusLabel ?? "Ошибка обработки"}: ${attachment.processingError}`
+    : attachment.processingStatusLabel;
 
   return (
     <div
@@ -67,7 +70,7 @@ function AttachmentChip({
       onFocus={(event) => showAttachmentTooltip(attachment.id, event.currentTarget)}
       onBlur={hideAttachmentTooltip}
     >
-      <ProcessingStatusBadge status={attachment.processingStatus} />
+      <ProcessingStatusBadge status={attachment.processingBadgeStatus ?? attachment.processingStatus} label={processingLabel} />
       <button type="button" className="attachment-chip__preview" aria-label={attachment.tooltip}>
         <span className="attachment-chip__icon">
           <AttachmentIcon aria-hidden="true" strokeWidth={1.9} />
@@ -286,7 +289,12 @@ export function Composer({
       {activeAttachment && typeof document !== "undefined"
         ? createPortal(
             <span className="attachment-tooltip" style={attachmentTooltipStyle}>
-              {activeAttachment.tooltip}
+              <strong>{activeAttachment.tooltip}</strong>
+              <span>
+                {activeAttachment.processingError
+                  ? `${activeAttachment.processingStatusLabel ?? "Ошибка обработки"}: ${activeAttachment.processingError}`
+                  : activeAttachment.processingStatusLabel ?? "Ожидает обработки"}
+              </span>
             </span>,
             document.body,
           )

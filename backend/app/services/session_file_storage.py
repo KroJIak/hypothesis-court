@@ -9,8 +9,9 @@ _CHUNK_SIZE = 1024 * 1024
 
 
 class SessionFileStorage:
-    def __init__(self, uploads_dir: Path) -> None:
+    def __init__(self, uploads_dir: Path, max_bytes: int) -> None:
         self._uploads_dir = uploads_dir
+        self._max_bytes = max_bytes
 
     async def save(self, *, chat_session_id: uuid.UUID, file: UploadFile) -> tuple[str, int]:
         filename = self.normalize_filename(file.filename)
@@ -24,10 +25,15 @@ class SessionFileStorage:
             with target_path.open("wb") as target_file:
                 while chunk := await file.read(_CHUNK_SIZE):
                     size_bytes += len(chunk)
+                    if size_bytes > self._max_bytes:
+                        raise ValidationError(f"Session file is too large. Maximum size is {self._max_bytes} bytes.")
                     target_file.write(chunk)
         except OSError as exc:
             self.delete(object_key)
             raise ValidationError("Could not save session file.") from exc
+        except ValidationError:
+            self.delete(object_key)
+            raise
 
         if size_bytes == 0:
             self.delete(object_key)

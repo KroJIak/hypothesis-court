@@ -12,6 +12,15 @@ export const ATTACHMENT_TOOLTIP_EDGE_OFFSET = 32;
 export const PROCESSING_STATUS_PROCESSING = "processing";
 export const PROCESSING_STATUS_PROCESSED = "processed";
 export const PROCESSING_STATUS_QUEUED = "queued";
+export const DOCUMENT_PROCESSING_STATUS_UPLOADED = "uploaded";
+export const DOCUMENT_PROCESSING_STATUS_PROCESSING = "processing";
+export const DOCUMENT_PROCESSING_STATUS_PROCESSED = "processed";
+export const DOCUMENT_PROCESSING_STATUS_DONE = "done";
+export const DOCUMENT_PROCESSING_STATUS_PARSING = "parsing";
+export const DOCUMENT_PROCESSING_STATUS_CHUNKED = "chunked";
+export const DOCUMENT_PROCESSING_STATUS_INDEXED = "indexed";
+export const DOCUMENT_PROCESSING_STATUS_FAILED = "failed";
+export const DOCUMENT_PROCESSING_STATUS_UNSUPPORTED = "unsupported";
 export const COMPOSER_CONTEXT_OPTIONS = [
   { value: "kpi", label: "KPI" },
   { value: "constraints", label: "Ограничения" },

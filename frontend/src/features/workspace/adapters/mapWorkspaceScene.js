@@ -1,4 +1,4 @@
-import { normalizeAttachmentProcessingStatus } from "../utils/processingStatus";
+import { createAttachmentProcessingView } from "../utils/processingStatus";
 
 export function mapWorkspaceScene(dto) {
   return {
@@ -32,7 +32,7 @@ export function mapWorkspaceScene(dto) {
         kind: attachment.kind,
         shortLabel: attachment.kind.toUpperCase(),
         tooltip: attachment.fileName,
-        processingStatus: normalizeAttachmentProcessingStatus(attachment.processingStatus),
+        ...createAttachmentProcessingView(attachment.processingStatus),
       })),
       debate: {
         playLabel: session.debate.playLabel,

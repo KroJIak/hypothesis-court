@@ -1,9 +1,27 @@
+import asyncio
 import uuid
 
 from app.models.chat_session import ChatSession
 from app.models.session_file import SessionFile
 from app.models.user import User
+from app.services.exceptions import ValidationError
 from app.services.session_file_service import SessionFileService
+from app.services.session_file_storage import SessionFileStorage
+
+
+class FakeUploadFile:
+    def __init__(self, *, filename: str, content: bytes, content_type: str | None = None) -> None:
+        self.filename = filename
+        self.content_type = content_type
+        self._content = content
+        self._cursor = 0
+
+    async def read(self, size: int) -> bytes:
+        if self._cursor >= len(self._content):
+            return b""
+        chunk = self._content[self._cursor : self._cursor + size]
+        self._cursor += len(chunk)
+        return chunk
 
 
 class DummySession:
@@ -142,3 +160,32 @@ def test_get_downloadable_file_rejects_other_user() -> None:
         assert exc.detail == "Session file not found."
     else:
         raise AssertionError("Expected not found for another user")
+
+
+def test_storage_accepts_pdf_under_upload_limit(tmp_path) -> None:
+    storage = SessionFileStorage(uploads_dir=tmp_path, max_bytes=100 * 1024 * 1024)
+    upload = FakeUploadFile(
+        filename="brief.pdf",
+        content=b"%PDF-1.7\n" + (b"x" * (151 * 1024)),
+        content_type="application/pdf",
+    )
+
+    object_key, size_bytes = asyncio.run(storage.save(chat_session_id=uuid.uuid4(), file=upload))
+
+    assert object_key.endswith(".pdf")
+    assert size_bytes == 151 * 1024 + len(b"%PDF-1.7\n")
+    assert (tmp_path / object_key).is_file()
+
+
+def test_storage_rejects_file_over_upload_limit_and_removes_partial_file(tmp_path) -> None:
+    storage = SessionFileStorage(uploads_dir=tmp_path, max_bytes=4)
+    upload = FakeUploadFile(filename="too-large.txt", content=b"12345", content_type="text/plain")
+
+    try:
+        asyncio.run(storage.save(chat_session_id=uuid.uuid4(), file=upload))
+    except ValidationError as exc:
+        assert exc.detail == "Session file is too large. Maximum size is 4 bytes."
+    else:
+        raise AssertionError("Expected file size validation error")
+
+    assert list(tmp_path.rglob("*.*")) == []

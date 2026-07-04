@@ -1,5 +1,5 @@
 import { getApiBaseUrl } from "../../../api/baseUrl";
-import { normalizeAttachmentProcessingStatus } from "../utils/processingStatus";
+import { createAttachmentProcessingView } from "../utils/processingStatus";
 import { readWorkspaceApiError } from "./readWorkspaceApiError";
 
 function mapSessionFile(dto) {
@@ -13,7 +13,7 @@ function mapSessionFile(dto) {
     fileName: dto.original_filename,
     sizeBytes: dto.size_bytes,
     downloadUrl: dto.download_url,
-    processingStatus: normalizeAttachmentProcessingStatus(dto.processing_status),
+    ...createAttachmentProcessingView(dto.processing_status),
     processingError: dto.processing_error ?? null,
     textExtractedAt: dto.text_extracted_at ?? null,
     createdAt: dto.created_at,

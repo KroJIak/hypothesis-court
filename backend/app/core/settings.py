@@ -49,6 +49,13 @@ def _parse_non_negative_int(raw_value: str, name: str) -> int:
     return value
 
 
+def _parse_positive_int(raw_value: str, name: str) -> int:
+    value = _parse_non_negative_int(raw_value, name)
+    if value <= 0:
+        raise ValueError(f"{name} must be greater than 0.")
+    return value
+
+
 def _get_env(name: str, default: str | None = None) -> str:
     value = os.getenv(name, default)
     if value is None:
@@ -71,6 +78,7 @@ class Settings:
     superadmin_last_name: str | None
     chat_max_pinned_sessions: int
     session_max_files: int
+    session_file_upload_max_bytes: int
     user_max_agents: int
     model_provider_base_url: str
     model_provider_api_key: str | None
@@ -124,6 +132,10 @@ def get_settings() -> Settings:
         session_max_files=_parse_non_negative_int(
             _get_env("SESSION_MAX_FILES", "100"),
             "SESSION_MAX_FILES",
+        ),
+        session_file_upload_max_bytes=_parse_positive_int(
+            _get_env("SESSION_FILE_UPLOAD_MAX_BYTES", str(100 * 1024 * 1024)),
+            "SESSION_FILE_UPLOAD_MAX_BYTES",
         ),
         user_max_agents=_parse_non_negative_int(
             _get_env("USER_MAX_AGENTS", "50"),

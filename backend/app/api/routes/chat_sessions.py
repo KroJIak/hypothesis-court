@@ -206,7 +206,10 @@ async def upload_session_file(
     settings: Settings = Depends(get_settings),
 ) -> SessionFileResponse:
     service = _get_session_file_service(session)
-    storage = SessionFileStorage(uploads_dir=settings.uploads_dir)
+    storage = SessionFileStorage(
+        uploads_dir=settings.uploads_dir,
+        max_bytes=settings.session_file_upload_max_bytes,
+    )
     try:
         session_file = await service.upload_file(
             user=current_user,
@@ -229,7 +232,10 @@ def delete_session_file(
     settings: Settings = Depends(get_settings),
 ) -> Response:
     service = _get_session_file_service(session)
-    storage = SessionFileStorage(uploads_dir=settings.uploads_dir)
+    storage = SessionFileStorage(
+        uploads_dir=settings.uploads_dir,
+        max_bytes=settings.session_file_upload_max_bytes,
+    )
     try:
         service.delete_file(
             user=current_user,
