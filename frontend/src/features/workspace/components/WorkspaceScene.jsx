@@ -6,7 +6,13 @@ import { HypothesisCandidates } from "./HypothesisCandidates";
 import { useScenePlayback } from "../hooks/useScenePlayback";
 import { getElementCenter, createStraightPath } from "../utils/geometry";
 
-const VERDICT_SCROLL_SETTLE_MS = 260;
+const VERDICT_SCROLL_FRAME_DELAY = 2;
+
+const initialVerdictScroll = {
+  key: null,
+  phase: "idle",
+  spacerHeight: 0,
+};
 
 function clampNumber(value, min, max) {
   return Math.min(Math.max(value, min), max);
@@ -29,10 +35,8 @@ export function WorkspaceScene({
   const judgeAvatarRef = useRef(null);
   const evaluationAvatarRefs = useRef(new Map());
   const verdictScrollSpacerRef = useRef(null);
-  const verdictScrollFrameRef = useRef(null);
-  const verdictScrollTimeoutRef = useRef(null);
-  const [preparedVerdictScrollKey, setPreparedVerdictScrollKey] = useState(null);
-  const [verdictScrollSpacerHeight, setVerdictScrollSpacerHeight] = useState(0);
+  const verdictScrollFramesRef = useRef([]);
+  const [verdictScroll, setVerdictScroll] = useState(initialVerdictScroll);
   const [connectionLayer, setConnectionLayer] = useState({ width: 0, height: 0, paths: [] });
   const {
     activeDebateConnectionDirections,
@@ -49,7 +53,8 @@ export function WorkspaceScene({
     && (session.launchedRequests ?? []).length > 0
     && !hasHypotheses;
   const answerRevealScrollKey = `${session.id}:${session.answer ?? ""}`;
-  const isVerdictTypewriterReady = !isAnswerVisible || preparedVerdictScrollKey === answerRevealScrollKey;
+  const isVerdictTypewriterReady = !isAnswerVisible
+    || (verdictScroll.key === answerRevealScrollKey && verdictScroll.phase === "ready");
   const debate = useMemo(() => ({
     ...session.debate,
     roles: session.debate.roles.map((role) => ({
@@ -145,7 +150,7 @@ export function WorkspaceScene({
 
       setConnectionLayer({
         width: sceneRect.width,
-        height: sceneElement.scrollHeight,
+        height: sceneRect.height,
         paths,
       });
     };
@@ -173,95 +178,170 @@ export function WorkspaceScene({
     };
   }, [session.evaluation.agents]);
 
-  useLayoutEffect(() => {
-    function clearPendingScroll() {
-      if (verdictScrollFrameRef.current) {
-        window.cancelAnimationFrame(verdictScrollFrameRef.current);
-        verdictScrollFrameRef.current = null;
-      }
+  const cancelVerdictScrollFrames = useCallback(() => {
+    verdictScrollFramesRef.current.forEach((frameId) => window.cancelAnimationFrame(frameId));
+    verdictScrollFramesRef.current = [];
+  }, []);
 
-      if (verdictScrollTimeoutRef.current) {
-        window.clearTimeout(verdictScrollTimeoutRef.current);
-        verdictScrollTimeoutRef.current = null;
-      }
+  const getVerdictScrollGeometry = useCallback(() => {
+    const sceneElement = sceneRef.current;
+    const judgeAvatarElement = judgeAvatarRef.current;
+    const scrollContainer = sceneElement?.parentElement;
+
+    if (!sceneElement || !judgeAvatarElement || !scrollContainer) {
+      return null;
     }
 
-    function getScrollGeometry() {
-      const sceneElement = sceneRef.current;
-      const judgeAvatarElement = judgeAvatarRef.current;
-      const scrollContainer = sceneElement?.parentElement;
+    const containerRect = scrollContainer.getBoundingClientRect();
+    const judgeAvatarRect = judgeAvatarElement.getBoundingClientRect();
+    const scrollContainerStyles = window.getComputedStyle(scrollContainer);
+    const targetOffset = Number.parseFloat(
+      scrollContainerStyles.getPropertyValue("--workspace-verdict-scroll-top-offset"),
+    ) || 0;
+    const spacerElement = verdictScrollSpacerRef.current;
+    const targetScrollTop = scrollContainer.scrollTop + judgeAvatarRect.top - containerRect.top - targetOffset;
+    const contentHeightWithoutSpacer = spacerElement
+      ? spacerElement.offsetTop
+      : [...sceneElement.children]
+        .filter((child) =>
+          !child.classList.contains("workspace-scene__connection-layer")
+          && !child.classList.contains("workspace-scene__verdict-scroll-spacer"),
+        )
+        .reduce((height, child) => Math.max(height, child.offsetTop + child.offsetHeight), 0);
+    const requiredSpacerHeight = Math.ceil(Math.max(
+      0,
+      targetScrollTop + scrollContainer.clientHeight - contentHeightWithoutSpacer,
+    ));
 
-      if (!sceneElement || !judgeAvatarElement || !scrollContainer) {
-        return null;
-      }
+    return {
+      scrollContainer,
+      targetScrollTop,
+      requiredSpacerHeight,
+    };
+  }, []);
 
-      const containerRect = scrollContainer.getBoundingClientRect();
-      const judgeAvatarRect = judgeAvatarElement.getBoundingClientRect();
-      const spacerHeight = verdictScrollSpacerRef.current?.offsetHeight ?? 0;
-      const targetScrollTop = scrollContainer.scrollTop + judgeAvatarRect.top - containerRect.top;
-      const naturalMaxScrollTop = Math.max(
-        0,
-        scrollContainer.scrollHeight - spacerHeight - scrollContainer.clientHeight,
-      );
+  const scheduleAfterFrames = useCallback((frameCount, callback) => {
+    let remainingFrames = frameCount;
 
-      return {
-        scrollContainer,
-        targetScrollTop,
-        requiredSpacerHeight: Math.ceil(Math.max(0, targetScrollTop - naturalMaxScrollTop)),
-      };
-    }
-
-    clearPendingScroll();
-
-    if (!isAnswerVisible || !session.answer) {
-      setPreparedVerdictScrollKey(null);
-      setVerdictScrollSpacerHeight(0);
-      return;
-    }
-
-    if (preparedVerdictScrollKey === answerRevealScrollKey) {
-      return;
-    }
-
-    setPreparedVerdictScrollKey(null);
-
-    const initialGeometry = getScrollGeometry();
-
-    if (!initialGeometry) {
-      setPreparedVerdictScrollKey(answerRevealScrollKey);
-      return;
-    }
-
-    setVerdictScrollSpacerHeight(initialGeometry.requiredSpacerHeight);
-
-    verdictScrollFrameRef.current = window.requestAnimationFrame(() => {
-      const scrollGeometry = getScrollGeometry();
-
-      if (!scrollGeometry) {
-        setPreparedVerdictScrollKey(answerRevealScrollKey);
+    const runNextFrame = () => {
+      if (remainingFrames <= 0) {
+        callback();
         return;
       }
 
-      const maxScrollTop = Math.max(0, scrollGeometry.scrollContainer.scrollHeight - scrollGeometry.scrollContainer.clientHeight);
-      const nextScrollTop = clampNumber(scrollGeometry.targetScrollTop, 0, maxScrollTop);
-      const shouldAnimateScroll = Math.abs(scrollGeometry.scrollContainer.scrollTop - nextScrollTop) > 1;
-
-      scrollGeometry.scrollContainer.scrollTo({
-        top: nextScrollTop,
-        behavior: shouldAnimateScroll ? "smooth" : "auto",
+      remainingFrames -= 1;
+      const frameId = window.requestAnimationFrame(() => {
+        verdictScrollFramesRef.current = verdictScrollFramesRef.current.filter((storedFrameId) => storedFrameId !== frameId);
+        runNextFrame();
       });
 
-      verdictScrollTimeoutRef.current = window.setTimeout(() => {
-        setPreparedVerdictScrollKey(answerRevealScrollKey);
-        verdictScrollTimeoutRef.current = null;
-      }, shouldAnimateScroll ? VERDICT_SCROLL_SETTLE_MS : 0);
-    });
+      verdictScrollFramesRef.current.push(frameId);
+    };
 
-    return clearPendingScroll;
-  }, [answerRevealScrollKey, isAnswerVisible, preparedVerdictScrollKey, session.answer]);
+    runNextFrame();
+  }, []);
 
   useLayoutEffect(() => {
-    if (!isAnswerVisible || preparedVerdictScrollKey !== answerRevealScrollKey || verdictScrollSpacerHeight <= 0) {
+    cancelVerdictScrollFrames();
+
+    if (!isAnswerVisible || !session.answer) {
+      setVerdictScroll((currentScroll) =>
+        currentScroll.phase === "idle" && currentScroll.spacerHeight === 0
+          ? currentScroll
+          : initialVerdictScroll,
+      );
+      return undefined;
+    }
+
+    if (verdictScroll.key !== answerRevealScrollKey) {
+      setVerdictScroll({
+        key: answerRevealScrollKey,
+        phase: "measure",
+        spacerHeight: 0,
+      });
+      return undefined;
+    }
+
+    if (verdictScroll.phase === "measure") {
+      const geometry = getVerdictScrollGeometry();
+
+      if (!geometry) {
+        setVerdictScroll({
+          key: answerRevealScrollKey,
+          phase: "ready",
+          spacerHeight: 0,
+        });
+        return undefined;
+      }
+
+      setVerdictScroll({
+        key: answerRevealScrollKey,
+        phase: "scroll",
+        spacerHeight: geometry.requiredSpacerHeight,
+      });
+      return undefined;
+    }
+
+    if (verdictScroll.phase !== "scroll") {
+      return undefined;
+    }
+
+    scheduleAfterFrames(VERDICT_SCROLL_FRAME_DELAY, () => {
+      const geometry = getVerdictScrollGeometry();
+
+      if (!geometry) {
+        setVerdictScroll((currentScroll) => ({
+          key: answerRevealScrollKey,
+          phase: "ready",
+          spacerHeight: currentScroll.key === answerRevealScrollKey ? currentScroll.spacerHeight : 0,
+        }));
+        return;
+      }
+
+      const maxScrollTop = Math.max(0, geometry.scrollContainer.scrollHeight - geometry.scrollContainer.clientHeight);
+      const hasGeneratedScrollSpace = verdictScroll.spacerHeight > 0;
+      const nextScrollTop = hasGeneratedScrollSpace
+        ? maxScrollTop
+        : clampNumber(geometry.targetScrollTop, 0, maxScrollTop);
+
+      geometry.scrollContainer.scrollTo({
+        top: nextScrollTop,
+        behavior: "auto",
+      });
+
+      const readyFrameId = window.requestAnimationFrame(() => {
+        verdictScrollFramesRef.current = verdictScrollFramesRef.current.filter((storedFrameId) => storedFrameId !== readyFrameId);
+        setVerdictScroll((currentScroll) => ({
+          key: answerRevealScrollKey,
+          phase: "ready",
+          spacerHeight: currentScroll.key === answerRevealScrollKey
+            ? currentScroll.spacerHeight
+            : geometry.requiredSpacerHeight,
+        }));
+      });
+      verdictScrollFramesRef.current.push(readyFrameId);
+    });
+
+    return cancelVerdictScrollFrames;
+  }, [
+    answerRevealScrollKey,
+    cancelVerdictScrollFrames,
+    getVerdictScrollGeometry,
+    isAnswerVisible,
+    scheduleAfterFrames,
+    session.answer,
+    verdictScroll.key,
+    verdictScroll.phase,
+    verdictScroll.spacerHeight,
+  ]);
+
+  useLayoutEffect(() => {
+    if (
+      !isAnswerVisible
+      || verdictScroll.key !== answerRevealScrollKey
+      || verdictScroll.phase !== "ready"
+      || verdictScroll.spacerHeight <= 0
+    ) {
       return undefined;
     }
 
@@ -282,24 +362,21 @@ export function WorkspaceScene({
       animationFrame = window.requestAnimationFrame(() => {
         animationFrame = null;
 
-        const containerRect = scrollContainer.getBoundingClientRect();
-        const judgeAvatarRect = judgeAvatarRef.current?.getBoundingClientRect();
+        const geometry = getVerdictScrollGeometry();
 
-        if (!judgeAvatarRect) {
+        if (!geometry) {
           return;
         }
 
-        const currentSpacerHeight = verdictScrollSpacerRef.current?.offsetHeight ?? 0;
-        const targetScrollTop = scrollContainer.scrollTop + judgeAvatarRect.top - containerRect.top;
-        const naturalMaxScrollTop = Math.max(
-          0,
-          scrollContainer.scrollHeight - currentSpacerHeight - scrollContainer.clientHeight,
-        );
-        const nextSpacerHeight = Math.ceil(Math.max(0, targetScrollTop - naturalMaxScrollTop));
+        setVerdictScroll((currentScroll) => {
+          if (currentScroll.key !== answerRevealScrollKey || currentScroll.phase !== "ready") {
+            return currentScroll;
+          }
 
-        setVerdictScrollSpacerHeight((currentHeight) =>
-          Math.abs(currentHeight - nextSpacerHeight) > 1 ? nextSpacerHeight : currentHeight,
-        );
+          return Math.abs(currentScroll.spacerHeight - geometry.requiredSpacerHeight) > 1
+            ? { ...currentScroll, spacerHeight: geometry.requiredSpacerHeight }
+            : currentScroll;
+        });
       });
     };
 
@@ -316,7 +393,14 @@ export function WorkspaceScene({
 
       resizeObserver.disconnect();
     };
-  }, [answerRevealScrollKey, isAnswerVisible, preparedVerdictScrollKey, verdictScrollSpacerHeight]);
+  }, [
+    answerRevealScrollKey,
+    getVerdictScrollGeometry,
+    isAnswerVisible,
+    verdictScroll.key,
+    verdictScroll.phase,
+    verdictScroll.spacerHeight,
+  ]);
 
   return (
     <div className={`workspace-scene${hasHypotheses ? "" : " workspace-scene--empty"}`} ref={sceneRef}>
@@ -373,7 +457,7 @@ export function WorkspaceScene({
         <div
           ref={verdictScrollSpacerRef}
           className="workspace-scene__verdict-scroll-spacer"
-          style={{ height: `${verdictScrollSpacerHeight}px` }}
+          style={{ height: `${verdictScroll.spacerHeight}px` }}
           aria-hidden="true"
         />
       ) : null}

@@ -75,7 +75,11 @@ export function Sidebar({
         return;
       }
 
-      if (event.target.closest("[data-chat-actions-root]") || chatMenuRef.current?.contains(event.target)) {
+      if (!(event.target instanceof Element)) {
+        return;
+      }
+
+      if (event.target.closest(".chat-list-menu") || event.target.closest(".chat-list__actions-trigger")) {
         return;
       }
 

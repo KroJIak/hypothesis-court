@@ -224,8 +224,8 @@ export function WorkspacePage({
       && !selectedSession.isVerdictComplete
     : false;
   const agentEditingLockedReason = selectedSession?.isVerdictComplete
-    ? "Агентов нельзя менять в завершенном чате."
-    : "Агентов можно менять только до старта процесса.";
+    ? "Агентов нельзя выставлять в завершенном чате."
+    : "Агентов можно выставлять только до старта процесса.";
   const {
     runVersions,
     activeVersionIndex,
@@ -427,7 +427,7 @@ export function WorkspacePage({
 
   useEffect(() => {
     setActivePendingAgentId(null);
-  }, [selectedSession?.id, isAgentEditingLocked]);
+  }, [selectedSession?.id]);
 
   if (status === "loading") {
     return <WorkspaceSkeleton />;
@@ -605,10 +605,6 @@ export function WorkspacePage({
   }
 
   async function handleAddAgent() {
-    if (isAgentEditingLocked) {
-      return;
-    }
-
     if (addAgentFrameRef.current !== null) {
       return;
     }
@@ -638,10 +634,6 @@ export function WorkspacePage({
   }
 
   function handleOpenPendingAgentSetup(agentId) {
-    if (isAgentEditingLocked) {
-      return;
-    }
-
     const availableAgents = selectedSession.availableAgents ?? getInitialAvailableAgents(selectedSession, getPaletteAgents(userAgents, data));
     const editableAgent = availableAgents.find((agent) => (
       agent.id === agentId
@@ -656,10 +648,6 @@ export function WorkspacePage({
   }
 
   function handleChangePendingAgentSetup(agentId, changes) {
-    if (isAgentEditingLocked) {
-      return;
-    }
-
     updateSelectedSession((session) => ({
       ...session,
       availableAgents: (session.availableAgents ?? getInitialAvailableAgents(session, getPaletteAgents(userAgents, data))).map((agent) =>
@@ -674,10 +662,6 @@ export function WorkspacePage({
   }
 
   async function handleGeneratePendingAgentPrompt(agentId) {
-    if (isAgentEditingLocked) {
-      return;
-    }
-
     const availableAgents = selectedSession.availableAgents ?? getInitialAvailableAgents(selectedSession, getPaletteAgents(userAgents, data));
     const pendingAgent = availableAgents.find((agent) => agent.id === agentId && (agent.isPendingSetup || !agent.isEmpty));
 
@@ -702,10 +686,6 @@ export function WorkspacePage({
   }
 
   async function handleSavePendingAgentSetup(agentId) {
-    if (isAgentEditingLocked) {
-      return;
-    }
-
     const availableAgents = selectedSession.availableAgents ?? getInitialAvailableAgents(selectedSession, getPaletteAgents(userAgents, data));
     const pendingAgent = availableAgents.find((agent) => (
       agent.id === agentId
@@ -737,10 +717,6 @@ export function WorkspacePage({
   }
 
   async function handleDeletePendingAgentSetup(agentId) {
-    if (isAgentEditingLocked) {
-      return;
-    }
-
     const availableAgents = selectedSession.availableAgents ?? getInitialAvailableAgents(selectedSession, getPaletteAgents(userAgents, data));
     const agent = availableAgents.find((availableAgent) => (
       availableAgent.id === agentId
@@ -1242,7 +1218,7 @@ export function WorkspacePage({
         onAgentDragEnd={handleAgentDragEnd}
         onDropAgentToPalette={handleDropAgentToPalette}
         isDropTargetVisible={dragSource === "evaluation"}
-        isAddAgentDisabled={isAgentEditingLocked}
+        isAddAgentDisabled={false}
         isAgentEditingLocked={isAgentEditingLocked}
         lockedReason={agentEditingLockedReason}
         activePendingAgentId={activePendingAgentId}
