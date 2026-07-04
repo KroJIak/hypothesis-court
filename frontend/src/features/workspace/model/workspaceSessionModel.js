@@ -11,6 +11,10 @@ export function sortAvailableAgents(agents) {
       return firstAgent.isPendingSetup ? -1 : 1;
     }
 
+    if (firstAgent.isCustom !== secondAgent.isCustom) {
+      return firstAgent.isCustom ? -1 : 1;
+    }
+
     if (firstAgent.isEmpty === secondAgent.isEmpty) {
       return 0;
     }

@@ -1659,10 +1659,10 @@
 
 .agent-palette__title {
   width: 100%;
-  margin: 0 0 3px;
-  color: rgba(244, 244, 244, 0.72);
-  font-size: 0.82rem;
-  font-weight: 600;
+  margin: 0 0 6px;
+  color: rgba(244, 244, 244, 0.9);
+  font-size: 1.02rem;
+  font-weight: 700;
   line-height: 1;
   text-align: center;
 }
