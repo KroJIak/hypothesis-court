@@ -74,9 +74,11 @@ class Settings:
     model_provider_base_url: str
     model_provider_api_key: str | None
     model_provider_model: str
+    model_provider_folder_id: str | None
     embedding_base_url: str
     embedding_api_key: str | None
     embedding_model: str
+    embedding_folder_id: str | None
     avatar_upload_max_bytes: int = 5 * 1024 * 1024
 
     @property
@@ -124,7 +126,9 @@ def get_settings() -> Settings:
         model_provider_base_url=_get_env("MODEL_PROVIDER_BASE_URL"),
         model_provider_api_key=os.getenv("MODEL_PROVIDER_API_KEY") or None,
         model_provider_model=_get_env("MODEL_PROVIDER_MODEL"),
+        model_provider_folder_id=os.getenv("MODEL_PROVIDER_FOLDER_ID") or None,
         embedding_base_url=_get_env("EMBEDDING_BASE_URL", "https://api.openai.com/v1"),
         embedding_api_key=os.getenv("EMBEDDING_API_KEY") or None,
         embedding_model=_get_env("EMBEDDING_MODEL", "text-embedding-3-large"),
+        embedding_folder_id=os.getenv("EMBEDDING_FOLDER_ID") or None,
     )

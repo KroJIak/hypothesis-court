@@ -37,9 +37,9 @@ class ModelProviderSettingsService:
             return stored_settings
         return ModelProviderSettings(
             provider=OPENAI_PROVIDER,
-            provider_type=OPENAI_PROVIDER_TYPE,
+            provider_type=self._get_provider_type(settings.model_provider_folder_id),
             base_url=settings.model_provider_base_url,
-            project_id=None,
+            project_id=settings.model_provider_folder_id,
             model=settings.model_provider_model,
             api_token=settings.model_provider_api_key,
         )
@@ -50,9 +50,9 @@ class ModelProviderSettingsService:
             return stored_settings
         return ModelProviderSettings(
             provider=EMBEDDING_PROVIDER,
-            provider_type=OPENAI_PROVIDER_TYPE,
+            provider_type=self._get_provider_type(settings.embedding_folder_id),
             base_url=settings.embedding_base_url,
-            project_id=None,
+            project_id=settings.embedding_folder_id,
             model=settings.embedding_model,
             api_token=settings.embedding_api_key,
         )
@@ -166,17 +166,17 @@ class ModelProviderSettingsService:
         if provider == EMBEDDING_PROVIDER:
             return ModelProviderSettings(
                 provider=EMBEDDING_PROVIDER,
-                provider_type=OPENAI_PROVIDER_TYPE,
+                provider_type=self._get_provider_type(settings.embedding_folder_id),
                 base_url=settings.embedding_base_url,
-                project_id=None,
+                project_id=settings.embedding_folder_id,
                 model=settings.embedding_model,
                 api_token=settings.embedding_api_key,
             )
         return ModelProviderSettings(
             provider=OPENAI_PROVIDER,
-            provider_type=OPENAI_PROVIDER_TYPE,
+            provider_type=self._get_provider_type(settings.model_provider_folder_id),
             base_url=settings.model_provider_base_url,
-            project_id=None,
+            project_id=settings.model_provider_folder_id,
             model=settings.model_provider_model,
             api_token=settings.model_provider_api_key,
         )
@@ -207,6 +207,10 @@ class ModelProviderSettingsService:
         if normalized not in {OPENAI_PROVIDER_TYPE, YANDEX_AI_STUDIO_PROVIDER_TYPE}:
             raise ValidationError("Unknown provider type.")
         return normalized
+
+    @staticmethod
+    def _get_provider_type(folder_id: str | None) -> str:
+        return YANDEX_AI_STUDIO_PROVIDER_TYPE if folder_id else OPENAI_PROVIDER_TYPE
 
     @staticmethod
     def _normalize_base_url(base_url: str) -> str:
