@@ -23,34 +23,6 @@ export function sortAvailableAgents(agents) {
   });
 }
 
-export function reorderAvailableAgents(agents, movingAgentId, targetAgentId, placement = "before") {
-  if (movingAgentId === targetAgentId) {
-    return agents;
-  }
-
-  const movingAgent = agents.find((agent) => agent.id === movingAgentId);
-  const targetAgent = agents.find((agent) => agent.id === targetAgentId);
-
-  if (!movingAgent || !targetAgent || movingAgent.isEmpty || targetAgent.isEmpty) {
-    return agents;
-  }
-
-  const agentsWithoutMoving = agents.filter((agent) => agent.id !== movingAgentId);
-  const targetIndex = agentsWithoutMoving.findIndex((agent) => agent.id === targetAgentId);
-
-  if (targetIndex === -1) {
-    return agents;
-  }
-
-  const insertIndex = placement === "after" ? targetIndex + 1 : targetIndex;
-
-  return [
-    ...agentsWithoutMoving.slice(0, insertIndex),
-    movingAgent,
-    ...agentsWithoutMoving.slice(insertIndex),
-  ];
-}
-
 export function getInitialAvailableAgents(session, paletteAgents) {
   const selectedAgentIds = new Set(session.evaluation.agents.map((agent) => agent.id));
 
