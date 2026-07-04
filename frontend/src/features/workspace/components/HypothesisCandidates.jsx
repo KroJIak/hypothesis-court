@@ -11,7 +11,11 @@ const HYPOTHESIS_VISIBLE_COUNT = 3;
 const HYPOTHESIS_FALLBACK_CARD_WIDTH = 220;
 const HYPOTHESIS_SKELETON_COUNT = 3;
 
-export function HypothesisCandidates({ hypotheses, isLoading = false }) {
+export function HypothesisCandidates({
+  hypotheses,
+  isLoading = false,
+  onOpenKnowledgeGraph,
+}) {
   const visibleHypotheses = hypotheses ?? [];
   const displayedHypotheses = isLoading
     ? Array.from({ length: HYPOTHESIS_SKELETON_COUNT }, (_, index) => ({ id: `hypothesis-skeleton-${index}` }))
@@ -139,9 +143,18 @@ export function HypothesisCandidates({ hypotheses, isLoading = false }) {
       aria-label="Сформулированные гипотезы"
     >
       <div className="hypothesis-candidates__content">
-        <div className="hypothesis-candidates__agent" aria-label="Системный агент формулирования гипотез">
-          <BrainCircuit aria-hidden="true" strokeWidth={1.75} />
-        </div>
+        <button
+          type="button"
+          className="hypothesis-candidates__agent"
+          aria-label="Открыть граф доказательств"
+          onClick={() => onOpenKnowledgeGraph?.({ source: "system-agent" })}
+        >
+          <span className="hypothesis-candidates__agent-name">Картограф</span>
+          <span className="hypothesis-candidates__agent-icon">
+            <BrainCircuit aria-hidden="true" strokeWidth={1.75} />
+          </span>
+          <span className="hypothesis-candidates__agent-caption">Граф</span>
+        </button>
 
         {hypothesisCount > 0 ? (
           <div className="hypothesis-candidates__list">

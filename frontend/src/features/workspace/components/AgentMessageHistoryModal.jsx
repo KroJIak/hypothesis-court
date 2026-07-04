@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
 import { AgentAvatar } from "./AgentAvatar";
+import { getGraphNodeIdForSource } from "../model/knowledgeGraphModel";
 import { clampNumber } from "../utils/format";
 
 const DEBATE_ROLE_ORDER = ["defender", "attacker", "manufacturer"];
@@ -19,6 +20,7 @@ function getPrimarySource(session, salt = 0) {
 
   if (attachments.length === 0) {
     return {
+      nodeId: "source-fallback-1",
       title: "Материалы дела",
       excerpt: "Фрагмент появится здесь после подключения источников к графу знаний.",
     };
@@ -27,6 +29,8 @@ function getPrimarySource(session, salt = 0) {
   const attachment = attachments[salt % attachments.length];
 
   return {
+    attachmentId: attachment.id,
+    nodeId: `source-${attachment.id}`,
     title: attachment.fileName ?? attachment.name ?? "Файл",
     excerpt: attachment.summary ?? "Выдержка из файла будет подставляться из API вместе с привязкой к графу.",
   };
@@ -164,6 +168,7 @@ export function AgentMessageHistoryModal({
   session,
   target,
   onClose,
+  onOpenKnowledgeGraph,
 }) {
   const [activeHypothesisId, setActiveHypothesisId] = useState(null);
   const [sourceTooltip, setSourceTooltip] = useState(null);
@@ -223,6 +228,14 @@ export function AgentMessageHistoryModal({
         top: `${top}px`,
         width: `${tooltipWidth}px`,
       },
+    });
+  }
+
+  function handleOpenSource(event, source) {
+    event.preventDefault();
+    onOpenKnowledgeGraph?.({
+      source: "agent-history",
+      focusNodeId: getGraphNodeIdForSource(source),
     });
   }
 
@@ -300,7 +313,7 @@ export function AgentMessageHistoryModal({
                               onMouseLeave={hideSourceTooltip}
                               onFocus={(event) => showSourceTooltip(event, message.source)}
                               onBlur={hideSourceTooltip}
-                              onClick={(event) => event.preventDefault()}
+                              onClick={(event) => handleOpenSource(event, message.source)}
                             >
                               источник
                             </button>

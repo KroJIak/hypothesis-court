@@ -21,6 +21,7 @@ export function WorkspaceScene({
   isAgentEditingLocked,
   onVerdictComplete,
   onOpenAgentHistory,
+  onOpenKnowledgeGraph,
   verdictActions,
 }) {
   const sceneRef = useRef(null);
@@ -336,7 +337,11 @@ export function WorkspaceScene({
         </svg>
       ) : null}
 
-      <HypothesisCandidates hypotheses={hypotheses} isLoading={isHypothesesLoading} />
+      <HypothesisCandidates
+        hypotheses={hypotheses}
+        isLoading={isHypothesesLoading}
+        onOpenKnowledgeGraph={onOpenKnowledgeGraph}
+      />
       <DebateStage
         debate={debate}
         manufacturerAvatarRef={manufacturerAvatarRef}

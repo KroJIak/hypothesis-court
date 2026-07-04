@@ -3,6 +3,7 @@ import { useCallback, useDeferredValue, useEffect, useLayoutEffect, useRef, useS
 import { AgentPalette } from "./AgentPalette";
 import { AgentMessageHistoryModal } from "./AgentMessageHistoryModal";
 import { Composer } from "./Composer";
+import { KnowledgeGraphModal } from "./KnowledgeGraphModal";
 import { RequestSummaryRail } from "./RequestSummaryRail";
 import { Sidebar } from "./Sidebar";
 import { WorkspaceScene } from "./WorkspaceScene";
@@ -208,6 +209,7 @@ export function WorkspacePage({
   const [isAgentGenerationAvailable, setIsAgentGenerationAvailable] = useState(false);
   const [activePendingAgentId, setActivePendingAgentId] = useState(null);
   const [activeAgentHistoryTarget, setActiveAgentHistoryTarget] = useState(null);
+  const [activeKnowledgeGraphTarget, setActiveKnowledgeGraphTarget] = useState(null);
   const sceneScrollRef = useRef(null);
   const addAgentFrameRef = useRef(null);
   const notificationTimeoutsRef = useRef(new Map());
@@ -315,6 +317,7 @@ export function WorkspacePage({
 
   useEffect(() => {
     setActiveAgentHistoryTarget(null);
+    setActiveKnowledgeGraphTarget(null);
   }, [selectedChatId]);
 
   useEffect(() => {
@@ -1039,6 +1042,14 @@ export function WorkspacePage({
     setActiveAgentHistoryTarget(null);
   }
 
+  function handleOpenKnowledgeGraph(target = {}) {
+    setActiveKnowledgeGraphTarget(target);
+  }
+
+  function handleCloseKnowledgeGraph() {
+    setActiveKnowledgeGraphTarget(null);
+  }
+
   function handleSwitchRunVersion(nextIndex) {
     if (!selectedSession || isProcessRunning || selectedSession.isEditingRunVersion) {
       return;
@@ -1199,6 +1210,7 @@ export function WorkspacePage({
             isAgentEditingLocked={isAgentEditingLocked}
             onVerdictComplete={handleVerdictComplete}
             onOpenAgentHistory={handleOpenAgentHistory}
+            onOpenKnowledgeGraph={handleOpenKnowledgeGraph}
             verdictActions={verdictActions}
           />
         </div>
@@ -1248,6 +1260,14 @@ export function WorkspacePage({
           session={selectedSession}
           target={activeAgentHistoryTarget}
           onClose={handleCloseAgentHistory}
+          onOpenKnowledgeGraph={handleOpenKnowledgeGraph}
+        />
+      ) : null}
+      {activeKnowledgeGraphTarget ? (
+        <KnowledgeGraphModal
+          session={selectedSession}
+          focusNodeId={activeKnowledgeGraphTarget.focusNodeId}
+          onClose={handleCloseKnowledgeGraph}
         />
       ) : null}
       <WorkspaceNotifications notifications={workspaceNotifications} />
