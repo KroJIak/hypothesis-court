@@ -4,6 +4,12 @@ const DEFAULT_SOURCE_EXCERPTS = [
   "Материал содержит ограничение или наблюдение, которое влияет на приоритет гипотезы и маршрут следующей проверки.",
 ];
 
+const DEFAULT_SOURCE_QUOTES = [
+  "показатель сохраняется в целевом диапазоне после короткой серии испытаний",
+  "основной риск связан не с идеей, а с переносом результата в производственный режим",
+  "ограничение оборудования требует отдельной проверки перед масштабированием",
+];
+
 const EVIDENCE_SIGNAL_LABELS = {
   support: "поддерживает",
   risk: "риск",
@@ -51,6 +57,21 @@ function getAttachmentExcerpt(attachment, index) {
   );
 }
 
+function createSourceQuote(attachment, index) {
+  const excerpt = getAttachmentExcerpt(attachment, index);
+  const fallbackQuote = DEFAULT_SOURCE_QUOTES[index % DEFAULT_SOURCE_QUOTES.length];
+  const words = excerpt.split(/\s+/u).filter(Boolean);
+  const quote = words.length > 7
+    ? words.slice(2, Math.min(words.length, 10)).join(" ")
+    : fallbackQuote;
+
+  return {
+    quote,
+    contextBefore: words.length > 7 ? words.slice(0, 2).join(" ") : "Фрагмент:",
+    contextAfter: words.length > 10 ? words.slice(10, 18).join(" ") : "используется как доказательная привязка в графе.",
+  };
+}
+
 function createFallbackSources(session) {
   const attachments = session.attachments ?? [];
 
@@ -69,6 +90,7 @@ function createFallbackSources(session) {
       source: {
         title: getAttachmentTitle(attachment, index),
         excerpt: getAttachmentExcerpt(attachment, index),
+        ...createSourceQuote(attachment, index),
       },
     }));
   }
@@ -86,6 +108,9 @@ function createFallbackSources(session) {
     source: {
       title: "Материалы сессии",
       excerpt: "Доказательные фрагменты будут подставляться из API retrieval/evidence layer.",
+      quote: "доказательные фрагменты будут подставляться из API",
+      contextBefore: "После подключения evidence layer",
+      contextAfter: "вместе с точной позицией в документе.",
     },
   }];
 }

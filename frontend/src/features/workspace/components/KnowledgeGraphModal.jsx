@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   BookOpenText,
@@ -7,8 +7,11 @@ import {
   GitBranch,
   Lightbulb,
   Network,
+  RotateCcw,
   Scale,
   X,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 
 import { buildKnowledgeGraph } from "../model/knowledgeGraphModel";
@@ -16,46 +19,29 @@ import { clampNumber } from "../utils/format";
 
 const GRAPH_WIDTH = 1080;
 const GRAPH_HEIGHT = 640;
-const TOOLTIP_WIDTH = 300;
+const TOOLTIP_WIDTH = 320;
 const TOOLTIP_GAP = 12;
 const TOOLTIP_EDGE_OFFSET = 16;
+const MIN_CAMERA_SCALE = 0.54;
+const MAX_CAMERA_SCALE = 2.6;
+const CAMERA_ZOOM_INTENSITY = 0.0012;
+const NODE_REPEL_RADIUS = 76;
+const NODE_REPEL_STEP = 28;
+const NODE_DRAG_LIMIT = 520;
+const ZONE_NODE_PADDING = 72;
+
+const INITIAL_CAMERA = {
+  x: 0,
+  y: 0,
+  scale: 1,
+};
 
 const ZONE_LAYOUTS = {
-  brief: {
-    x: 52,
-    y: 72,
-    width: 230,
-    height: 220,
-    polygon: [[0, 18], [34, 0], [100, 8], [100, 84], [88, 100], [12, 94]],
-  },
-  sources: {
-    x: 54,
-    y: 352,
-    width: 244,
-    height: 206,
-    polygon: [[4, 12], [72, 0], [100, 18], [94, 92], [58, 100], [0, 86]],
-  },
-  evidence: {
-    x: 370,
-    y: 62,
-    width: 270,
-    height: 504,
-    polygon: [[8, 4], [92, 0], [100, 30], [94, 96], [34, 100], [0, 84], [4, 22]],
-  },
-  hypotheses: {
-    x: 732,
-    y: 82,
-    width: 284,
-    height: 250,
-    polygon: [[0, 16], [28, 0], [100, 8], [96, 88], [72, 100], [8, 92]],
-  },
-  decision: {
-    x: 720,
-    y: 408,
-    width: 300,
-    height: 170,
-    polygon: [[6, 10], [50, 0], [98, 14], [100, 82], [78, 100], [0, 92]],
-  },
+  brief: { x: 52, y: 72, width: 230, height: 220 },
+  sources: { x: 54, y: 352, width: 244, height: 206 },
+  evidence: { x: 370, y: 62, width: 270, height: 504 },
+  hypotheses: { x: 732, y: 82, width: 284, height: 250 },
+  decision: { x: 720, y: 408, width: 300, height: 170 },
 };
 
 const NODE_META = {
@@ -69,16 +55,26 @@ const NODE_META = {
   verdict: { label: "Вердикт", icon: Network },
 };
 
-function createZonePath(layout) {
-  return layout.polygon
-    .map(([xPercent, yPercent], index) => {
-      const x = layout.x + (layout.width * xPercent) / 100;
-      const y = layout.y + (layout.height * yPercent) / 100;
+function clampGraphCoordinate(value, axisSize) {
+  return clampNumber(value, -NODE_DRAG_LIMIT, axisSize + NODE_DRAG_LIMIT);
+}
 
-      return `${index === 0 ? "M" : "L"} ${x} ${y}`;
-    })
-    .join(" ")
-    .concat(" Z");
+function createSmoothZonePath(bounds) {
+  const left = bounds.x;
+  const top = bounds.y;
+  const right = bounds.x + bounds.width;
+  const bottom = bounds.y + bounds.height;
+  const width = bounds.width;
+  const height = bounds.height;
+
+  return [
+    `M ${left + width * 0.16} ${top + height * 0.04}`,
+    `C ${left + width * 0.34} ${top - height * 0.04}, ${left + width * 0.74} ${top - height * 0.02}, ${right - width * 0.08} ${top + height * 0.15}`,
+    `C ${right + width * 0.04} ${top + height * 0.36}, ${right + width * 0.02} ${bottom - height * 0.26}, ${right - width * 0.16} ${bottom - height * 0.08}`,
+    `C ${right - width * 0.34} ${bottom + height * 0.05}, ${left + width * 0.28} ${bottom + height * 0.04}, ${left + width * 0.08} ${bottom - height * 0.16}`,
+    `C ${left - width * 0.04} ${bottom - height * 0.34}, ${left - width * 0.04} ${top + height * 0.28}, ${left + width * 0.16} ${top + height * 0.04}`,
+    "Z",
+  ].join(" ");
 }
 
 function createEdgePath(fromNode, toNode) {
@@ -105,11 +101,29 @@ function getNodePosition(layout, index, count) {
   return { x, y };
 }
 
+function getSvgPoint(event, svgElement) {
+  const rect = svgElement.getBoundingClientRect();
+
+  return {
+    x: ((event.clientX - rect.left) / rect.width) * GRAPH_WIDTH,
+    y: ((event.clientY - rect.top) / rect.height) * GRAPH_HEIGHT,
+  };
+}
+
+function getWorldPoint(event, svgElement, camera) {
+  const point = getSvgPoint(event, svgElement);
+
+  return {
+    x: (point.x - camera.x) / camera.scale,
+    y: (point.y - camera.y) / camera.scale,
+  };
+}
+
 function getTooltipStyle(event) {
   const top = clampNumber(
     event.clientY + TOOLTIP_GAP,
     TOOLTIP_EDGE_OFFSET,
-    window.innerHeight - TOOLTIP_EDGE_OFFSET - 180,
+    window.innerHeight - TOOLTIP_EDGE_OFFSET - 220,
   );
   const left = clampNumber(
     event.clientX + TOOLTIP_GAP,
@@ -150,6 +164,78 @@ function getConnectedIds(graph, activeItem) {
   return { nodeIds, edgeIds };
 }
 
+function getStableAngle(id) {
+  const hash = [...id].reduce((sum, character) => sum + character.charCodeAt(0), 0);
+
+  return (hash % 360) * (Math.PI / 180);
+}
+
+function repelNearbyNodes(nodes, draggedNodeId, draggedPosition, currentPositions) {
+  const nextPositions = {
+    ...currentPositions,
+    [draggedNodeId]: draggedPosition,
+  };
+
+  nodes.forEach((node) => {
+    if (node.id === draggedNodeId) {
+      return;
+    }
+
+    const currentPosition = nextPositions[node.id] ?? { x: node.x, y: node.y };
+    const dx = currentPosition.x - draggedPosition.x;
+    const dy = currentPosition.y - draggedPosition.y;
+    const distance = Math.hypot(dx, dy);
+
+    if (distance >= NODE_REPEL_RADIUS) {
+      return;
+    }
+
+    const fallbackAngle = getStableAngle(node.id);
+    const directionX = distance > 0.01 ? dx / distance : Math.cos(fallbackAngle);
+    const directionY = distance > 0.01 ? dy / distance : Math.sin(fallbackAngle);
+    const push = ((NODE_REPEL_RADIUS - distance) / NODE_REPEL_RADIUS) * NODE_REPEL_STEP;
+
+    nextPositions[node.id] = {
+      x: clampGraphCoordinate(currentPosition.x + directionX * push, GRAPH_WIDTH),
+      y: clampGraphCoordinate(currentPosition.y + directionY * push, GRAPH_HEIGHT),
+    };
+  });
+
+  return nextPositions;
+}
+
+function createZoneBounds(zoneId, nodes) {
+  const layout = ZONE_LAYOUTS[zoneId];
+  const zoneNodes = nodes.filter((node) => node.zone === zoneId);
+  const nodeXs = zoneNodes.map((node) => node.x);
+  const nodeYs = zoneNodes.map((node) => node.y);
+  const minX = Math.min(layout.x, ...nodeXs) - ZONE_NODE_PADDING;
+  const minY = Math.min(layout.y, ...nodeYs) - ZONE_NODE_PADDING;
+  const maxX = Math.max(layout.x + layout.width, ...nodeXs) + ZONE_NODE_PADDING;
+  const maxY = Math.max(layout.y + layout.height, ...nodeYs) + ZONE_NODE_PADDING;
+
+  return {
+    x: minX,
+    y: minY,
+    width: maxX - minX,
+    height: maxY - minY,
+  };
+}
+
+function SourceQuote({ source }) {
+  if (!source?.quote) {
+    return source?.excerpt ? <p>{source.excerpt}</p> : null;
+  }
+
+  return (
+    <p className="knowledge-graph-tooltip__quote">
+      {source.contextBefore ? <span>{source.contextBefore} </span> : null}
+      <strong>{source.quote}</strong>
+      {source.contextAfter ? <span> {source.contextAfter}</span> : null}
+    </p>
+  );
+}
+
 function GraphTooltip({ item }) {
   if (!item) {
     return null;
@@ -161,12 +247,13 @@ function GraphTooltip({ item }) {
     : item.item.details
       ? [item.item.details]
       : [];
+  const source = item.item.source;
 
   return createPortal(
     <aside className="knowledge-graph-tooltip" style={item.style} role="tooltip">
       <span className="knowledge-graph-tooltip__type">{nodeType}</span>
       <strong>{item.item.label}</strong>
-      {item.item.summary ? <p>{item.item.summary}</p> : null}
+      {source ? <SourceQuote source={source} /> : item.item.summary ? <p>{item.item.summary}</p> : null}
       {details.length > 0 ? (
         <ul>
           {details.slice(0, 3).map((detail, index) => (
@@ -184,7 +271,13 @@ export function KnowledgeGraphModal({
   focusNodeId = null,
   onClose,
 }) {
+  const svgRef = useRef(null);
+  const dragStateRef = useRef(null);
   const [activeItem, setActiveItem] = useState(null);
+  const [camera, setCamera] = useState(INITIAL_CAMERA);
+  const [nodePositions, setNodePositions] = useState({});
+  const [draggedNodeId, setDraggedNodeId] = useState(null);
+  const [isCameraDragging, setIsCameraDragging] = useState(false);
   const graph = useMemo(() => buildKnowledgeGraph(session), [session]);
   const positionedGraph = useMemo(() => {
     const nodesByZone = new Map();
@@ -200,13 +293,14 @@ export function KnowledgeGraphModal({
       const zoneId = ZONE_LAYOUTS[node.zone] ? node.zone : "evidence";
       const zoneNodes = nodesByZone.get(zoneId) ?? [];
       const index = Math.max(0, zoneNodes.findIndex((zoneNode) => zoneNode.id === node.id));
-      const position = getNodePosition(ZONE_LAYOUTS[zoneId], index, zoneNodes.length);
+      const basePosition = getNodePosition(ZONE_LAYOUTS[zoneId], index, zoneNodes.length);
+      const savedPosition = nodePositions[node.id];
 
       return {
         ...node,
         zone: zoneId,
-        x: position.x,
-        y: position.y,
+        x: savedPosition?.x ?? basePosition.x,
+        y: savedPosition?.y ?? basePosition.y,
       };
     });
     const nodeById = new Map(nodes.map((node) => [node.id, node]));
@@ -225,18 +319,30 @@ export function KnowledgeGraphModal({
         };
       })
       .filter(Boolean);
+    const zoneBounds = graph.zones.map((zone) => ({
+      ...zone,
+      bounds: ZONE_LAYOUTS[zone.id] ? createZoneBounds(zone.id, nodes) : null,
+    }));
 
     return {
       ...graph,
       nodes,
       edges,
       nodeById,
+      zoneBounds,
     };
-  }, [graph]);
+  }, [graph, nodePositions]);
   const connectedIds = useMemo(
     () => getConnectedIds(positionedGraph, activeItem),
     [activeItem, positionedGraph],
   );
+
+  useEffect(() => {
+    setCamera(INITIAL_CAMERA);
+    setNodePositions({});
+    setDraggedNodeId(null);
+    setActiveItem(null);
+  }, [session.id]);
 
   useEffect(() => {
     function handleKeyDown(event) {
@@ -251,6 +357,10 @@ export function KnowledgeGraphModal({
   }, [onClose]);
 
   const showNodeTooltip = useCallback((event, node) => {
+    if (dragStateRef.current) {
+      return;
+    }
+
     setActiveItem({
       kind: "node",
       item: node,
@@ -259,6 +369,10 @@ export function KnowledgeGraphModal({
   }, []);
 
   const showEdgeTooltip = useCallback((event, edge) => {
+    if (dragStateRef.current) {
+      return;
+    }
+
     setActiveItem({
       kind: "edge",
       item: edge,
@@ -283,6 +397,133 @@ export function KnowledgeGraphModal({
       window.removeEventListener("resize", hideTooltip);
     };
   }, [activeItem, hideTooltip]);
+
+  const zoomCameraAt = useCallback((event, nextScale) => {
+    const svgElement = svgRef.current;
+
+    if (!svgElement) {
+      return;
+    }
+
+    const svgPoint = getSvgPoint(event, svgElement);
+
+    setCamera((currentCamera) => {
+      const scale = clampNumber(nextScale, MIN_CAMERA_SCALE, MAX_CAMERA_SCALE);
+      const worldX = (svgPoint.x - currentCamera.x) / currentCamera.scale;
+      const worldY = (svgPoint.y - currentCamera.y) / currentCamera.scale;
+
+      return {
+        scale,
+        x: svgPoint.x - worldX * scale,
+        y: svgPoint.y - worldY * scale,
+      };
+    });
+  }, []);
+
+  const handleGraphWheel = useCallback((event) => {
+    event.preventDefault();
+    const nextScale = camera.scale * Math.exp(-event.deltaY * CAMERA_ZOOM_INTENSITY);
+
+    zoomCameraAt(event, nextScale);
+  }, [camera.scale, zoomCameraAt]);
+
+  const handleGraphPointerDown = useCallback((event) => {
+    if (event.button !== 0 || !svgRef.current) {
+      return;
+    }
+
+    const svgPoint = getSvgPoint(event, svgRef.current);
+
+    dragStateRef.current = {
+      type: "camera",
+      pointerId: event.pointerId,
+      startX: svgPoint.x,
+      startY: svgPoint.y,
+      camera,
+    };
+    setIsCameraDragging(true);
+    setActiveItem(null);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }, [camera]);
+
+  const handleNodePointerDown = useCallback((event, node) => {
+    if (event.button !== 0 || !svgRef.current) {
+      return;
+    }
+
+    event.stopPropagation();
+    const worldPoint = getWorldPoint(event, svgRef.current, camera);
+
+    dragStateRef.current = {
+      type: "node",
+      pointerId: event.pointerId,
+      nodeId: node.id,
+      offsetX: node.x - worldPoint.x,
+      offsetY: node.y - worldPoint.y,
+    };
+    setDraggedNodeId(node.id);
+    setActiveItem(null);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }, [camera]);
+
+  const handleGraphPointerMove = useCallback((event) => {
+    const dragState = dragStateRef.current;
+    const svgElement = svgRef.current;
+
+    if (!dragState || !svgElement) {
+      return;
+    }
+
+    if (dragState.type === "camera") {
+      const svgPoint = getSvgPoint(event, svgElement);
+
+      setCamera({
+        ...dragState.camera,
+        x: dragState.camera.x + svgPoint.x - dragState.startX,
+        y: dragState.camera.y + svgPoint.y - dragState.startY,
+      });
+      return;
+    }
+
+    const worldPoint = getWorldPoint(event, svgElement, camera);
+    const draggedPosition = {
+      x: clampGraphCoordinate(worldPoint.x + dragState.offsetX, GRAPH_WIDTH),
+      y: clampGraphCoordinate(worldPoint.y + dragState.offsetY, GRAPH_HEIGHT),
+    };
+
+    setNodePositions((currentPositions) =>
+      repelNearbyNodes(positionedGraph.nodes, dragState.nodeId, draggedPosition, currentPositions),
+    );
+  }, [camera, positionedGraph.nodes]);
+
+  const handleGraphPointerUp = useCallback((event) => {
+    const dragState = dragStateRef.current;
+
+    if (dragState?.pointerId === event.pointerId) {
+      dragStateRef.current = null;
+      setDraggedNodeId(null);
+      setIsCameraDragging(false);
+    }
+  }, []);
+
+  const handleControlZoom = useCallback((scaleMultiplier) => {
+    setCamera((currentCamera) => {
+      const nextScale = clampNumber(currentCamera.scale * scaleMultiplier, MIN_CAMERA_SCALE, MAX_CAMERA_SCALE);
+      const center = { x: GRAPH_WIDTH / 2, y: GRAPH_HEIGHT / 2 };
+      const worldX = (center.x - currentCamera.x) / currentCamera.scale;
+      const worldY = (center.y - currentCamera.y) / currentCamera.scale;
+
+      return {
+        scale: nextScale,
+        x: center.x - worldX * nextScale,
+        y: center.y - worldY * nextScale,
+      };
+    });
+  }, []);
+
+  const handleResetView = useCallback(() => {
+    setCamera(INITIAL_CAMERA);
+  }, []);
 
   return createPortal(
     <div className="knowledge-graph-modal-backdrop" role="presentation" onClick={onClose}>
@@ -311,127 +552,155 @@ export function KnowledgeGraphModal({
         </header>
 
         <div className="knowledge-graph-modal__body">
-          <svg
-            className="knowledge-graph"
-            viewBox={`0 0 ${GRAPH_WIDTH} ${GRAPH_HEIGHT}`}
-            role="img"
-            aria-label="Граф доказательств и гипотез"
-          >
-            <defs>
-              <marker
-                id="knowledge-graph-arrow"
-                viewBox="0 0 10 10"
-                refX="8"
-                refY="5"
-                markerWidth="6"
-                markerHeight="6"
-                orient="auto-start-reverse"
+          <div className="knowledge-graph-shell">
+            <svg
+              ref={svgRef}
+              className={[
+                "knowledge-graph",
+                isCameraDragging ? "knowledge-graph--panning" : "",
+                draggedNodeId ? "knowledge-graph--dragging-node" : "",
+              ].filter(Boolean).join(" ")}
+              viewBox={`0 0 ${GRAPH_WIDTH} ${GRAPH_HEIGHT}`}
+              role="img"
+              aria-label="Граф доказательств и гипотез"
+              onWheel={handleGraphWheel}
+              onPointerDown={handleGraphPointerDown}
+              onPointerMove={handleGraphPointerMove}
+              onPointerUp={handleGraphPointerUp}
+              onPointerCancel={handleGraphPointerUp}
+            >
+              <defs>
+                <marker
+                  id="knowledge-graph-arrow"
+                  viewBox="0 0 10 10"
+                  refX="8"
+                  refY="5"
+                  markerWidth="6"
+                  markerHeight="6"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M 0 0 L 10 5 L 0 10 z" />
+                </marker>
+              </defs>
+
+              <g
+                className="knowledge-graph__viewport"
+                transform={`translate(${camera.x} ${camera.y}) scale(${camera.scale})`}
               >
-                <path d="M 0 0 L 10 5 L 0 10 z" />
-              </marker>
-            </defs>
+                {positionedGraph.zoneBounds.map((zone) => {
+                  if (!zone.bounds) {
+                    return null;
+                  }
 
-            {graph.zones.map((zone) => {
-              const layout = ZONE_LAYOUTS[zone.id];
+                  return (
+                    <g key={zone.id} className={`knowledge-graph-zone knowledge-graph-zone--${zone.tone}`}>
+                      <path d={createSmoothZonePath(zone.bounds)} />
+                      <text x={zone.bounds.x + 24} y={zone.bounds.y + 34} className="knowledge-graph-zone__label">
+                        {zone.label}
+                      </text>
+                      <text x={zone.bounds.x + 24} y={zone.bounds.y + 51} className="knowledge-graph-zone__description">
+                        {zone.description}
+                      </text>
+                    </g>
+                  );
+                })}
 
-              if (!layout) {
-                return null;
-              }
+                <g className="knowledge-graph__edges">
+                  {positionedGraph.edges.map((edge) => {
+                    const isActive = connectedIds.edgeIds.has(edge.id);
+                    const isDimmed = activeItem && !isActive;
 
-              return (
-                <g key={zone.id} className={`knowledge-graph-zone knowledge-graph-zone--${zone.tone}`}>
-                  <path d={createZonePath(layout)} />
-                  <text x={layout.x + 18} y={layout.y + 28} className="knowledge-graph-zone__label">
-                    {zone.label}
-                  </text>
-                  <text x={layout.x + 18} y={layout.y + 45} className="knowledge-graph-zone__description">
-                    {zone.description}
-                  </text>
+                    return (
+                      <g key={edge.id}>
+                        <path
+                          className={[
+                            "knowledge-graph-edge",
+                            isActive ? "knowledge-graph-edge--active" : "",
+                            isDimmed ? "knowledge-graph-edge--dimmed" : "",
+                          ].filter(Boolean).join(" ")}
+                          d={edge.d}
+                          markerEnd="url(#knowledge-graph-arrow)"
+                        />
+                        <path
+                          className="knowledge-graph-edge__hitbox"
+                          d={edge.d}
+                          onMouseEnter={(event) => showEdgeTooltip(event, edge)}
+                          onMouseMove={(event) => showEdgeTooltip(event, edge)}
+                          onMouseLeave={hideTooltip}
+                        />
+                      </g>
+                    );
+                  })}
                 </g>
-              );
-            })}
 
-            <g className="knowledge-graph__edges">
-              {positionedGraph.edges.map((edge) => {
-                const isActive = connectedIds.edgeIds.has(edge.id);
-                const isDimmed = activeItem && !isActive;
+                <g className="knowledge-graph__nodes">
+                  {positionedGraph.nodes.map((node) => {
+                    const meta = NODE_META[node.type] ?? NODE_META.evidence;
+                    const Icon = meta.icon;
+                    const isFocused = focusNodeId === node.id;
+                    const isActive = connectedIds.nodeIds.has(node.id);
+                    const isDimmed = activeItem && !isActive;
+                    const isDragging = draggedNodeId === node.id;
 
-                return (
-                  <g key={edge.id}>
-                    <path
-                      className={[
-                        "knowledge-graph-edge",
-                        isActive ? "knowledge-graph-edge--active" : "",
-                        isDimmed ? "knowledge-graph-edge--dimmed" : "",
-                      ].filter(Boolean).join(" ")}
-                      d={edge.d}
-                      markerEnd="url(#knowledge-graph-arrow)"
-                    />
-                    <path
-                      className="knowledge-graph-edge__hitbox"
-                      d={edge.d}
-                      onMouseEnter={(event) => showEdgeTooltip(event, edge)}
-                      onMouseMove={(event) => showEdgeTooltip(event, edge)}
-                      onMouseLeave={hideTooltip}
-                    />
-                  </g>
-                );
-              })}
-            </g>
+                    return (
+                      <g
+                        key={node.id}
+                        className={[
+                          "knowledge-graph-node",
+                          `knowledge-graph-node--${node.type}`,
+                          isFocused ? "knowledge-graph-node--focused" : "",
+                          isActive ? "knowledge-graph-node--active" : "",
+                          isDimmed ? "knowledge-graph-node--dimmed" : "",
+                          isDragging ? "knowledge-graph-node--dragging" : "",
+                        ].filter(Boolean).join(" ")}
+                        style={{ transform: `translate(${node.x}px, ${node.y}px)` }}
+                        tabIndex={0}
+                        role="button"
+                        aria-label={`${meta.label}: ${node.label}`}
+                        onPointerDown={(event) => handleNodePointerDown(event, node)}
+                        onMouseEnter={(event) => showNodeTooltip(event, node)}
+                        onMouseMove={(event) => showNodeTooltip(event, node)}
+                        onMouseLeave={hideTooltip}
+                        onFocus={(event) => showNodeTooltip(event, node)}
+                        onBlur={hideTooltip}
+                      >
+                        <circle r="18" />
+                        <g className="knowledge-graph-node__icon" transform="translate(-9 -9)">
+                          <Icon aria-hidden="true" strokeWidth={1.9} />
+                        </g>
+                        <text className="knowledge-graph-node__label" y="35">
+                          {node.label.length > 20 ? `${node.label.slice(0, 18)}...` : node.label}
+                        </text>
+                      </g>
+                    );
+                  })}
+                </g>
+              </g>
+            </svg>
 
-            <g className="knowledge-graph__nodes">
-              {positionedGraph.nodes.map((node) => {
-                const meta = NODE_META[node.type] ?? NODE_META.evidence;
-                const isFocused = focusNodeId === node.id;
-                const isActive = connectedIds.nodeIds.has(node.id);
-                const isDimmed = activeItem && !isActive;
-
-                return (
-                  <g
-                    key={node.id}
-                    className={[
-                      "knowledge-graph-node",
-                      `knowledge-graph-node--${node.type}`,
-                      isFocused ? "knowledge-graph-node--focused" : "",
-                      isActive ? "knowledge-graph-node--active" : "",
-                      isDimmed ? "knowledge-graph-node--dimmed" : "",
-                    ].filter(Boolean).join(" ")}
-                    transform={`translate(${node.x} ${node.y})`}
-                    tabIndex={0}
-                    role="button"
-                    aria-label={`${meta.label}: ${node.label}`}
-                    onMouseEnter={(event) => showNodeTooltip(event, node)}
-                    onMouseMove={(event) => showNodeTooltip(event, node)}
-                    onMouseLeave={hideTooltip}
-                    onFocus={(event) => showNodeTooltip(event, node)}
-                    onBlur={hideTooltip}
-                  >
-                    <circle r="18" />
-                    <text className="knowledge-graph-node__glyph" y="5">
-                      {meta.label.slice(0, 1)}
-                    </text>
-                    <text className="knowledge-graph-node__label" y="35">
-                      {node.label.length > 20 ? `${node.label.slice(0, 18)}…` : node.label}
-                    </text>
-                  </g>
-                );
-              })}
-            </g>
-          </svg>
+            <div className="knowledge-graph-controls" aria-label="Управление графом">
+              <button type="button" aria-label="Увеличить" onClick={() => handleControlZoom(1.18)}>
+                <ZoomIn aria-hidden="true" strokeWidth={2} />
+              </button>
+              <button type="button" aria-label="Уменьшить" onClick={() => handleControlZoom(0.84)}>
+                <ZoomOut aria-hidden="true" strokeWidth={2} />
+              </button>
+              <button type="button" aria-label="Вернуть вид" onClick={handleResetView}>
+                <RotateCcw aria-hidden="true" strokeWidth={2} />
+              </button>
+            </div>
+          </div>
 
           <aside className="knowledge-graph-inspector">
-            <div className="knowledge-graph-inspector__icon">
-              <Network aria-hidden="true" strokeWidth={1.8} />
-            </div>
             <h3>Как читать граф</h3>
             <p>
-              Наведи на узел или связь: сверху появятся детали источника, факта,
-              гипотезы или причины связи. Клик по ссылке из истории агентов
-              открывает этот же граф с фокусом на источнике.
+              Колесо мыши меняет масштаб, пустое поле двигает камеру, а сами узлы можно перетаскивать.
+              При наведении видны источник, цитата, факт, гипотеза или причина связи.
             </p>
             <div className="knowledge-graph-inspector__stats">
               <span>{positionedGraph.nodes.length} узлов</span>
               <span>{positionedGraph.edges.length} связей</span>
+              <span>{Math.round(camera.scale * 100)}%</span>
             </div>
           </aside>
         </div>
