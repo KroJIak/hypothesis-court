@@ -9,9 +9,20 @@ _REQUEST_TIMEOUT_SECONDS = 12
 
 
 class OpenAICompatibleClient:
-    def __init__(self, *, base_url: str, api_token: str | None) -> None:
+    def __init__(
+        self,
+        *,
+        base_url: str,
+        api_token: str | None,
+        project_id: str | None = None,
+        api_token_prefix: str = "Bearer",
+        project_header_name: str = "OpenAI-Project",
+    ) -> None:
         self._base_url = base_url.rstrip("/") + "/"
         self._api_token = api_token
+        self._project_id = project_id
+        self._api_token_prefix = api_token_prefix
+        self._project_header_name = project_header_name
 
     def list_models(self) -> list[str]:
         payload = self._request_json("models")
@@ -32,7 +43,9 @@ class OpenAICompatibleClient:
     def _request_json(self, path: str) -> dict[str, object]:
         headers = {"Accept": "application/json"}
         if self._api_token:
-            headers["Authorization"] = f"Bearer {self._api_token}"
+            headers["Authorization"] = f"{self._api_token_prefix} {self._api_token}"
+        if self._project_id:
+            headers[self._project_header_name] = self._project_id
 
         request = Request(urljoin(self._base_url, path), headers=headers, method="GET")
         try:

@@ -13,6 +13,10 @@ OPENAI_PROVIDER = "openai"
 EMBEDDING_PROVIDER = "embedding"
 OPENAI_PROVIDER_TYPE = "openai"
 YANDEX_AI_STUDIO_PROVIDER_TYPE = "yandex_ai_studio"
+OPENAI_API_TOKEN_PREFIX = "Bearer"
+OPENAI_PROJECT_HEADER_NAME = "OpenAI-Project"
+YANDEX_API_TOKEN_PREFIX = "Api-Key"
+YANDEX_PROJECT_HEADER_NAME = "x-project"
 
 
 class ModelProviderSettingsService:
@@ -35,6 +39,7 @@ class ModelProviderSettingsService:
             provider=OPENAI_PROVIDER,
             provider_type=OPENAI_PROVIDER_TYPE,
             base_url=settings.model_provider_base_url,
+            project_id=None,
             model=settings.model_provider_model,
             api_token=settings.model_provider_api_key,
         )
@@ -47,6 +52,7 @@ class ModelProviderSettingsService:
             provider=EMBEDDING_PROVIDER,
             provider_type=OPENAI_PROVIDER_TYPE,
             base_url=settings.embedding_base_url,
+            project_id=None,
             model=settings.embedding_model,
             api_token=settings.embedding_api_key,
         )
@@ -58,6 +64,7 @@ class ModelProviderSettingsService:
         provider: str,
         provider_type: str,
         base_url: str,
+        project_id: str | None,
         model: str | None,
         api_token: str | None,
     ) -> ModelProviderSettings:
@@ -65,6 +72,10 @@ class ModelProviderSettingsService:
             self._validate_provider(provider)
             normalized_provider_type = self._normalize_provider_type(provider_type)
             normalized_base_url = self._normalize_base_url(base_url)
+            normalized_project_id = self._normalize_project_id(
+                project_id,
+                provider_type=normalized_provider_type,
+            )
             normalized_model = self._normalize_model(model)
             normalized_api_token = self._normalize_api_token(api_token)
             settings = self._settings.get_by_provider(self._session, provider)
@@ -76,6 +87,7 @@ class ModelProviderSettingsService:
                         provider=provider,
                         provider_type=normalized_provider_type,
                         base_url=normalized_base_url,
+                        project_id=normalized_project_id,
                         model=normalized_model,
                         api_token=normalized_api_token,
                         created_by_user_id=actor.id,
@@ -85,6 +97,7 @@ class ModelProviderSettingsService:
             else:
                 settings.provider_type = normalized_provider_type
                 settings.base_url = normalized_base_url
+                settings.project_id = normalized_project_id
                 settings.model = normalized_model
                 settings.updated_by_user_id = actor.id
                 if normalized_api_token is not None:
@@ -102,16 +115,23 @@ class ModelProviderSettingsService:
         provider: str,
         provider_type: str,
         base_url: str,
+        project_id: str | None,
         api_token: str | None,
         settings: Settings,
     ) -> list[str]:
         self._validate_provider(provider)
-        self._normalize_provider_type(provider_type)
+        normalized_provider_type = self._normalize_provider_type(provider_type)
         normalized_base_url = self._normalize_base_url(base_url)
+        normalized_project_id = self._normalize_project_id(
+            project_id,
+            provider_type=normalized_provider_type,
+        )
         resolved_api_token = self._resolve_api_token(provider=provider, api_token=api_token, settings=settings)
-        return OpenAICompatibleClient(
+        return self._create_provider_client(
+            provider_type=normalized_provider_type,
             base_url=normalized_base_url,
             api_token=resolved_api_token,
+            project_id=normalized_project_id,
         ).list_models()
 
     def test_provider_connection(
@@ -120,18 +140,25 @@ class ModelProviderSettingsService:
         provider: str,
         provider_type: str,
         base_url: str,
+        project_id: str | None,
         model: str,
         api_token: str | None,
         settings: Settings,
     ) -> list[str]:
         self._validate_provider(provider)
-        self._normalize_provider_type(provider_type)
+        normalized_provider_type = self._normalize_provider_type(provider_type)
         normalized_base_url = self._normalize_base_url(base_url)
+        normalized_project_id = self._normalize_project_id(
+            project_id,
+            provider_type=normalized_provider_type,
+        )
         normalized_model = self._normalize_model(model)
         resolved_api_token = self._resolve_api_token(provider=provider, api_token=api_token, settings=settings)
-        return OpenAICompatibleClient(
+        return self._create_provider_client(
+            provider_type=normalized_provider_type,
             base_url=normalized_base_url,
             api_token=resolved_api_token,
+            project_id=normalized_project_id,
         ).assert_model_available(normalized_model)
 
     def get_default_settings(self, provider: str, settings: Settings) -> ModelProviderSettings:
@@ -141,6 +168,7 @@ class ModelProviderSettingsService:
                 provider=EMBEDDING_PROVIDER,
                 provider_type=OPENAI_PROVIDER_TYPE,
                 base_url=settings.embedding_base_url,
+                project_id=None,
                 model=settings.embedding_model,
                 api_token=settings.embedding_api_key,
             )
@@ -148,6 +176,7 @@ class ModelProviderSettingsService:
             provider=OPENAI_PROVIDER,
             provider_type=OPENAI_PROVIDER_TYPE,
             base_url=settings.model_provider_base_url,
+            project_id=None,
             model=settings.model_provider_model,
             api_token=settings.model_provider_api_key,
         )
@@ -197,6 +226,43 @@ class ModelProviderSettingsService:
         if len(normalized) > 255:
             raise ValidationError("Model must contain at most 255 characters.")
         return normalized
+
+    @staticmethod
+    def _normalize_project_id(project_id: str | None, *, provider_type: str) -> str | None:
+        if provider_type != YANDEX_AI_STUDIO_PROVIDER_TYPE:
+            return None
+        if project_id is None:
+            raise ValidationError("Folder ID is required for Yandex AI Studio.")
+        normalized = project_id.strip()
+        if not normalized:
+            raise ValidationError("Folder ID is required for Yandex AI Studio.")
+        if len(normalized) > 255:
+            raise ValidationError("Folder ID must contain at most 255 characters.")
+        return normalized
+
+    @staticmethod
+    def _create_provider_client(
+        *,
+        provider_type: str,
+        base_url: str,
+        api_token: str | None,
+        project_id: str | None,
+    ) -> OpenAICompatibleClient:
+        if provider_type == YANDEX_AI_STUDIO_PROVIDER_TYPE:
+            return OpenAICompatibleClient(
+                base_url=base_url,
+                api_token=api_token,
+                project_id=project_id,
+                api_token_prefix=YANDEX_API_TOKEN_PREFIX,
+                project_header_name=YANDEX_PROJECT_HEADER_NAME,
+            )
+        return OpenAICompatibleClient(
+            base_url=base_url,
+            api_token=api_token,
+            project_id=project_id,
+            api_token_prefix=OPENAI_API_TOKEN_PREFIX,
+            project_header_name=OPENAI_PROJECT_HEADER_NAME,
+        )
 
     @staticmethod
     def _normalize_api_token(api_token: str | None) -> str | None:

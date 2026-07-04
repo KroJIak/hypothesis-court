@@ -25,6 +25,7 @@ export function AdminProviderSettingsSection({
 }) {
   const [providerType, setProviderType] = useState("openai");
   const [baseUrl, setBaseUrl] = useState("");
+  const [projectId, setProjectId] = useState("");
   const [apiToken, setApiToken] = useState("");
   const [model, setModel] = useState("");
   const [availableModels, setAvailableModels] = useState([]);
@@ -39,6 +40,8 @@ export function AdminProviderSettingsSection({
     () => mergeModelOptions([model], availableModels),
     [availableModels, model],
   );
+  const isYandexProvider = providerType === "yandex_ai_studio";
+  const canUseProvider = Boolean(baseUrl.trim()) && (!isYandexProvider || Boolean(projectId.trim()));
 
   useEffect(() => {
     let isActive = true;
@@ -53,6 +56,7 @@ export function AdminProviderSettingsSection({
         const nextModel = settings?.model ?? "";
         setProviderType(settings?.provider_type ?? "openai");
         setBaseUrl(settings?.base_url ?? "");
+        setProjectId(settings?.project_id ?? "");
         setModel(nextModel);
         setApiToken(settings?.api_token ?? "");
         setHasApiToken(Boolean(settings?.has_api_token));
@@ -83,6 +87,7 @@ export function AdminProviderSettingsSection({
       provider,
       providerType,
       baseUrl,
+      projectId: isYandexProvider ? projectId : null,
       apiToken: apiToken?.trim() || null,
     });
 
@@ -94,6 +99,7 @@ export function AdminProviderSettingsSection({
   async function handleSubmit(event) {
     event.preventDefault();
     const nextModel = model?.trim() || "";
+    const nextProjectId = isYandexProvider ? projectId?.trim() || "" : "";
     const nextApiToken = apiToken?.trim() || null;
     setIsSaving(true);
     setErrorMessage("");
@@ -105,10 +111,12 @@ export function AdminProviderSettingsSection({
         provider,
         providerType,
         baseUrl,
+        projectId: nextProjectId || null,
         model: nextModel,
         apiToken: nextApiToken,
       });
       setBaseUrl(settings.base_url);
+      setProjectId(settings.project_id ?? nextProjectId);
       setModel(settings.model ?? "");
       setApiToken(settings.api_token ?? nextApiToken ?? "");
       setHasApiToken(Boolean(settings.has_api_token));
@@ -133,11 +141,15 @@ export function AdminProviderSettingsSection({
             provider,
             providerType,
             baseUrl,
+            projectId: isYandexProvider ? projectId?.trim() || null : null,
             model: nextModel,
             apiToken: apiToken?.trim() || null,
           })).models ?? []
         : await refreshModels();
 
+      if (nextModels.length === 0) {
+        throw new Error("Провайдер не вернул список моделей.");
+      }
       setAvailableModels(mergeModelOptions(nextModels, [nextModel]));
       setSuccessMessage("Подключение работает.");
     } catch (error) {
@@ -148,7 +160,7 @@ export function AdminProviderSettingsSection({
   }
 
   async function handleModelSelectFocus() {
-    if (isLoading || isTesting || !baseUrl.trim()) {
+    if (isLoading || isTesting || !canUseProvider) {
       return;
     }
 
@@ -161,6 +173,8 @@ export function AdminProviderSettingsSection({
 
   function handleProviderTypeChange(event) {
     setProviderType(event.target.value);
+    setBaseUrl("");
+    setProjectId("");
     setModel("");
     setAvailableModels([]);
     setErrorMessage("");
@@ -192,13 +206,27 @@ export function AdminProviderSettingsSection({
             <input
               type="url"
               value={baseUrl}
-              placeholder="https://api.openai.com/v1"
+              placeholder={isYandexProvider ? "Введите Base URL" : "https://api.openai.com/v1"}
               disabled={isLoading}
               onChange={(event) => setBaseUrl(event.target.value)}
               required
             />
           </label>
         </div>
+
+        {isYandexProvider ? (
+          <label className="account-admin-field">
+            <span>Folder ID</span>
+            <input
+              type="text"
+              value={projectId}
+              placeholder="Folder ID из Yandex Cloud"
+              disabled={isLoading}
+              onChange={(event) => setProjectId(event.target.value)}
+              required
+            />
+          </label>
+        ) : null}
 
         <label className="account-admin-field">
           <span>Модель</span>
@@ -220,12 +248,12 @@ export function AdminProviderSettingsSection({
         </label>
 
         <label className="account-admin-field">
-          <span>API токен</span>
+          <span>{isYandexProvider ? "API ключ" : "API токен"}</span>
           <span className="account-admin-password-input">
             <input
               type={isApiTokenVisible ? "text" : "password"}
               value={apiToken ?? ""}
-              placeholder={hasApiToken ? "Токен уже сохранён" : "Введите API токен"}
+              placeholder={hasApiToken ? "Ключ уже сохранён" : "Введите ключ"}
               disabled={isLoading}
               onChange={(event) => setApiToken(event.target.value)}
             />
@@ -244,7 +272,7 @@ export function AdminProviderSettingsSection({
           <button
             type="button"
             className="account-admin-test-button"
-            disabled={isLoading || isTesting || !baseUrl.trim()}
+            disabled={isLoading || isTesting || !canUseProvider}
             aria-label="Проверить подключение"
             onClick={handleTestConnection}
           >

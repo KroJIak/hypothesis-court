@@ -35,6 +35,7 @@ def _to_response(settings, *, has_api_token: bool | None = None) -> ModelProvide
         provider=settings.provider,
         provider_type=settings.provider_type,
         base_url=settings.base_url,
+        project_id=settings.project_id,
         model=settings.model,
         api_token=settings.api_token,
         has_api_token=bool(settings.api_token) if has_api_token is None else has_api_token,
@@ -78,6 +79,7 @@ def _update_provider_settings_response(
         provider=provider,
         provider_type=payload.provider_type,
         base_url=payload.base_url,
+        project_id=payload.project_id,
         model=payload.model,
         api_token=payload.api_token,
     )
@@ -159,6 +161,7 @@ def _list_provider_models_response(
         provider=provider,
         provider_type=payload.provider_type,
         base_url=payload.base_url,
+        project_id=payload.project_id,
         api_token=payload.api_token,
         settings=settings,
     )
@@ -177,6 +180,7 @@ def _test_provider_connection_response(
         provider=provider,
         provider_type=payload.provider_type,
         base_url=payload.base_url,
+        project_id=payload.project_id,
         model=payload.model,
         api_token=payload.api_token,
         settings=settings,
