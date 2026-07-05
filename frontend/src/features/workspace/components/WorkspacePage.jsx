@@ -115,14 +115,10 @@ function getPaletteAgents(userAgents, data) {
   return [...userAgents, ...getEmptyPaletteAgents(data)];
 }
 
-function removeAgentFromSessions(sessions, agentId) {
+function removeAgentFromAvailableAgents(sessions, agentId) {
   return sessions.map((session) => ({
     ...session,
     availableAgents: (session.availableAgents ?? []).filter((agent) => agent.id !== agentId),
-    evaluation: {
-      ...session.evaluation,
-      agents: (session.evaluation?.agents ?? []).filter((agent) => agent.id !== agentId),
-    },
   }));
 }
 
@@ -1370,7 +1366,7 @@ export function WorkspacePage({
     try {
       await deleteUserAgent({ accessToken, agentId });
       setUserAgents((currentAgents) => currentAgents.filter((currentAgent) => currentAgent.id !== agentId));
-      setSessions((currentSessions) => removeAgentFromSessions(currentSessions, agentId));
+      setSessions((currentSessions) => removeAgentFromAvailableAgents(currentSessions, agentId));
       newAgentBaselineByIdRef.current.delete(agentId);
       setActivePendingAgentId((currentAgentId) => (currentAgentId === agentId ? null : currentAgentId));
       setDragSource(null);

@@ -246,7 +246,6 @@ class ResearchRepository:
             .where(
                 ChatSessionAgent.user_id == user_id,
                 ChatSessionAgent.chat_session_id == chat_session_id,
-                UserAgent.deleted_at.is_(None),
             )
             .order_by(ChatSessionAgent.position.asc(), ChatSessionAgent.created_at.asc())
         )

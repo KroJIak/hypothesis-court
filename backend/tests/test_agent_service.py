@@ -36,7 +36,10 @@ class FakeAgentRepository:
         del session, for_update
         if user_id != self.user_id:
             return None
-        return self.agents.get(agent_id)
+        agent = self.agents.get(agent_id)
+        if agent is None or agent.deleted_at is not None:
+            return None
+        return agent
 
     def get_selected_agent(self, session, *, user_id, chat_session_id, agent_id):
         del session
@@ -163,3 +166,24 @@ def test_attach_existing_agent_reorders_without_duplicate_selection():
     assert repository.get_selected_agent(None, user_id=user.id, chat_session_id=chat_session_id, agent_id=third_agent.id).placement == "left"
     assert session.commits == 1
     assert session.rollbacks == 0
+
+
+def test_deleted_agent_remains_in_existing_chat_selection():
+    user = User(id=uuid.uuid4(), username="researcher", password_hash="hash", token_version=1)
+    chat_session_id = uuid.uuid4()
+    agent = make_agent(user.id, "Финансовый эксперт")
+    repository = FakeAgentRepository(
+        user_id=user.id,
+        chat_session_id=chat_session_id,
+        agents=[agent],
+        selected_agents=[make_selected(user.id, chat_session_id, agent.id, 0, "right")],
+    )
+    session = DummySession()
+    service = make_service(repository, session)
+
+    service.delete_agent(user=user, agent_id=agent.id)
+    selected_agents = service.list_selected_agents(user=user, chat_session_id=chat_session_id)
+
+    assert agent.deleted_at is not None
+    assert selected_agents == [(repository.selected_agents[0], agent)]
+    assert session.commits == 1
