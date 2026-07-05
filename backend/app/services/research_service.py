@@ -32,6 +32,7 @@ from app.models.user_agent import UserAgent
 from app.models.enums import (
     DebateRole,
     DocumentProcessingStatus,
+    EvidenceRelationKind,
     ResearchFeedbackTarget,
     ResearchInputKind,
     ResearchRunStatus,
@@ -438,7 +439,7 @@ class ResearchService:
                     id=file_node_id,
                     type="file",
                     label=source_file.original_filename,
-                    description=source_file.processing_status.value,
+                    description=self._document_processing_status_label(source_file.processing_status),
                     metadata={
                         "session_file_id": str(source_file.id),
                         "processing_status": source_file.processing_status.value,
@@ -535,7 +536,7 @@ class ResearchService:
                         source=f"evidence:{link.evidence_id}",
                         target=hypothesis_node_id,
                         type=link.relation.value,
-                        label=link.rationale,
+                        label=link.rationale or self._evidence_relation_label(link.relation),
                     )
                 )
             for version in hypothesis.versions:
@@ -544,11 +545,15 @@ class ResearchService:
                     ResearchGraphNodeResponse(
                         id=version_node_id,
                         type="hypothesis_version",
-                        label=f"Версия {version.version_number}",
+                        label=self._hypothesis_version_graph_label(version),
                         description=version.statement,
                         metadata={
                             "hypothesis_id": str(hypothesis.id),
-                            "created_by_role": version.created_by_role.value if version.created_by_role else None,
+                            "created_by_role": (
+                                self._debate_role_label(version.created_by_role)
+                                if version.created_by_role
+                                else None
+                            ),
                         },
                     )
                 )
@@ -558,7 +563,7 @@ class ResearchService:
                         source=hypothesis_node_id,
                         target=version_node_id,
                         type="has_version",
-                        label=version.change_summary,
+                        label=version.change_summary or "Доработанная формулировка",
                     )
                 )
             for message in hypothesis.debate_messages:
@@ -567,9 +572,13 @@ class ResearchService:
                     ResearchGraphNodeResponse(
                         id=message_node_id,
                         type="debate_message",
-                        label=f"{message.role.value} / round {message.round_number}",
+                        label=self._debate_message_graph_label(message),
                         description=message.content,
-                        metadata={"hypothesis_id": str(hypothesis.id)},
+                        metadata={
+                            "hypothesis_id": str(hypothesis.id),
+                            "role": self._debate_role_label(message.role),
+                            "round_number": message.round_number,
+                        },
                     )
                 )
                 edges.append(
@@ -578,6 +587,7 @@ class ResearchService:
                         source=message_node_id,
                         target=hypothesis_node_id,
                         type="critiques",
+                        label="реплика в обсуждении",
                     )
                 )
             for evaluation in hypothesis.evaluations:
@@ -597,6 +607,7 @@ class ResearchService:
                         source=hypothesis_node_id,
                         target=evaluation_node_id,
                         type="evaluated_by",
+                        label="оценка эксперта",
                     )
                 )
 
@@ -637,6 +648,7 @@ class ResearchService:
                         source=verdict_node_id,
                         target=check_node_id,
                         type="recommends",
+                        label="следующая проверка",
                     )
                 )
 
@@ -1664,6 +1676,51 @@ class ResearchService:
             DebateRole.ATTACKER: "Атакующий",
             DebateRole.MANUFACTURER: "Производственник",
         }.get(role, role.value)
+
+    @staticmethod
+    def _debate_message_graph_label(message: DebateMessageResponse) -> str:
+        action_by_role = {
+            DebateRole.DEFENDER: "Защита",
+            DebateRole.ATTACKER: "Критика",
+            DebateRole.MANUFACTURER: "Проверка производства",
+        }
+        action = action_by_role.get(message.role, ResearchService._debate_role_label(message.role))
+        return f"{action}, раунд {message.round_number}"
+
+    @staticmethod
+    def _hypothesis_version_graph_label(version: HypothesisVersionResponse) -> str:
+        if version.version_number == 1:
+            return "Первичная формулировка"
+
+        if version.created_by_role == DebateRole.MANUFACTURER:
+            return f"Доработка после обсуждения {version.version_number - 1}"
+
+        if version.created_by_role is not None:
+            return f"Доработка: {ResearchService._debate_role_label(version.created_by_role)}"
+
+        return f"Доработка {version.version_number}"
+
+    @staticmethod
+    def _evidence_relation_label(relation: EvidenceRelationKind) -> str:
+        return {
+            EvidenceRelationKind.SUPPORTS: "поддерживает гипотезу",
+            EvidenceRelationKind.CONTRADICTS: "противоречит гипотезе",
+            EvidenceRelationKind.RISK: "указывает на риск",
+            EvidenceRelationKind.CONSTRAINS: "задаёт ограничение",
+        }.get(relation, relation.value)
+
+    @staticmethod
+    def _document_processing_status_label(status: DocumentProcessingStatus) -> str:
+        return {
+            DocumentProcessingStatus.UPLOADED: "Файл загружен",
+            DocumentProcessingStatus.PROCESSING: "Файл обрабатывается",
+            DocumentProcessingStatus.PARSING: "Текст извлекается",
+            DocumentProcessingStatus.CHUNKED: "Файл разбит на фрагменты",
+            DocumentProcessingStatus.INDEXED: "Фрагменты проиндексированы",
+            DocumentProcessingStatus.PROCESSED: "Файл обработан",
+            DocumentProcessingStatus.FAILED: "Ошибка обработки",
+            DocumentProcessingStatus.UNSUPPORTED: "Формат не поддерживается",
+        }.get(status, status.value)
 
     @staticmethod
     def _apply_pipeline_settings_to_brief(research_brief: str, pipeline_settings) -> str:

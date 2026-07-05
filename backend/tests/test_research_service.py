@@ -659,6 +659,15 @@ def test_graph_contains_inputs_evidence_hypotheses_and_verdict(service_bundle, u
     assert "hypothesis_version" in node_types
     assert "debate_message" in node_types
     assert "evaluation" in node_types
+    node_labels = {node.label for node in graph.nodes}
+    edge_labels = {edge.label for edge in graph.edges if edge.label}
+    assert "Первичная формулировка" in node_labels
+    assert "Доработка после обсуждения 1" in node_labels
+    assert "Защита, раунд 1" in node_labels
+    assert "Критика, раунд 1" in node_labels
+    assert "Проверка производства, раунд 1" in node_labels
+    assert "реплика в обсуждении" in edge_labels
+    assert all("/ round" not in node.label for node in graph.nodes)
 
 
 def test_progress_lists_pipeline_events(service_bundle, user, chat_session):
