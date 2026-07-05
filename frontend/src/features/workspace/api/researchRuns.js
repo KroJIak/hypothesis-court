@@ -132,10 +132,23 @@ function mapResearchRunDetail(dto) {
   };
 }
 
-function mapGraphNodeType(type) {
+function mapGraphInputNodeType(kind) {
+  switch (kind) {
+    case "kpi":
+      return "kpi";
+    case "constraints":
+      return "constraint";
+    default:
+      return "brief";
+  }
+}
+
+function mapGraphNodeType(node) {
+  const type = node.type;
+
   switch (type) {
     case "input":
-      return "brief";
+      return mapGraphInputNodeType(node.metadata?.kind);
     case "file":
     case "chunk":
       return "source";
@@ -208,7 +221,7 @@ function mapResearchGraph(dto) {
     ],
     nodes: (dto.nodes ?? []).map((node) => ({
       id: node.id,
-      type: mapGraphNodeType(node.type),
+      type: mapGraphNodeType(node),
       sourceType: node.type,
       zone: mapGraphNodeZone(node.type),
       label: node.label,

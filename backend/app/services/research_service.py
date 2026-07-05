@@ -507,6 +507,18 @@ class ResearchService:
                 )
             )
             node_ids.add(evidence_node_id)
+            for input_item in detail.inputs:
+                input_node_id = f"input:{input_item.id}"
+                edges.append(
+                    ResearchGraphEdgeResponse(
+                        id=f"{input_node_id}->evidence:{evidence.id}",
+                        source=input_node_id,
+                        target=evidence_node_id,
+                        type="frames_evidence",
+                        label=self._input_evidence_graph_label(input_item.kind),
+                        metadata={"input_kind": input_item.kind.value},
+                    )
+                )
             if chunk_node_id is not None:
                 edges.append(
                     ResearchGraphEdgeResponse(
@@ -1708,6 +1720,15 @@ class ResearchService:
             EvidenceRelationKind.RISK: "указывает на риск",
             EvidenceRelationKind.CONSTRAINS: "задаёт ограничение",
         }.get(relation, relation.value)
+
+    @staticmethod
+    def _input_evidence_graph_label(kind: ResearchInputKind) -> str:
+        return {
+            ResearchInputKind.KPI: "связывает факт с KPI",
+            ResearchInputKind.CONSTRAINTS: "проверяет ограничение",
+            ResearchInputKind.CONTEXT: "задаёт контекст факта",
+            ResearchInputKind.CUSTOM: "учтено при поиске факта",
+        }.get(kind, "учтено при поиске факта")
 
     @staticmethod
     def _document_processing_status_label(status: DocumentProcessingStatus) -> str:

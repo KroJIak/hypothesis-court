@@ -111,8 +111,14 @@ def test_research_api_contracts(monkeypatch, tmp_path):
     assert graph_response.status_code == 200
     graph_payload = graph_response.json()
     graph_node_types = {node["type"] for node in graph_payload["nodes"]}
+    graph_edge_types = {edge["type"] for edge in graph_payload["edges"]}
     assert {"hypothesis_version", "debate_message", "evaluation"}.issubset(graph_node_types)
     assert "run" not in graph_node_types
+    assert "frames_evidence" in graph_edge_types
+    assert any(
+        edge["source"].startswith("input:") and edge["target"].startswith("evidence:")
+        for edge in graph_payload["edges"]
+    )
     assert all(
         not edge["source"].startswith("run:") and not edge["target"].startswith("run:")
         for edge in graph_payload["edges"]

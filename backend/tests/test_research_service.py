@@ -652,8 +652,10 @@ def test_graph_contains_inputs_evidence_hypotheses_and_verdict(service_bundle, u
     edge_types = {edge.type for edge in graph.edges}
     assert {"input", "evidence", "hypothesis", "verdict"}.issubset(node_types)
     assert "run" not in node_types
+    assert "frames_evidence" in edge_types
     assert "synthesizes" in edge_types
     assert all(not edge.source.startswith("run:") and not edge.target.startswith("run:") for edge in graph.edges)
+    assert any(edge.source.startswith("input:") and edge.target.startswith("evidence:") for edge in graph.edges)
     assert any(edge.source.startswith("evidence:") and edge.target.startswith("hypothesis:") for edge in graph.edges)
     assert any(edge.source.startswith("hypothesis:") and edge.target.startswith("verdict:") for edge in graph.edges)
     assert "hypothesis_version" in node_types
@@ -666,6 +668,9 @@ def test_graph_contains_inputs_evidence_hypotheses_and_verdict(service_bundle, u
     assert "Защита, раунд 1" in node_labels
     assert "Критика, раунд 1" in node_labels
     assert "Проверка производства, раунд 1" in node_labels
+    assert "связывает факт с KPI" in edge_labels
+    assert "проверяет ограничение" in edge_labels
+    assert "задаёт контекст факта" in edge_labels
     assert "реплика в обсуждении" in edge_labels
     assert all("/ round" not in node.label for node in graph.nodes)
 
