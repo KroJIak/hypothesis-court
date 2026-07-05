@@ -4,7 +4,6 @@ import { DebateStage } from "./DebateStage";
 import { EvaluationStage } from "./EvaluationStage";
 import { HypothesisCandidates } from "./HypothesisCandidates";
 import { ResearchProcessChats } from "./ResearchProcessChats";
-import { useScenePlayback } from "../hooks/useScenePlayback";
 import { createResearchProgressView } from "../model/researchProgressViewModel";
 import { getElementCenter, createStraightPath } from "../utils/geometry";
 
@@ -30,6 +29,7 @@ export function WorkspaceScene({
   onVerdictComplete,
   onOpenAgentHistory,
   onOpenKnowledgeGraph,
+  isProcessRunning,
   verdictActions,
 }) {
   const sceneRef = useRef(null);
@@ -40,28 +40,14 @@ export function WorkspaceScene({
   const verdictScrollFramesRef = useRef([]);
   const [verdictScroll, setVerdictScroll] = useState(initialVerdictScroll);
   const [connectionLayer, setConnectionLayer] = useState({ width: 0, height: 0, paths: [] });
-  const {
-    activeDebateConnectionDirections,
-    activeEvaluationConnectionDirections,
-    debateCycleNumber,
-    debateRoleStatuses,
-    evaluationAgentStatuses,
-    hypotheses,
-    isAnswerVisible,
-    judgeStatus,
-  } = useScenePlayback(session);
   const hasHypotheses = (session.hypotheses ?? []).length > 0;
-  const isHypothesesLoading = session.isStarted
-    && (session.launchedRequests ?? []).length > 0
-    && !hasHypotheses;
+  const isHypothesesLoading = isProcessRunning && !hasHypotheses;
   const progressView = createResearchProgressView(session);
-  const activeDebateDirections = progressView.activeDebateConnectionDirections.size > 0
-    ? progressView.activeDebateConnectionDirections
-    : activeDebateConnectionDirections;
-  const activeEvaluationDirections = progressView.activeEvaluationConnectionDirections.size > 0
-    ? progressView.activeEvaluationConnectionDirections
-    : activeEvaluationConnectionDirections;
-  const activeDebateCycleNumber = progressView.debateCycleNumber ?? debateCycleNumber;
+  const activeDebateDirections = progressView.activeDebateConnectionDirections;
+  const activeEvaluationDirections = progressView.activeEvaluationConnectionDirections;
+  const activeDebateCycleNumber = progressView.debateCycleNumber;
+  const hypotheses = session.hypotheses ?? [];
+  const isAnswerVisible = Boolean(session.answer);
   const answerRevealScrollKey = `${session.id}:${session.answer ?? ""}`;
   const isVerdictTypewriterReady = !isAnswerVisible
     || (verdictScroll.key === answerRevealScrollKey && verdictScroll.phase === "ready");
@@ -69,20 +55,20 @@ export function WorkspaceScene({
     ...session.debate,
     roles: session.debate.roles.map((role) => ({
       ...role,
-      status: debateRoleStatuses[role.id] ?? progressView.debateRoleStatuses[role.id] ?? "",
+      status: progressView.debateRoleStatuses[role.id] ?? "",
     })),
-  }), [debateRoleStatuses, progressView.debateRoleStatuses, session.debate]);
+  }), [progressView.debateRoleStatuses, session.debate]);
   const evaluation = useMemo(() => ({
     ...session.evaluation,
     agents: session.evaluation.agents.map((agent) => ({
       ...agent,
-      status: evaluationAgentStatuses[agent.id] ?? progressView.evaluationAgentStatuses[agent.id] ?? "",
+      status: progressView.evaluationAgentStatuses[agent.id] ?? "",
     })),
     judge: {
       ...session.evaluation.judge,
-      status: judgeStatus || progressView.judgeStatus,
+      status: progressView.judgeStatus,
     },
-  }), [evaluationAgentStatuses, judgeStatus, progressView.evaluationAgentStatuses, progressView.judgeStatus, session.evaluation]);
+  }), [progressView.evaluationAgentStatuses, progressView.judgeStatus, session.evaluation]);
 
   const setEvaluationAvatarRef = useCallback((agentId, node) => {
     if (node) {

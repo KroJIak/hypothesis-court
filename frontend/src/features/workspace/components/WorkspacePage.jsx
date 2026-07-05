@@ -50,7 +50,6 @@ import {
   PROCESSING_STATUS_PROCESSING,
 } from "../constants";
 import { useWorkspaceScene } from "../hooks/useWorkspaceScene";
-import { resetScenePlayback } from "../hooks/useScenePlayback";
 import { resetJudgeVerdict } from "./JudgeVerdict";
 import {
   createEvaluationAgent,
@@ -336,6 +335,7 @@ export function WorkspacePage({
   const [activePendingAgentId, setActivePendingAgentId] = useState(null);
   const [activeAgentHistoryTarget, setActiveAgentHistoryTarget] = useState(null);
   const [activeKnowledgeGraphTarget, setActiveKnowledgeGraphTarget] = useState(null);
+  const [pendingRunChatIds, setPendingRunChatIds] = useState(() => new Set());
   const sceneScrollRef = useRef(null);
   const addAgentFrameRef = useRef(null);
   const notificationTimeoutsRef = useRef(new Map());
@@ -360,13 +360,7 @@ export function WorkspacePage({
     ? selectedSession.isStarted || (selectedSession.hypotheses ?? []).length > 0
     : false;
   const isProcessRunning = selectedSession
-    ? activeRunStatus === "running"
-      || (
-        activeVersion === null
-        && selectedSession.isStarted
-        && (selectedSession.launchedRequests ?? []).length > 0
-        && !selectedSession.isVerdictComplete
-      )
+    ? activeRunStatus === "running" || pendingRunChatIds.has(selectedSession.id)
     : false;
   const shouldPollSessionFiles = isProcessRunning && (selectedSession?.attachments ?? []).length > 0;
   const shouldPollResearchRun = Boolean(selectedSession?.activeResearchRunId) && activeRunStatus === "running";
@@ -1561,6 +1555,7 @@ export function WorkspacePage({
 
     const optimisticTitle = createChatTitleFromRequests(composerRequests);
 
+    setPendingRunChatIds((currentChatIds) => new Set(currentChatIds).add(selectedSession.id));
     updateSelectedSession((session) => ({
       ...session,
       title: optimisticTitle,
@@ -1626,14 +1621,25 @@ export function WorkspacePage({
               : session,
           ),
         );
+      })
+      .finally(() => {
+        setPendingRunChatIds((currentChatIds) => {
+          const nextChatIds = new Set(currentChatIds);
+          nextChatIds.delete(selectedSession.id);
+          return nextChatIds;
+        });
       });
   }
 
   function handleStopProcess() {
     const restoredRequests = selectedSession.launchedRequests ?? [];
 
-    resetScenePlayback(selectedSession.id);
     resetJudgeVerdict(selectedSession.id);
+    setPendingRunChatIds((currentChatIds) => {
+      const nextChatIds = new Set(currentChatIds);
+      nextChatIds.delete(selectedSession.id);
+      return nextChatIds;
+    });
     setDraftMessage("");
 
     updateSelectedSession((session) => ({
@@ -1763,7 +1769,6 @@ export function WorkspacePage({
       return;
     }
 
-    resetScenePlayback(selectedSession.id);
     if (nextVersion.isDetailLoaded) {
       updateSelectedSession((session) => applyRunVersion(session, nextVersion, { isComplete: true }));
       return;
@@ -1788,7 +1793,6 @@ export function WorkspacePage({
       return;
     }
 
-    resetScenePlayback(selectedSession.id);
     resetJudgeVerdict(selectedSession.id);
     updateSelectedSession((session) => ({
       ...session,
@@ -1832,7 +1836,6 @@ export function WorkspacePage({
       return;
     }
 
-    resetScenePlayback(selectedSession.id);
     resetJudgeVerdict(selectedSession.id);
     updateSelectedSession((session) => ({
       ...session,
@@ -1945,6 +1948,7 @@ export function WorkspacePage({
             onVerdictComplete={handleVerdictComplete}
             onOpenAgentHistory={handleOpenAgentHistory}
             onOpenKnowledgeGraph={handleOpenKnowledgeGraph}
+            isProcessRunning={isProcessRunning}
             verdictActions={verdictActions}
           />
         </div>
