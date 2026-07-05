@@ -1,3 +1,4 @@
+import base64
 import json
 from urllib.error import HTTPError, URLError
 from urllib.parse import urljoin
@@ -142,6 +143,106 @@ class OpenAICompatibleClient:
             )
         raise ValidationError("Неизвестный режим API провайдера")
 
+    def create_image_description(
+        self,
+        *,
+        api_mode: str,
+        model: str,
+        prompt: str,
+        image_bytes: bytes,
+        content_type: str,
+        temperature: float = 0.1,
+    ) -> str:
+        if not image_bytes:
+            raise ValidationError("Изображение пустое")
+        data_url = self._image_data_url(image_bytes=image_bytes, content_type=content_type)
+        if api_mode == RESPONSES_API_MODE:
+            return self._create_response_image_description(
+                model=model,
+                prompt=prompt,
+                data_url=data_url,
+                temperature=temperature,
+            )
+        if api_mode == CHAT_COMPLETIONS_API_MODE:
+            return self._create_chat_image_description(
+                model=model,
+                prompt=prompt,
+                data_url=data_url,
+                temperature=temperature,
+            )
+        raise ValidationError("Неизвестный режим API провайдера")
+
+    def _create_response_image_description(
+        self,
+        *,
+        model: str,
+        prompt: str,
+        data_url: str,
+        temperature: float,
+    ) -> str:
+        payload = self._request_json(
+            "responses",
+            method="POST",
+            body={
+                "model": model,
+                "input": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "input_text", "text": prompt},
+                            {"type": "input_image", "image_url": data_url},
+                        ],
+                    }
+                ],
+                "temperature": temperature,
+            },
+            timeout_seconds=_GENERATION_TIMEOUT_SECONDS,
+        )
+        content = self._extract_response_text(payload)
+        if not content:
+            raise ValidationError("Провайдер вернул пустое описание изображения")
+        return content
+
+    def _create_chat_image_description(
+        self,
+        *,
+        model: str,
+        prompt: str,
+        data_url: str,
+        temperature: float,
+    ) -> str:
+        payload = self._request_json(
+            "chat/completions",
+            method="POST",
+            body={
+                "model": model,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": prompt},
+                            {"type": "image_url", "image_url": {"url": data_url}},
+                        ],
+                    }
+                ],
+                "temperature": temperature,
+            },
+            timeout_seconds=_GENERATION_TIMEOUT_SECONDS,
+        )
+        choices = payload.get("choices", [])
+        if not isinstance(choices, list) or not choices:
+            raise ValidationError("Провайдер вернул пустое описание изображения")
+        first_choice = choices[0]
+        if not isinstance(first_choice, dict):
+            raise ValidationError("Провайдер вернул некорректное описание изображения")
+        message = first_choice.get("message")
+        if not isinstance(message, dict):
+            raise ValidationError("Провайдер вернул некорректное описание изображения")
+        content = message.get("content")
+        if isinstance(content, str) and content.strip():
+            return content.strip()
+        raise ValidationError("Провайдер вернул некорректное описание изображения")
+
     def assert_text_generation_available(self, *, model: str, api_mode: str) -> list[str]:
         models = self.assert_model_available(model)
         self.create_text_completion(
@@ -187,6 +288,12 @@ class OpenAICompatibleClient:
             return [embeddings_by_index[index] for index in range(len(inputs))]
         except KeyError as exc:
             raise ValidationError("Провайдер вернул неполный набор эмбеддингов") from exc
+
+    @staticmethod
+    def _image_data_url(*, image_bytes: bytes, content_type: str) -> str:
+        normalized_content_type = content_type.strip() or "image/png"
+        encoded = base64.b64encode(image_bytes).decode("ascii")
+        return f"data:{normalized_content_type};base64,{encoded}"
 
     @staticmethod
     def _extract_response_text(payload: dict[str, object]) -> str:

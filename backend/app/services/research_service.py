@@ -65,9 +65,10 @@ from app.schemas.research import (
     ResearchRunSummaryResponse,
 )
 from app.services.exceptions import ConflictError, NotFoundError, ServiceError, ValidationError
-from app.services.document_text_extractor import DocumentTextExtractor
+from app.services.document_text_extractor import DocumentTextExtractor, ExtractedText
 from app.services.research_llm_orchestrator import EvidenceDraft, HypothesisDraft, ResearchLlmOrchestrator
 from app.services.research_retrieval_service import ResearchRetrievalService, RetrievalResult
+from app.services.image_text_extractor import ImageTextExtractor, is_supported_image
 
 _CHUNK_MAX_CHARS = 1800
 _WORD_RE = re.compile(r"\s+")
@@ -89,6 +90,7 @@ class ResearchService:
         repository: ResearchRepository,
         settings: Settings,
         text_extractor: DocumentTextExtractor | None = None,
+        image_text_extractor: ImageTextExtractor | None = None,
         retrieval_service: ResearchRetrievalService | None = None,
         llm_orchestrator: ResearchLlmOrchestrator | None = None,
     ) -> None:
@@ -96,6 +98,7 @@ class ResearchService:
         self._repository = repository
         self._settings = settings
         self._text_extractor = text_extractor or DocumentTextExtractor()
+        self._image_text_extractor = image_text_extractor or ImageTextExtractor()
         self._retrieval_service = retrieval_service
         self._llm_orchestrator = llm_orchestrator
 
@@ -916,11 +919,7 @@ class ResearchService:
                     message=f"Парсинг файла: {session_file.original_filename}.",
                     metadata={"file_id": str(session_file.id), "filename": session_file.original_filename},
                 )
-                extracted = self._text_extractor.extract(
-                    path=self._settings.uploads_dir / session_file.object_key,
-                    kind=session_file.kind,
-                    content_type=session_file.content_type,
-                )
+                extracted = self._extract_file_text(session_file)
                 if extracted is None or not extracted.text.strip():
                     self._set_file_processing_status(
                         session_file,
@@ -981,6 +980,36 @@ class ResearchService:
                     metadata={"file_id": str(session_file.id), "filename": session_file.original_filename},
                 )
         return chunks
+
+    def _extract_file_text(self, session_file: SessionFile) -> ExtractedText | None:
+        path = self._settings.uploads_dir / session_file.object_key
+        if not is_supported_image(kind=session_file.kind, content_type=session_file.content_type):
+            return self._text_extractor.extract(
+                path=path,
+                kind=session_file.kind,
+                content_type=session_file.content_type,
+            )
+
+        vision_error: str | None = None
+        if self._llm_orchestrator is not None:
+            try:
+                description = self._llm_orchestrator.describe_image(
+                    image_path=str(path),
+                    content_type=session_file.content_type,
+                    filename=session_file.original_filename,
+                ).strip()
+                if description:
+                    return ExtractedText(
+                        text=description,
+                        metadata={
+                            "parser": "image_vision",
+                            "original_media_type": session_file.content_type,
+                        },
+                    )
+            except ValidationError as exc:
+                vision_error = exc.detail
+
+        return self._image_text_extractor.extract_with_ocr(path=path, vision_error=vision_error)
 
     @staticmethod
     def _split_text(text: str) -> list[str]:

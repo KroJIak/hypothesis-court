@@ -6,7 +6,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends fonts-dejavu-core \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        fonts-dejavu-core \
+        tesseract-ocr \
+        tesseract-ocr-eng \
+        tesseract-ocr-rus \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .

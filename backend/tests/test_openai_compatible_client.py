@@ -105,3 +105,59 @@ def test_responses_mode_uses_responses_endpoint(monkeypatch):
     assert request.full_url == "https://provider.example/v1/responses"
     assert body["instructions"] == "system rules"
     assert body["input"] == [{"role": "user", "content": "test"}]
+
+
+def test_chat_completions_image_description_uses_image_url_payload(monkeypatch):
+    requests = []
+
+    def _fake_urlopen(request, timeout):
+        requests.append((request, timeout))
+        return _JsonResponse({"choices": [{"message": {"content": "описание изображения"}}]})
+
+    monkeypatch.setattr("app.services.openai_compatible_client.urlopen", _fake_urlopen)
+    client = OpenAICompatibleClient(base_url="https://provider.example/v1", api_token="token")
+
+    result = client.create_image_description(
+        api_mode="chat_completions",
+        model="vision-model",
+        prompt="Опиши изображение",
+        image_bytes=b"image",
+        content_type="image/png",
+    )
+
+    assert result == "описание изображения"
+    request, _timeout = requests[0]
+    body = json.loads(request.data.decode("utf-8"))
+    assert request.full_url == "https://provider.example/v1/chat/completions"
+    content = body["messages"][0]["content"]
+    assert content[0] == {"type": "text", "text": "Опиши изображение"}
+    assert content[1]["type"] == "image_url"
+    assert content[1]["image_url"]["url"].startswith("data:image/png;base64,")
+
+
+def test_responses_image_description_uses_input_image_payload(monkeypatch):
+    requests = []
+
+    def _fake_urlopen(request, timeout):
+        requests.append((request, timeout))
+        return _JsonResponse({"output_text": "описание изображения"})
+
+    monkeypatch.setattr("app.services.openai_compatible_client.urlopen", _fake_urlopen)
+    client = OpenAICompatibleClient(base_url="https://provider.example/v1", api_token="token")
+
+    result = client.create_image_description(
+        api_mode="responses",
+        model="vision-model",
+        prompt="Опиши изображение",
+        image_bytes=b"image",
+        content_type="image/jpeg",
+    )
+
+    assert result == "описание изображения"
+    request, _timeout = requests[0]
+    body = json.loads(request.data.decode("utf-8"))
+    assert request.full_url == "https://provider.example/v1/responses"
+    content = body["input"][0]["content"]
+    assert content[0] == {"type": "input_text", "text": "Опиши изображение"}
+    assert content[1]["type"] == "input_image"
+    assert content[1]["image_url"].startswith("data:image/jpeg;base64,")

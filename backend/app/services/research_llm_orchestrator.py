@@ -11,6 +11,7 @@ from app.prompts.research_prompts import (
     EVALUATION_PROMPT,
     EVIDENCE_EXTRACTION_PROMPT,
     HYPOTHESIS_GENERATION_PROMPT,
+    IMAGE_DESCRIPTION_PROMPT,
     JUDGE_PROMPT,
     RESEARCH_JSON_SYSTEM_PROMPT,
 )
@@ -131,6 +132,25 @@ class ResearchLlmOrchestrator:
         if not drafts:
             raise ValidationError("Модель не смогла выделить evidence из входных данных")
         return drafts
+
+    def describe_image(
+        self,
+        *,
+        image_path: str,
+        content_type: str | None,
+        filename: str,
+    ) -> str:
+        client, model, api_mode = self._provider_settings_service.get_model_client(self._settings)
+        prompt = f"{IMAGE_DESCRIPTION_PROMPT}\n\nИмя файла: {filename}"
+        with open(image_path, "rb") as image_file:
+            image_bytes = image_file.read()
+        return client.create_image_description(
+            api_mode=api_mode,
+            model=model,
+            prompt=prompt,
+            image_bytes=image_bytes,
+            content_type=content_type or "image/png",
+        )
 
     def generate_hypotheses(
         self,

@@ -26,6 +26,7 @@ from app.models.user import User
 from app.models.enums import DebateRole, EvidenceKind, EvidenceRelationKind, ResearchInputKind, ResearchRunStatus
 from app.schemas.research import ResearchFeedbackCreateRequest, ResearchInputRequest
 from app.services.exceptions import ConflictError, NotFoundError, ValidationError
+from app.services.document_text_extractor import ExtractedText
 from app.services.research_llm_orchestrator import (
     DebateDraft,
     EvaluationDraft,
@@ -379,6 +380,41 @@ class FakeLlmOrchestrator:
                 for index, _ in enumerate(hypotheses)
             ],
             next_checks=["Проверить KPI на малой серии."],
+        )
+
+
+class VisionFakeLlmOrchestrator(FakeLlmOrchestrator):
+    def __init__(self, description: str) -> None:
+        self.description = description
+
+    def describe_image(self, *, image_path, content_type, filename):
+        del image_path, content_type
+        return f"{self.description}\nФайл: {filename}"
+
+
+class FailingVisionFakeLlmOrchestrator(FakeLlmOrchestrator):
+    def describe_image(self, *, image_path, content_type, filename):
+        del image_path, content_type, filename
+        raise ValidationError("Выбранная модель не поддерживает изображения")
+
+
+class FakeImageTextExtractor:
+    def __init__(self, text: str) -> None:
+        self.text = text
+        self.calls = 0
+        self.vision_errors: list[str | None] = []
+
+    def extract_with_ocr(self, *, path, vision_error=None):
+        del path
+        self.calls += 1
+        self.vision_errors.append(vision_error)
+        return ExtractedText(
+            text=self.text,
+            metadata={
+                "parser": "image_ocr",
+                "ocr_engine": "fake",
+                "vision_fallback_reason": vision_error,
+            },
         )
 
 
@@ -861,6 +897,78 @@ def test_text_file_is_chunked_and_used_as_evidence(tmp_path, service_bundle, use
     assert len(repository.chunks) == 1
     assert response.evidence[0].chunk_id == repository.chunks[0].id
     assert response.evidence[0].kind in {EvidenceKind.SUPPORT, EvidenceKind.RISK}
+
+
+def test_image_file_uses_vision_description_when_available(tmp_path, service_bundle, user, chat_session):
+    service, repository, _ = service_bundle
+    service._llm_orchestrator = VisionFakeLlmOrchestrator(
+        "На изображении показан график роста прочности после термообработки."
+    )
+    object_key = "session-files/plot.png"
+    file_path = tmp_path / object_key
+    file_path.parent.mkdir(parents=True)
+    file_path.write_bytes(b"fake-image-bytes")
+    repository.files.append(
+        SessionFile(
+            id=uuid.uuid4(),
+            chat_session_id=chat_session.id,
+            user_id=user.id,
+            original_filename="plot.png",
+            object_key=object_key,
+            content_type="image/png",
+            kind="png",
+            size_bytes=file_path.stat().st_size,
+        )
+    )
+
+    response = service.create_run(
+        user=user,
+        chat_session_id=chat_session.id,
+        input_requests=input_requests(),
+        hypothesis_count=3,
+    )
+
+    assert response.status == ResearchRunStatus.COMPLETED
+    assert len(repository.chunks) == 1
+    assert "график роста прочности" in repository.chunks[0].content
+    assert repository.chunks[0].source_metadata["parser"] == "image_vision"
+
+
+def test_image_file_falls_back_to_ocr_when_vision_is_unavailable(tmp_path, service_bundle, user, chat_session):
+    service, repository, _ = service_bundle
+    fake_ocr = FakeImageTextExtractor("OCR распознал подпись: предел прочности 520 МПа.")
+    service._llm_orchestrator = FailingVisionFakeLlmOrchestrator()
+    service._image_text_extractor = fake_ocr
+    object_key = "session-files/microstructure.jpg"
+    file_path = tmp_path / object_key
+    file_path.parent.mkdir(parents=True)
+    file_path.write_bytes(b"fake-image-bytes")
+    repository.files.append(
+        SessionFile(
+            id=uuid.uuid4(),
+            chat_session_id=chat_session.id,
+            user_id=user.id,
+            original_filename="microstructure.jpg",
+            object_key=object_key,
+            content_type="image/jpeg",
+            kind="jpg",
+            size_bytes=file_path.stat().st_size,
+        )
+    )
+
+    response = service.create_run(
+        user=user,
+        chat_session_id=chat_session.id,
+        input_requests=input_requests(),
+        hypothesis_count=3,
+    )
+
+    assert response.status == ResearchRunStatus.COMPLETED
+    assert fake_ocr.calls == 1
+    assert fake_ocr.vision_errors == ["Выбранная модель не поддерживает изображения"]
+    assert len(repository.chunks) == 1
+    assert "предел прочности 520 МПа" in repository.chunks[0].content
+    assert repository.chunks[0].source_metadata["parser"] == "image_ocr"
 
 
 def test_regenerate_preserves_existing_chunk_references(tmp_path, service_bundle, user, chat_session):
