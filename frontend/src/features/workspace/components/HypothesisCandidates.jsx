@@ -6,7 +6,8 @@ import { ProcessingStatusBadge } from "./ProcessingStatusBadge";
 import { clampNumber } from "../utils/format";
 
 const HYPOTHESIS_PREVIEW_EDGE_OFFSET = 14;
-const HYPOTHESIS_PREVIEW_HEIGHT = 126;
+const HYPOTHESIS_PREVIEW_HEIGHT = 320;
+const HYPOTHESIS_PREVIEW_HIDE_DELAY_MS = 320;
 const HYPOTHESIS_VISIBLE_COUNT = 3;
 const HYPOTHESIS_FALLBACK_CARD_WIDTH = 220;
 const HYPOTHESIS_SKELETON_COUNT = 3;
@@ -25,6 +26,7 @@ export function HypothesisCandidates({
   const hypothesisCount = displayedHypotheses.length;
   const sectionRef = useRef(null);
   const systemAgentRef = useRef(null);
+  const previewRef = useRef(null);
   const cardRefs = useRef(new Map());
   const hidePreviewTimeoutRef = useRef(null);
   const [activeHypothesisId, setActiveHypothesisId] = useState(null);
@@ -92,12 +94,20 @@ export function HypothesisCandidates({
     window.clearTimeout(hidePreviewTimeoutRef.current);
     hidePreviewTimeoutRef.current = window.setTimeout(() => {
       setActiveHypothesisId(null);
-    }, 90);
+    }, HYPOTHESIS_PREVIEW_HIDE_DELAY_MS);
   }, []);
 
   const keepPreviewVisible = useCallback(() => {
     window.clearTimeout(hidePreviewTimeoutRef.current);
   }, []);
+
+  const hidePreviewOnExternalScroll = useCallback((event) => {
+    if (previewRef.current?.contains(event.target)) {
+      return;
+    }
+
+    hidePreview();
+  }, [hidePreview]);
 
   const updateSystemAgentTooltip = useCallback(() => {
     const agentElement = systemAgentRef.current;
@@ -166,14 +176,14 @@ export function HypothesisCandidates({
       return undefined;
     }
 
-    window.addEventListener("scroll", hidePreview, true);
+    window.addEventListener("scroll", hidePreviewOnExternalScroll, true);
     window.addEventListener("resize", hidePreview);
 
     return () => {
-      window.removeEventListener("scroll", hidePreview, true);
+      window.removeEventListener("scroll", hidePreviewOnExternalScroll, true);
       window.removeEventListener("resize", hidePreview);
     };
-  }, [activeHypothesisId, hidePreview]);
+  }, [activeHypothesisId, hidePreview, hidePreviewOnExternalScroll]);
 
   useEffect(() => {
     if (!isSystemAgentNameVisible) {
@@ -263,6 +273,7 @@ export function HypothesisCandidates({
       {activeHypothesis && typeof document !== "undefined"
         ? createPortal(
             <article
+              ref={previewRef}
               className="hypothesis-card-preview"
               style={previewStyle}
               role="tooltip"
