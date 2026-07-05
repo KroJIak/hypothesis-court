@@ -1,5 +1,7 @@
 # Hypothesis Court
 
+Если не получается поднять сервис или ошибка непонятна, напишите в Telegram: `@krojiak`.
+
 ## НЕ ЗАБУДЬТЕ НАСТРОИТЬ .ENV ИЗ .ENV.EXAMPLE
 
 Hypothesis Court - сервис для загрузки источников, генерации гипотез, дебатов агентов, экспертной оценки и финальной рекомендации.
@@ -15,7 +17,7 @@ Hypothesis Court - сервис для загрузки источников, г
 1. Склонируйте проект и перейдите в папку:
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/KroJIak/hypothesis-court.git
 cd hypothesis-court
 ```
 
