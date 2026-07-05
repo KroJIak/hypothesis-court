@@ -212,9 +212,8 @@ function mapResearchGraph(dto) {
       sourceType: node.type,
       zone: mapGraphNodeZone(node.type),
       label: node.label,
-      summary: node.description ?? "",
+      summary: node.type === "chunk" ? "" : node.description ?? "",
       details: [
-        node.description,
         node.metadata?.kind ? `Тип: ${node.metadata.kind}` : "",
         node.metadata?.confidence !== undefined ? `Уверенность: ${node.metadata.confidence}` : "",
         node.metadata?.score !== undefined ? `Оценка: ${node.metadata.score}` : "",
