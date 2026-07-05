@@ -139,10 +139,10 @@ export function HypothesisCandidates({
     const updateCardWidth = () => {
       const sectionStyle = window.getComputedStyle(sectionElement);
       const agentSize = Number.parseFloat(sectionStyle.getPropertyValue("--hypothesis-agent-size")) || 44;
+      const graphButtonWidth = Number.parseFloat(sectionStyle.getPropertyValue("--hypothesis-graph-width")) || 42;
       const gap = Number.parseFloat(sectionStyle.getPropertyValue("--hypothesis-card-gap")) || 8;
       const sideGap = Number.parseFloat(sectionStyle.getPropertyValue("--hypothesis-gap")) || gap;
-      const graphButtonWidth = 42;
-      const reservedInlineSpace = (agentSize + graphButtonWidth + sideGap * 2);
+      const reservedInlineSpace = agentSize + graphButtonWidth + sideGap * 2;
       const availableListWidth = Math.max(1, sectionElement.clientWidth - reservedInlineSpace);
       const nextCardWidth = (availableListWidth - gap * (HYPOTHESIS_VISIBLE_COUNT - 1)) / HYPOTHESIS_VISIBLE_COUNT;
 
@@ -211,16 +211,6 @@ export function HypothesisCandidates({
             <BrainCircuit aria-hidden="true" strokeWidth={1.75} />
           </span>
         </div>
-        <button
-          type="button"
-          className="hypothesis-candidates__graph-trigger"
-          aria-label="Открыть граф знаний"
-          onClick={() => onOpenKnowledgeGraph?.({ source: "graph-trigger" })}
-        >
-          <Network aria-hidden="true" strokeWidth={1.8} />
-          <span>Граф</span>
-        </button>
-
         {hypothesisCount > 0 ? (
           <div className="hypothesis-candidates__list">
             {displayedHypotheses.map((hypothesis) => (
@@ -252,6 +242,15 @@ export function HypothesisCandidates({
             ))}
           </div>
         ) : null}
+        <button
+          type="button"
+          className="hypothesis-candidates__graph-trigger"
+          aria-label="Открыть граф знаний"
+          onClick={() => onOpenKnowledgeGraph?.({ source: "graph-trigger" })}
+        >
+          <Network aria-hidden="true" strokeWidth={1.8} />
+          <span>Граф</span>
+        </button>
       </div>
       {isSystemAgentNameVisible && typeof document !== "undefined"
         ? createPortal(
