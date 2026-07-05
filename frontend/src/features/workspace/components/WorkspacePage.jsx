@@ -222,6 +222,22 @@ function hasProcessingAttachments(session) {
   );
 }
 
+function getAttachmentIds(attachments) {
+  return (attachments ?? []).map((attachment) => attachment.id);
+}
+
+function hasBranchDraftAttachmentChanges(session) {
+  if (!Array.isArray(session?.branchDraftBaseAttachmentIds)) {
+    return false;
+  }
+
+  const baseAttachmentIds = new Set(session.branchDraftBaseAttachmentIds);
+  const currentAttachmentIds = getAttachmentIds(session.attachments);
+
+  return currentAttachmentIds.length !== baseAttachmentIds.size
+    || currentAttachmentIds.some((attachmentId) => !baseAttachmentIds.has(attachmentId));
+}
+
 function applyRunVersion(session, version, { isComplete = true } = {}) {
   return {
     ...session,
@@ -241,6 +257,7 @@ function applyRunVersion(session, version, { isComplete = true } = {}) {
     isEditingRunVersion: false,
     isVerdictComplete: isComplete,
     activeRunVersionId: version.id,
+    branchDraftBaseAttachmentIds: null,
   };
 }
 
@@ -1560,6 +1577,7 @@ export function WorkspacePage({
       selectedSession.isEditingRunVersion
       && activeVersion
       && areRunRequestsEqual(composerRequests, activeVersion.requests)
+      && !hasBranchDraftAttachmentChanges(selectedSession)
     ) {
       updateSelectedSession((session) => applyRunVersion(session, activeVersion, { isComplete: true }));
       setDraftMessage("");
@@ -1576,6 +1594,7 @@ export function WorkspacePage({
       isStarted: true,
       isPendingDraft: false,
       isEditingRunVersion: false,
+      branchDraftBaseAttachmentIds: null,
       query: composerRequests.map(formatComposerRequest).join("\n"),
       launchedRequests: composerRequests,
       hypotheses: [],
@@ -1822,16 +1841,54 @@ export function WorkspacePage({
       answer: "",
       consultationMessages: [],
       isVerdictComplete: false,
+      branchDraftBaseAttachmentIds: getAttachmentIds(session.attachments),
     }));
     setDraftMessage("");
   }
 
-  function handleCancelRunVersionEdit() {
+  async function handleCancelRunVersionEdit() {
     if (!selectedSession?.isEditingRunVersion || !activeVersion) {
       return;
     }
 
-    updateSelectedSession((session) => applyRunVersion(session, activeVersion, { isComplete: true }));
+    const chatSessionId = selectedSession.id;
+    const baseAttachmentIds = new Set(selectedSession.branchDraftBaseAttachmentIds ?? []);
+    const draftAttachments = Array.isArray(selectedSession.branchDraftBaseAttachmentIds)
+      ? (selectedSession.attachments ?? []).filter((attachment) => !baseAttachmentIds.has(attachment.id))
+      : [];
+
+    try {
+      for (const attachment of draftAttachments) {
+        await deleteSessionFile({
+          accessToken,
+          chatSessionId,
+          sessionFileId: attachment.id,
+        });
+      }
+    } catch (error) {
+      try {
+        await refreshSessionFiles(chatSessionId);
+      } catch {
+        // The original delete error is the actionable failure for the user.
+      }
+      showWorkspaceError(error, "Не удалось удалить файлы черновика");
+      return;
+    }
+
+    setSessions((currentSessions) =>
+      currentSessions.map((session) => {
+        if (session.id !== chatSessionId) {
+          return session;
+        }
+
+        return {
+          ...applyRunVersion(session, activeVersion, { isComplete: true }),
+          attachments: Array.isArray(selectedSession.branchDraftBaseAttachmentIds)
+            ? (session.attachments ?? []).filter((attachment) => baseAttachmentIds.has(attachment.id))
+            : session.attachments,
+        };
+      }),
+    );
     setDraftMessage("");
   }
 
