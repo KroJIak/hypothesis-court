@@ -402,6 +402,7 @@ class ResearchService:
     def get_graph(self, *, user: User, chat_session_id: uuid.UUID, run_id: uuid.UUID) -> ResearchGraphResponse:
         run = self._get_run(user=user, chat_session_id=chat_session_id, run_id=run_id)
         detail = self._build_detail_response(run)
+        node_ids: set[str] = {f"run:{run.id}"}
         nodes: list[ResearchGraphNodeResponse] = [
             ResearchGraphNodeResponse(
                 id=f"run:{run.id}",
@@ -424,6 +425,7 @@ class ResearchService:
                     metadata={"kind": input_item.kind.value},
                 )
             )
+            node_ids.add(input_node_id)
             edges.append(
                 ResearchGraphEdgeResponse(
                     id=f"{input_node_id}->run:{run.id}",
@@ -439,6 +441,13 @@ class ResearchService:
             user_id=run.user_id,
             chat_session_id=run.chat_session_id,
         )
+        chunks_by_file_id: dict[uuid.UUID, list[DocumentChunk]] = defaultdict(list)
+        for chunk in self._repository.list_chunks_for_files(
+            self._session,
+            session_file_ids=[source_file.id for source_file in source_files],
+        ):
+            chunks_by_file_id[chunk.session_file_id].append(chunk)
+
         for source_file in source_files:
             file_node_id = f"file:{source_file.id}"
             nodes.append(
@@ -454,6 +463,7 @@ class ResearchService:
                     },
                 )
             )
+            node_ids.add(file_node_id)
             edges.append(
                 ResearchGraphEdgeResponse(
                     id=f"run:{run.id}->file:{source_file.id}",
@@ -463,9 +473,9 @@ class ResearchService:
                     label="использует источник",
                 )
             )
-            for chunk in self._repository.list_chunks_for_file(self._session, session_file_id=source_file.id):
+            for chunk in chunks_by_file_id[source_file.id]:
                 chunk_node_id = f"chunk:{chunk.id}"
-                if all(node.id != chunk_node_id for node in nodes):
+                if chunk_node_id not in node_ids:
                     nodes.append(
                         ResearchGraphNodeResponse(
                             id=chunk_node_id,
@@ -479,6 +489,7 @@ class ResearchService:
                             },
                         )
                     )
+                    node_ids.add(chunk_node_id)
                 edges.append(
                     ResearchGraphEdgeResponse(
                         id=f"file:{source_file.id}->chunk:{chunk.id}",
@@ -491,7 +502,7 @@ class ResearchService:
 
         for evidence in detail.evidence:
             chunk_node_id = f"chunk:{evidence.chunk_id}" if evidence.chunk_id else None
-            if chunk_node_id is not None and all(node.id != chunk_node_id for node in nodes):
+            if chunk_node_id is not None and chunk_node_id not in node_ids:
                 nodes.append(
                     ResearchGraphNodeResponse(
                         id=chunk_node_id,
@@ -504,6 +515,7 @@ class ResearchService:
                         },
                     )
                 )
+                node_ids.add(chunk_node_id)
             evidence_node_id = f"evidence:{evidence.id}"
             nodes.append(
                 ResearchGraphNodeResponse(
@@ -519,6 +531,7 @@ class ResearchService:
                     },
                 )
             )
+            node_ids.add(evidence_node_id)
             edges.append(
                 ResearchGraphEdgeResponse(
                     id=f"run:{run.id}->evidence:{evidence.id}",
@@ -736,7 +749,9 @@ class ResearchService:
         run: ResearchRun | None = None
         try:
             chat_session = self._get_chat_session(user=user, chat_session_id=chat_session_id, for_update=True)
-            run = self._get_run(user=user, chat_session_id=chat_session_id, run_id=run_id)
+            run = self._get_run(user=user, chat_session_id=chat_session_id, run_id=run_id, for_update=True)
+            if run.status != ResearchRunStatus.RUNNING:
+                return self._build_detail_response(run)
             input_items = self._repository.list_input_items(self._session, run_id=run.id)
             normalized_inputs = [
                 NormalizedInput(kind=item.kind, label=item.label, text=item.text, position=item.position)
@@ -1492,13 +1507,21 @@ class ResearchService:
             raise NotFoundError("Чат не найден.")
         return chat_session
 
-    def _get_run(self, *, user: User, chat_session_id: uuid.UUID, run_id: uuid.UUID) -> ResearchRun:
+    def _get_run(
+        self,
+        *,
+        user: User,
+        chat_session_id: uuid.UUID,
+        run_id: uuid.UUID,
+        for_update: bool = False,
+    ) -> ResearchRun:
         self._get_chat_session(user=user, chat_session_id=chat_session_id)
         run = self._repository.get_run(
             self._session,
             user_id=user.id,
             chat_session_id=chat_session_id,
             run_id=run_id,
+            for_update=for_update,
         )
         if run is None:
             raise NotFoundError("Версия исследования не найдена.")

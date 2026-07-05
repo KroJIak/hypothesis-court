@@ -20,6 +20,7 @@ from app.models.research_run import ResearchRun
 from app.models.research_run_event import ResearchRunEvent
 from app.models.session_file import SessionFile
 from app.models.user_agent import UserAgent
+from app.models.enums import ResearchRunStatus
 
 
 class ResearchRepository:
@@ -43,7 +44,7 @@ class ResearchRepository:
     def has_running_run(self, session: Session, *, chat_session_id: uuid.UUID) -> bool:
         stmt = select(func.count()).select_from(ResearchRun).where(
             ResearchRun.chat_session_id == chat_session_id,
-            ResearchRun.status == "running",
+            ResearchRun.status == ResearchRunStatus.RUNNING,
         )
         return session.execute(stmt).scalar_one() > 0
 
@@ -159,6 +160,16 @@ class ResearchRepository:
             select(DocumentChunk)
             .where(DocumentChunk.session_file_id == session_file_id)
             .order_by(DocumentChunk.position.asc())
+        )
+        return session.execute(stmt).scalars().all()
+
+    def list_chunks_for_files(self, session: Session, *, session_file_ids: list[uuid.UUID]) -> list[DocumentChunk]:
+        if not session_file_ids:
+            return []
+        stmt = (
+            select(DocumentChunk)
+            .where(DocumentChunk.session_file_id.in_(session_file_ids))
+            .order_by(DocumentChunk.session_file_id.asc(), DocumentChunk.position.asc())
         )
         return session.execute(stmt).scalars().all()
 

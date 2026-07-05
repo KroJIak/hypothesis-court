@@ -257,10 +257,10 @@ function isReusableEmptyDraftSession(session) {
 
 function getRunVersionContext(session) {
   const runVersions = session.runVersions ?? [];
-  const activeVersionIndex = Math.max(
-    0,
-    runVersions.findIndex((version) => version.id === session.activeRunVersionId),
-  );
+  const matchedVersionIndex = runVersions.findIndex((version) => version.id === session.activeRunVersionId);
+  const activeVersionIndex = matchedVersionIndex >= 0
+    ? matchedVersionIndex
+    : Math.max(0, runVersions.length - 1);
 
   return {
     runVersions,
@@ -341,6 +341,7 @@ export function WorkspacePage({
   const notificationTimeoutsRef = useRef(new Map());
   const selectedAgentsByChatRef = useRef(new Map());
   const runDetailRequestsRef = useRef(new Map());
+  const lastRunDetailPollKeyRef = useRef(new Map());
   const graphRequestsRef = useRef(new Map());
   const newAgentBaselineByIdRef = useRef(new Map());
   const deferredChatSearchQuery = useDeferredValue(chatSearchQuery);
@@ -610,13 +611,20 @@ export function WorkspacePage({
         });
 
         if (!TERMINAL_RESEARCH_RUN_STATUSES.has(progress.run.status)) {
-          if (RESEARCH_RUN_DETAIL_POLL_STAGES.has(progress.currentStage)) {
+          const latestEventSequence = progress.events?.at(-1)?.sequenceNumber ?? 0;
+          const detailPollKey = `${progress.currentStage}:${latestEventSequence}`;
+          const runDetailKey = `${selectedChatId}:${runId}`;
+          const shouldLoadRunDetail = RESEARCH_RUN_DETAIL_POLL_STAGES.has(progress.currentStage)
+            && lastRunDetailPollKeyRef.current.get(runDetailKey) !== detailPollKey;
+
+          if (shouldLoadRunDetail) {
             const loadedRun = await getResearchRun({
               accessToken,
               chatSessionId: selectedChatId,
               runId,
               signal: controller.signal,
             });
+            lastRunDetailPollKeyRef.current.set(runDetailKey, detailPollKey);
             setSessions((currentSessions) =>
               currentSessions.map((session) =>
                 session.id === selectedChatId
@@ -644,6 +652,7 @@ export function WorkspacePage({
           window.clearInterval(intervalId);
           intervalId = null;
         }
+        lastRunDetailPollKeyRef.current.delete(`${selectedChatId}:${runId}`);
 
         if (progress.run.status === "completed") {
           const loadedRun = await getResearchRun({

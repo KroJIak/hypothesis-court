@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const DEBATE_CYCLE_COUNT = 3;
 const DEBATE_STEP_MS = 1200;
@@ -20,10 +20,16 @@ const STATUS_WAITS = "ожидает";
 const STATUS_EVALUATES = "оценивает";
 const STATUS_VERDICT = "выносит вердикт";
 const PLAYBACK_TICK_MS = 180;
-const playbackTimelines = new Map();
+const SCENE_PLAYBACK_RESET_EVENT = "workspace:scene-playback-reset";
 
 export function resetScenePlayback(sessionId) {
-  playbackTimelines.delete(sessionId);
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.dispatchEvent(new CustomEvent(SCENE_PLAYBACK_RESET_EVENT, {
+    detail: { sessionId },
+  }));
 }
 
 const debateSpeakerSteps = [
@@ -209,30 +215,31 @@ function createPlaybackSignature(session) {
   return `${hypothesisIds}|${evaluationAgentIds}`;
 }
 
-function getOrCreatePlaybackTimeline(session) {
+function getOrCreatePlaybackTimeline(session, timelineRef) {
   if (session.researchProgress?.run?.status === "running") {
-    playbackTimelines.delete(session.id);
+    timelineRef.current = null;
     return null;
   }
 
   if (!session.hypotheses || session.hypotheses.length === 0) {
-    playbackTimelines.delete(session.id);
+    timelineRef.current = null;
     return null;
   }
 
   const signature = createPlaybackSignature(session);
-  const existingTimeline = playbackTimelines.get(session.id);
+  const existingTimeline = timelineRef.current;
 
-  if (existingTimeline?.signature === signature) {
+  if (existingTimeline?.sessionId === session.id && existingTimeline?.signature === signature) {
     return existingTimeline;
   }
 
   const nextTimeline = {
+    sessionId: session.id,
     signature,
     startedAt: Date.now(),
   };
 
-  playbackTimelines.set(session.id, nextTimeline);
+  timelineRef.current = nextTimeline;
 
   return nextTimeline;
 }
@@ -334,9 +341,10 @@ function getHypothesesWithPlaybackStatus(hypotheses, playbackState, currentStep)
 }
 
 export function useScenePlayback(session) {
+  const playbackTimelineRef = useRef(null);
   const isBackendRunLive = session.researchProgress?.run?.status === "running";
   const steps = useMemo(() => createScenePlaybackSteps(session), [session]);
-  const playbackTimeline = useMemo(() => getOrCreatePlaybackTimeline(session), [session]);
+  const playbackTimeline = useMemo(() => getOrCreatePlaybackTimeline(session, playbackTimelineRef), [session]);
   const [playbackNow, setPlaybackNow] = useState(() => Date.now());
   const playbackState = getPlaybackStateAtTime(
     steps,
@@ -361,12 +369,27 @@ export function useScenePlayback(session) {
     return () => window.clearInterval(intervalId);
   }, [playbackTimeline]);
 
+  useEffect(() => {
+    const handleReset = (event) => {
+      if (event.detail?.sessionId !== session.id) {
+        return;
+      }
+
+      playbackTimelineRef.current = null;
+      setPlaybackNow(Date.now());
+    };
+
+    window.addEventListener(SCENE_PLAYBACK_RESET_EVENT, handleReset);
+
+    return () => window.removeEventListener(SCENE_PLAYBACK_RESET_EVENT, handleReset);
+  }, [session.id]);
+
   const startPlayback = useCallback(() => {
     if (!session.hypotheses || session.hypotheses.length === 0) {
       return;
     }
 
-    getOrCreatePlaybackTimeline(session);
+    getOrCreatePlaybackTimeline(session, playbackTimelineRef);
     setPlaybackNow(Date.now());
   }, [session]);
 

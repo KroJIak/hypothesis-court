@@ -166,6 +166,11 @@ class FakeResearchRepository:
         del session
         return [chunk for chunk in self.chunks if chunk.session_file_id == session_file_id]
 
+    def list_chunks_for_files(self, session, *, session_file_ids):
+        del session
+        session_file_id_set = set(session_file_ids)
+        return [chunk for chunk in self.chunks if chunk.session_file_id in session_file_id_set]
+
     def search_chunks_by_vector(self, session, *, user_id, chat_session_id, query_vector, limit):
         del session, query_vector
         chunks = [
@@ -478,6 +483,42 @@ def test_create_run_persists_complete_research_artifacts(service_bundle, user, c
     assert repository.runs[0].completed_at is not None
     assert repository.events[-1].stage.value == "completed"
     assert repository.events[-1].progress_percent == 100
+
+
+def test_execute_pipeline_is_noop_for_non_running_run(service_bundle, user, chat_session):
+    service, repository, session = service_bundle
+    run = repository.create_run(
+        None,
+        ResearchRun(
+            id=uuid.uuid4(),
+            chat_session_id=chat_session.id,
+            user_id=user.id,
+            version_number=1,
+            trigger="initial",
+            status=ResearchRunStatus.COMPLETED,
+            title="Завершённая версия",
+            hypothesis_count=3,
+            completed_at=datetime.now(UTC),
+        ),
+    )
+    repository.create_input_item(
+        None,
+        ResearchInputItem(
+            run_id=run.id,
+            kind=ResearchInputKind.KPI,
+            label="KPI",
+            text="Повысить прочность",
+            position=0,
+        ),
+    )
+
+    response = service.execute_run_pipeline(user=user, chat_session_id=chat_session.id, run_id=run.id)
+
+    assert response.status == ResearchRunStatus.COMPLETED
+    assert repository.evidence == []
+    assert repository.hypotheses == []
+    assert repository.verdicts == []
+    assert session.commits == 0
 
 
 def test_create_run_blocks_when_another_run_is_running(service_bundle, user, chat_session):
