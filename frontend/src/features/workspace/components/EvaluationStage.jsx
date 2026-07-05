@@ -16,6 +16,8 @@ export function EvaluationStage({
   evaluation,
   sessionId,
   answer,
+  verdict,
+  hypotheses = [],
   consultationMessages = [],
   isAnswerVisible,
   isVerdictTypewriterReady,
@@ -260,10 +262,12 @@ export function EvaluationStage({
         />
       </div>
 
-      {isAnswerVisible && answer ? (
+      {isAnswerVisible && (answer || verdict) ? (
         <>
           <JudgeVerdict
             answer={answer}
+            verdict={verdict}
+            hypotheses={hypotheses}
             sessionId={sessionId}
             onComplete={onVerdictComplete}
             isReadyToType={isVerdictTypewriterReady}

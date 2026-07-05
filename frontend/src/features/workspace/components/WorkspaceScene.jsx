@@ -434,6 +434,8 @@ export function WorkspaceScene({
         evaluation={evaluation}
         sessionId={session.id}
         answer={session.answer}
+        verdict={session.verdict}
+        hypotheses={hypotheses}
         consultationMessages={session.consultationMessages ?? []}
         isAnswerVisible={isAnswerVisible}
         isVerdictTypewriterReady={isVerdictTypewriterReady}

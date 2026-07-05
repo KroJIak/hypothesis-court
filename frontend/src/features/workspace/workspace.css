@@ -1807,8 +1807,94 @@
   text-align: left;
 }
 
-.judge-verdict p {
+.judge-verdict__fallback,
+.judge-verdict__text {
   margin: 0;
+  white-space: pre-wrap;
+}
+
+.judge-verdict__section {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.judge-verdict__section + .judge-verdict__section {
+  margin-top: 14px;
+}
+
+.judge-verdict__heading {
+  margin: 0;
+  color: rgba(244, 244, 244, 0.92);
+  font-size: 0.78rem;
+  font-weight: 760;
+  letter-spacing: 0.055em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.judge-verdict__next-checks {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0 0 0 18px;
+}
+
+.judge-verdict__next-checks li {
+  padding-left: 2px;
+}
+
+.judge-verdict__ranking {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.judge-verdict__ranking table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+}
+
+.judge-verdict__ranking th,
+.judge-verdict__ranking td {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  vertical-align: top;
+}
+
+.judge-verdict__ranking th {
+  color: rgba(244, 244, 244, 0.68);
+  font-size: 0.69rem;
+  font-weight: 720;
+  letter-spacing: 0.045em;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.judge-verdict__ranking td {
+  color: rgba(244, 244, 244, 0.86);
+  font-size: 0.78rem;
+  line-height: 1.38;
+}
+
+.judge-verdict__ranking tr:last-child td {
+  border-bottom: 0;
+}
+
+.judge-verdict__ranking td:first-child,
+.judge-verdict__ranking th:first-child {
+  width: 64px;
+  text-align: center;
+}
+
+.judge-verdict__ranking td:nth-child(2) {
+  color: rgba(244, 244, 244, 0.94);
+  font-weight: 700;
 }
 
 .judge-actions {
