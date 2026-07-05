@@ -26,7 +26,8 @@ const MIN_CAMERA_SCALE = 0.54;
 const MAX_CAMERA_SCALE = 2.6;
 const CAMERA_ZOOM_INTENSITY = 0.0012;
 const NODE_CLICK_DRAG_THRESHOLD = 5;
-const NODE_RADIUS = 18;
+const NODE_RADIUS = 12;
+const NODE_ICON_SIZE = 13;
 const SAME_ZONE_NODE_DISTANCE = 58;
 const CROSS_ZONE_NODE_DISTANCE = 82;
 const NODE_REPEL_STEP = 22;
@@ -1580,11 +1581,17 @@ export function KnowledgeGraphModal({
                           }
                         }}
                       >
-                        <circle r="18" />
-                        <g className="knowledge-graph-node__icon" transform="translate(-9 -9)">
-                          <Icon aria-hidden="true" strokeWidth={1.9} />
-                        </g>
-                        <text className="knowledge-graph-node__label" y="35">
+                        <circle r={NODE_RADIUS} />
+                        <Icon
+                          className="knowledge-graph-node__icon"
+                          aria-hidden="true"
+                          x={-NODE_ICON_SIZE / 2}
+                          y={-NODE_ICON_SIZE / 2}
+                          width={NODE_ICON_SIZE}
+                          height={NODE_ICON_SIZE}
+                          strokeWidth={1.9}
+                        />
+                        <text className="knowledge-graph-node__label" y="27">
                           {node.label.length > 20 ? `${node.label.slice(0, 18)}...` : node.label}
                         </text>
                       </g>

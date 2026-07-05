@@ -402,16 +402,8 @@ class ResearchService:
     def get_graph(self, *, user: User, chat_session_id: uuid.UUID, run_id: uuid.UUID) -> ResearchGraphResponse:
         run = self._get_run(user=user, chat_session_id=chat_session_id, run_id=run_id)
         detail = self._build_detail_response(run)
-        node_ids: set[str] = {f"run:{run.id}"}
-        nodes: list[ResearchGraphNodeResponse] = [
-            ResearchGraphNodeResponse(
-                id=f"run:{run.id}",
-                type="run",
-                label=f"Версия {run.version_number}",
-                description=run.title,
-                metadata={"status": run.status.value},
-            ),
-        ]
+        node_ids: set[str] = set()
+        nodes: list[ResearchGraphNodeResponse] = []
         edges: list[ResearchGraphEdgeResponse] = []
 
         for input_item in detail.inputs:
@@ -426,15 +418,6 @@ class ResearchService:
                 )
             )
             node_ids.add(input_node_id)
-            edges.append(
-                ResearchGraphEdgeResponse(
-                    id=f"{input_node_id}->run:{run.id}",
-                    source=input_node_id,
-                    target=f"run:{run.id}",
-                    type="defines",
-                    label="задаёт рамку",
-                )
-            )
 
         source_files = self._repository.list_active_files(
             self._session,
@@ -464,15 +447,6 @@ class ResearchService:
                 )
             )
             node_ids.add(file_node_id)
-            edges.append(
-                ResearchGraphEdgeResponse(
-                    id=f"run:{run.id}->file:{source_file.id}",
-                    source=f"run:{run.id}",
-                    target=file_node_id,
-                    type="uses_source",
-                    label="использует источник",
-                )
-            )
             for chunk in chunks_by_file_id[source_file.id]:
                 chunk_node_id = f"chunk:{chunk.id}"
                 if chunk_node_id not in node_ids:
@@ -532,14 +506,6 @@ class ResearchService:
                 )
             )
             node_ids.add(evidence_node_id)
-            edges.append(
-                ResearchGraphEdgeResponse(
-                    id=f"run:{run.id}->evidence:{evidence.id}",
-                    source=f"run:{run.id}",
-                    target=evidence_node_id,
-                    type="contains",
-                )
-            )
             if chunk_node_id is not None:
                 edges.append(
                     ResearchGraphEdgeResponse(
@@ -560,14 +526,6 @@ class ResearchService:
                     label=hypothesis.title,
                     description=hypothesis.statement,
                     metadata={"position": hypothesis.position},
-                )
-            )
-            edges.append(
-                ResearchGraphEdgeResponse(
-                    id=f"run:{run.id}->hypothesis:{hypothesis.id}",
-                    source=f"run:{run.id}",
-                    target=hypothesis_node_id,
-                    type="generates",
                 )
             )
             for link in hypothesis.evidence_links:
@@ -653,14 +611,16 @@ class ResearchService:
                     metadata={"ranking": detail.verdict.ranking},
                 )
             )
-            edges.append(
-                ResearchGraphEdgeResponse(
-                    id=f"run:{run.id}->verdict:{detail.verdict.id}",
-                    source=f"run:{run.id}",
-                    target=verdict_node_id,
-                    type="synthesizes",
+            for hypothesis in detail.hypotheses:
+                edges.append(
+                    ResearchGraphEdgeResponse(
+                        id=f"hypothesis:{hypothesis.id}->verdict:{detail.verdict.id}",
+                        source=f"hypothesis:{hypothesis.id}",
+                        target=verdict_node_id,
+                        type="synthesizes",
+                        label="учтена судёй",
+                    )
                 )
-            )
             for index, check in enumerate(detail.verdict.next_checks, start=1):
                 check_node_id = f"next-check:{detail.verdict.id}:{index}"
                 nodes.append(

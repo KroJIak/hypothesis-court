@@ -2600,13 +2600,10 @@
 
 .knowledge-graph-node__icon {
   color: rgba(255, 255, 255, 0.78);
-  pointer-events: none;
-}
-
-.knowledge-graph-node__icon svg {
   display: block;
-  width: 18px;
-  height: 18px;
+  pointer-events: none;
+  transform-box: fill-box;
+  transform-origin: center;
 }
 
 .knowledge-graph-node__label {

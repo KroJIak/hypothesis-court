@@ -144,8 +144,6 @@ function mapGraphNodeType(type) {
       return "evidence";
     case "next_check":
       return "verdict";
-    case "run":
-      return "brief";
     default:
       return type;
   }
@@ -154,7 +152,6 @@ function mapGraphNodeType(type) {
 function mapGraphNodeZone(type) {
   switch (type) {
     case "input":
-    case "run":
       return "brief";
     case "file":
     case "chunk":

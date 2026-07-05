@@ -650,10 +650,12 @@ def test_graph_contains_inputs_evidence_hypotheses_and_verdict(service_bundle, u
 
     node_types = {node.type for node in graph.nodes}
     edge_types = {edge.type for edge in graph.edges}
-    assert {"run", "input", "evidence", "hypothesis", "verdict"}.issubset(node_types)
-    assert "generates" in edge_types
+    assert {"input", "evidence", "hypothesis", "verdict"}.issubset(node_types)
+    assert "run" not in node_types
     assert "synthesizes" in edge_types
+    assert all(not edge.source.startswith("run:") and not edge.target.startswith("run:") for edge in graph.edges)
     assert any(edge.source.startswith("evidence:") and edge.target.startswith("hypothesis:") for edge in graph.edges)
+    assert any(edge.source.startswith("hypothesis:") and edge.target.startswith("verdict:") for edge in graph.edges)
     assert "hypothesis_version" in node_types
     assert "debate_message" in node_types
     assert "evaluation" in node_types

@@ -109,8 +109,13 @@ def test_research_api_contracts(monkeypatch, tmp_path):
 
     graph_response = client.get(f"/chat-sessions/{chat_session.id}/research-runs/{run['id']}/graph")
     assert graph_response.status_code == 200
-    assert {"hypothesis_version", "debate_message", "evaluation"}.issubset(
-        {node["type"] for node in graph_response.json()["nodes"]}
+    graph_payload = graph_response.json()
+    graph_node_types = {node["type"] for node in graph_payload["nodes"]}
+    assert {"hypothesis_version", "debate_message", "evaluation"}.issubset(graph_node_types)
+    assert "run" not in graph_node_types
+    assert all(
+        not edge["source"].startswith("run:") and not edge["target"].startswith("run:")
+        for edge in graph_payload["edges"]
     )
 
     feedback_response = client.post(
