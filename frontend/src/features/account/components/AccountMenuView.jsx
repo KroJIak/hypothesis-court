@@ -3,6 +3,7 @@ import { LogOut, Settings, Shield } from "lucide-react";
 import { AccountAvatar } from "./AccountAvatar";
 
 export function AccountMenuView({
+  accessToken,
   canOpenAdminPanel,
   displayName,
   profile,
@@ -16,6 +17,7 @@ export function AccountMenuView({
     <>
       <div className="account-popover__header">
         <AccountAvatar
+          accessToken={accessToken}
           user={user}
           avatarUrl={profile?.avatarUrl ?? null}
           className="account-popover__avatar"

@@ -6,6 +6,7 @@ import { AccountAvatar } from "./AccountAvatar";
 import { getDisplayName } from "../utils/getDisplayName";
 
 export function AccountSettingsView({
+  accessToken,
   errorMessage,
   onChangePassword,
   onClose,
@@ -130,6 +131,7 @@ export function AccountSettingsView({
             <div className="account-settings__avatar-column">
               <label htmlFor={inputId} className="account-settings__avatar-action">
                 <AccountAvatar
+                  accessToken={accessToken}
                   user={user}
                   avatarUrl={profile?.avatarUrl ?? null}
                   className="account-settings__avatar"
