@@ -25,6 +25,24 @@ function mapResearchRunSummary(dto) {
   };
 }
 
+function mapResearchRunProgress(dto) {
+  return {
+    run: mapResearchRunSummary(dto.run),
+    currentStage: dto.current_stage,
+    progressPercent: dto.progress_percent ?? 0,
+    events: (dto.events ?? []).map((event) => ({
+      id: event.id,
+      runId: event.run_id,
+      stage: event.stage,
+      sequenceNumber: event.sequence_number,
+      progressPercent: event.progress_percent,
+      message: event.message,
+      metadata: event.event_metadata ?? {},
+      createdAt: event.created_at,
+    })),
+  };
+}
+
 function mapResearchRunDetail(dto) {
   return {
     ...mapResearchRunSummary(dto),
@@ -269,6 +287,18 @@ export async function getResearchRun({ accessToken, chatSessionId, runId, signal
   });
 
   return mapResearchRunDetail(await readJsonResponse(response, "Не удалось загрузить запуск"));
+}
+
+export async function getResearchRunProgress({ accessToken, chatSessionId, runId, signal }) {
+  const response = await fetch(`${getResearchRunsUrl(chatSessionId)}/${runId}/progress`, {
+    headers: {
+      Accept: "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    signal,
+  });
+
+  return mapResearchRunProgress(await readJsonResponse(response, "Не удалось загрузить состояние запуска"));
 }
 
 export async function createResearchRun({ accessToken, chatSessionId, requests, hypothesisCount = 3 }) {

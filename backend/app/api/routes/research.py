@@ -1,12 +1,14 @@
+import logging
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps.auth import get_current_user
 from app.core.settings import Settings, get_settings
-from app.db.session import get_db_session
+from app.db.session import SessionLocal, get_db_session
 from app.models.user import User
+from app.repositories.user_repository import UserRepository
 from app.repositories.research_repository import ResearchRepository
 from app.repositories.model_provider_settings_repository import ModelProviderSettingsRepository
 from app.schemas.research import (
@@ -31,6 +33,7 @@ from app.services.research_retrieval_service import ResearchRetrievalService
 from app.services.research_service import ResearchService
 
 router = APIRouter(prefix="/chat-sessions/{chat_session_id}/research-runs", tags=["research-runs"])
+logger = logging.getLogger(__name__)
 
 
 def _get_research_service(session: Session, settings: Settings) -> ResearchService:
@@ -51,6 +54,27 @@ def _get_research_service(session: Session, settings: Settings) -> ResearchServi
             settings=settings,
         ),
     )
+
+
+def _execute_research_run_in_background(
+    *,
+    user_id: uuid.UUID,
+    chat_session_id: uuid.UUID,
+    run_id: uuid.UUID,
+    settings: Settings,
+) -> None:
+    session = SessionLocal()
+    try:
+        user = UserRepository().get_by_id(session, user_id)
+        if user is None:
+            logger.warning("research background run skipped because user is missing", extra={"run_id": str(run_id)})
+            return
+        service = _get_research_service(session, settings)
+        service.execute_run_pipeline(user=user, chat_session_id=chat_session_id, run_id=run_id)
+    except Exception:
+        logger.exception("research background run failed", extra={"run_id": str(run_id)})
+    finally:
+        session.close()
 
 
 @router.get("", response_model=ResearchRunListResponse)
@@ -82,18 +106,27 @@ def get_research_pipeline_settings(
 def create_research_run(
     chat_session_id: uuid.UUID,
     payload: ResearchRunCreateRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
     settings: Settings = Depends(get_settings),
 ) -> ResearchRunDetailResponse:
     service = _get_research_service(session, settings)
     try:
-        return service.create_run(
+        run = service.create_run_record(
             user=current_user,
             chat_session_id=chat_session_id,
             input_requests=payload.inputs,
             hypothesis_count=payload.hypothesis_count,
         )
+        background_tasks.add_task(
+            _execute_research_run_in_background,
+            user_id=current_user.id,
+            chat_session_id=chat_session_id,
+            run_id=run.id,
+            settings=settings,
+        )
+        return run
     except ServiceError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
@@ -204,18 +237,27 @@ def regenerate_research_run(
     chat_session_id: uuid.UUID,
     run_id: uuid.UUID,
     payload: ResearchRunRegenerateRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
     settings: Settings = Depends(get_settings),
 ) -> ResearchRunDetailResponse:
     service = _get_research_service(session, settings)
     try:
-        return service.regenerate_run(
+        run = service.regenerate_run_record(
             user=current_user,
             chat_session_id=chat_session_id,
             run_id=run_id,
             hypothesis_count=payload.hypothesis_count,
         )
+        background_tasks.add_task(
+            _execute_research_run_in_background,
+            user_id=current_user.id,
+            chat_session_id=chat_session_id,
+            run_id=run.id,
+            settings=settings,
+        )
+        return run
     except ServiceError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
@@ -225,19 +267,28 @@ def edit_research_run(
     chat_session_id: uuid.UUID,
     run_id: uuid.UUID,
     payload: ResearchRunEditRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
     settings: Settings = Depends(get_settings),
 ) -> ResearchRunDetailResponse:
     service = _get_research_service(session, settings)
     try:
-        return service.edit_run(
+        run = service.edit_run_record(
             user=current_user,
             chat_session_id=chat_session_id,
             run_id=run_id,
             input_requests=payload.inputs,
             hypothesis_count=payload.hypothesis_count,
         )
+        background_tasks.add_task(
+            _execute_research_run_in_background,
+            user_id=current_user.id,
+            chat_session_id=chat_session_id,
+            run_id=run.id,
+            settings=settings,
+        )
+        return run
     except ServiceError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 

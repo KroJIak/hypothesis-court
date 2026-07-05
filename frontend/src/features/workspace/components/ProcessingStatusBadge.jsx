@@ -1,6 +1,7 @@
-import { CircleCheck, LoaderCircle } from "lucide-react";
+import { CircleAlert, CircleCheck, LoaderCircle } from "lucide-react";
 
 import {
+  PROCESSING_STATUS_ERROR,
   PROCESSING_STATUS_PROCESSING,
   PROCESSING_STATUS_PROCESSED,
 } from "../constants";
@@ -15,6 +16,11 @@ const statusMeta = {
     className: "processing-status-badge processing-status-badge--processed",
     label: "Обработано",
     Icon: CircleCheck,
+  },
+  [PROCESSING_STATUS_ERROR]: {
+    className: "processing-status-badge processing-status-badge--error",
+    label: "Ошибка обработки",
+    Icon: CircleAlert,
   },
 };
 

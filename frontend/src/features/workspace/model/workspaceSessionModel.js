@@ -88,6 +88,7 @@ export function createWorkspaceSession(session, paletteAgents) {
     runVersions,
     activeRunVersionId: session.activeRunVersionId ?? runVersions.at(-1)?.id ?? null,
     availableAgents: getInitialAvailableAgents(session, paletteAgents),
+    researchProgress: session.researchProgress ?? null,
   };
 }
 
@@ -235,6 +236,42 @@ export function createRunVersionFromResearchRunSummary(run) {
   };
 }
 
+export function applyResearchRunProgressToSession(session, progress) {
+  const run = progress.run;
+  const runVersions = (session.runVersions ?? []).map((version) =>
+    version.id === run.id
+      ? {
+          ...version,
+          title: run.title,
+          status: run.status,
+          errorMessage: run.errorMessage,
+          completedAt: run.completedAt,
+        }
+      : version,
+  );
+  const hasRunVersion = runVersions.some((version) => version.id === run.id);
+  const nextRunVersions = hasRunVersion
+    ? runVersions
+    : [...runVersions, createRunVersionFromResearchRunSummary(run)];
+  const isTerminal = ["completed", "failed", "cancelled"].includes(run.status);
+
+  return {
+    ...session,
+    runVersions: nextRunVersions.sort((firstVersion, secondVersion) =>
+      new Date(firstVersion.createdAt).getTime() - new Date(secondVersion.createdAt).getTime(),
+    ),
+    activeRunVersionId: run.id,
+    activeResearchRunId: run.id,
+    researchProgress: progress,
+    isStarted: run.status === "running" || session.isStarted,
+    isVerdictComplete: run.status === "completed" ? session.isVerdictComplete : false,
+    isPendingDraft: false,
+    isEditingRunVersion: false,
+    knowledgeGraph: isTerminal && session.knowledgeGraphRunId === run.id ? session.knowledgeGraph : null,
+    knowledgeGraphRunId: isTerminal && session.knowledgeGraphRunId === run.id ? session.knowledgeGraphRunId : null,
+  };
+}
+
 export function createRunVersionFromResearchRun(run) {
   const requests = createComposerRequestsFromResearchInputs(run.inputs);
   const hypotheses = (run.hypotheses ?? [])
@@ -281,6 +318,7 @@ export function applyResearchRunsToSession(session, runSummaries, activeRunId = 
       runVersions: [],
       activeRunVersionId: null,
       activeResearchRunId: null,
+      researchProgress: null,
     };
   }
 
@@ -306,6 +344,7 @@ export function applyResearchRunsToSession(session, runSummaries, activeRunId = 
     isPendingDraft: false,
     isEditingRunVersion: false,
     composerRequests: [],
+    researchProgress: activeVersion.status === "running" ? session.researchProgress : null,
   };
 }
 
@@ -335,6 +374,7 @@ export function applyResearchRunToSession(session, run) {
     isPendingDraft: false,
     isEditingRunVersion: false,
     isVerdictComplete: nextVersion.status === "completed",
+    researchProgress: nextVersion.status === "running" ? session.researchProgress : null,
   };
 }
 

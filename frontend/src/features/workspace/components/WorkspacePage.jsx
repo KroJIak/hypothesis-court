@@ -39,16 +39,15 @@ import {
   editResearchRun,
   getResearchGraph,
   getResearchRun,
+  getResearchRunProgress,
   listResearchRuns,
   regenerateResearchRun,
 } from "../api/researchRuns";
 import {
   AGENT_DRAG_MIME_TYPE,
   DOCUMENT_PROCESSING_STATUS_PROCESSING,
-  DOCUMENT_PROCESSING_STATUS_UPLOADED,
   EVALUATION_SIDE_RIGHT,
   PROCESSING_STATUS_PROCESSING,
-  PROCESSING_STATUS_PROCESSED,
 } from "../constants";
 import { useWorkspaceScene } from "../hooks/useWorkspaceScene";
 import { resetScenePlayback } from "../hooks/useScenePlayback";
@@ -58,6 +57,7 @@ import {
   createChatTitleFromRequests,
   createComposerRequest,
   applyChatSessionMetadata,
+  applyResearchRunProgressToSession,
   applyResearchRunToSession,
   applyResearchRunsToSession,
   createWorkspaceSessionFromChatSession,
@@ -75,7 +75,9 @@ import "../workspace.css";
 const WORKSPACE_NOTIFICATION_TTL_MS = 4200;
 const WORKSPACE_NOTIFICATION_LIMIT = 5;
 const SESSION_FILE_STATUS_POLL_INTERVAL_MS = 1600;
+const RESEARCH_RUN_PROGRESS_POLL_INTERVAL_MS = 1400;
 const LOCAL_PENDING_AGENT_ID_PREFIX = "pending-agent-";
+const TERMINAL_RESEARCH_RUN_STATUSES = new Set(["completed", "failed", "cancelled"]);
 
 function createLocalPendingAgent() {
   const id =
@@ -188,18 +190,6 @@ function markAttachmentsAsProcessing(attachments) {
     ...attachment,
     ...createAttachmentProcessingView(DOCUMENT_PROCESSING_STATUS_PROCESSING),
     processingStartedAt,
-  }));
-}
-
-function markAttachmentsAsUploaded(attachments) {
-  return (attachments ?? []).map((attachment) => ({
-    ...attachment,
-    rawProcessingStatus: DOCUMENT_PROCESSING_STATUS_UPLOADED,
-    processingStatus: PROCESSING_STATUS_PROCESSED,
-    processingBadgeStatus: PROCESSING_STATUS_PROCESSED,
-    processingStatusLabel: "Файл загружен",
-    processingError: null,
-    processingStartedAt: null,
   }));
 }
 
@@ -351,23 +341,29 @@ export function WorkspacePage({
     ? refreshAvailableAgentsForSession(selectedSession, userAgents, data).availableAgents
     : [];
   const unchangedNewAgent = findUnchangedNewAgent(selectedSessionAvailableAgents, newAgentBaselineByIdRef.current);
-  const isAgentEditingLocked = selectedSession
-    ? selectedSession.isStarted || (selectedSession.hypotheses ?? []).length > 0
-    : false;
-  const isProcessRunning = selectedSession
-    ? selectedSession.isStarted
-      && (selectedSession.launchedRequests ?? []).length > 0
-      && !selectedSession.isVerdictComplete
-    : false;
-  const shouldPollSessionFiles = isProcessRunning && (selectedSession?.attachments ?? []).length > 0;
-  const agentEditingLockedReason = selectedSession?.isVerdictComplete
-    ? "Агентов нельзя выставлять в завершенном чате."
-    : "Агентов можно выставлять только до старта процесса.";
   const {
     runVersions,
     activeVersionIndex,
     activeVersion,
   } = selectedSession ? getRunVersionContext(selectedSession) : { runVersions: [], activeVersionIndex: 0, activeVersion: null };
+  const activeRunStatus = activeVersion?.status ?? selectedSession?.researchProgress?.run?.status ?? null;
+  const isAgentEditingLocked = selectedSession
+    ? selectedSession.isStarted || (selectedSession.hypotheses ?? []).length > 0
+    : false;
+  const isProcessRunning = selectedSession
+    ? activeRunStatus === "running"
+      || (
+        activeVersion === null
+        && selectedSession.isStarted
+        && (selectedSession.launchedRequests ?? []).length > 0
+        && !selectedSession.isVerdictComplete
+      )
+    : false;
+  const shouldPollSessionFiles = isProcessRunning && (selectedSession?.attachments ?? []).length > 0;
+  const shouldPollResearchRun = Boolean(selectedSession?.activeResearchRunId) && activeRunStatus === "running";
+  const agentEditingLockedReason = selectedSession?.isVerdictComplete
+    ? "Агентов нельзя выставлять в завершенном чате."
+    : "Агентов можно выставлять только до старта процесса.";
 
   const showWorkspaceNotification = useCallback((message, type = "info") => {
     if (!message) {
@@ -578,6 +574,103 @@ export function WorkspacePage({
       window.clearInterval(intervalId);
     };
   }, [accessToken, selectedChatId, shouldPollSessionFiles, showWorkspaceError, status]);
+
+  useEffect(() => {
+    const runId = selectedSession?.activeResearchRunId;
+
+    if (status !== "success" || !selectedChatId || !runId || !shouldPollResearchRun) {
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    let intervalId = null;
+    let didReportTerminalError = false;
+
+    async function pollResearchRunProgress() {
+      try {
+        const progress = await getResearchRunProgress({
+          accessToken,
+          chatSessionId: selectedChatId,
+          runId,
+          signal: controller.signal,
+        });
+
+        if (!TERMINAL_RESEARCH_RUN_STATUSES.has(progress.run.status)) {
+          setSessions((currentSessions) =>
+            currentSessions.map((session) =>
+              session.id === selectedChatId
+                ? applyResearchRunProgressToSession(session, progress)
+                : session,
+            ),
+          );
+          return;
+        }
+
+        if (intervalId !== null) {
+          window.clearInterval(intervalId);
+          intervalId = null;
+        }
+
+        if (progress.run.status === "completed") {
+          const loadedRun = await getResearchRun({
+            accessToken,
+            chatSessionId: selectedChatId,
+            runId,
+            signal: controller.signal,
+          });
+          resetJudgeVerdict(selectedChatId);
+          setSessions((currentSessions) =>
+            currentSessions.map((session) =>
+              session.id === selectedChatId
+                ? applyResearchRunToSession(session, loadedRun)
+                : session,
+            ),
+          );
+        } else {
+          setSessions((currentSessions) =>
+            currentSessions.map((session) =>
+              session.id === selectedChatId
+                ? applyResearchRunProgressToSession(session, progress)
+                : session,
+            ),
+          );
+        }
+
+        if (progress.run.status === "failed" && !didReportTerminalError) {
+          didReportTerminalError = true;
+          showWorkspaceNotification(progress.run.errorMessage || "Исследовательский запуск завершился ошибкой", "error");
+        }
+
+        void refreshSessionFiles(selectedChatId).catch((error) => {
+          showWorkspaceError(error, "Не удалось обновить статусы файлов");
+        });
+      } catch (error) {
+        if (error?.name === "AbortError") {
+          return;
+        }
+
+        showWorkspaceError(error, "Не удалось обновить состояние запуска");
+      }
+    }
+
+    void pollResearchRunProgress();
+    intervalId = window.setInterval(pollResearchRunProgress, RESEARCH_RUN_PROGRESS_POLL_INTERVAL_MS);
+
+    return () => {
+      controller.abort();
+      if (intervalId !== null) {
+        window.clearInterval(intervalId);
+      }
+    };
+  }, [
+    accessToken,
+    selectedChatId,
+    selectedSession?.activeResearchRunId,
+    shouldPollResearchRun,
+    showWorkspaceError,
+    showWorkspaceNotification,
+    status,
+  ]);
 
   useEffect(() => {
     if (status !== "success" || !selectedChatId || !data) {
@@ -1447,7 +1540,6 @@ export function WorkspacePage({
       answer: "",
       isVerdictComplete: false,
       consultationMessages: [],
-      attachments: markAttachmentsAsUploaded(session.attachments),
     }));
 
     if (selectedSession.activeResearchRunId) {
@@ -1455,9 +1547,25 @@ export function WorkspacePage({
         accessToken,
         chatSessionId: selectedSession.id,
         runId: selectedSession.activeResearchRunId,
-      }).catch((error) => {
-        showWorkspaceError(error, "Не удалось остановить запуск");
-      });
+      })
+        .then(() => getResearchRunProgress({
+          accessToken,
+          chatSessionId: selectedSession.id,
+          runId: selectedSession.activeResearchRunId,
+        }))
+        .then((progress) => {
+          setSessions((currentSessions) =>
+            currentSessions.map((session) =>
+              session.id === selectedSession.id
+                ? applyResearchRunProgressToSession(session, progress)
+                : session,
+            ),
+          );
+          return refreshSessionFiles(selectedSession.id);
+        })
+        .catch((error) => {
+          showWorkspaceError(error, "Не удалось остановить запуск");
+        });
     }
   }
 

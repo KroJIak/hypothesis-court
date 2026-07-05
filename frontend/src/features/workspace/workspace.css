@@ -217,6 +217,10 @@
   color: rgba(235, 235, 235, 0.82);
 }
 
+.processing-status-badge--error {
+  color: #ff6b57;
+}
+
 .processing-status-badge--processing svg {
   animation: processing-status-spin 850ms linear infinite;
 }

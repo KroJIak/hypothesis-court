@@ -8,6 +8,7 @@ import {
   DOCUMENT_PROCESSING_STATUS_PROCESSING,
   DOCUMENT_PROCESSING_STATUS_UNSUPPORTED,
   DOCUMENT_PROCESSING_STATUS_UPLOADED,
+  PROCESSING_STATUS_ERROR,
   PROCESSING_STATUS_PROCESSING,
   PROCESSING_STATUS_PROCESSED,
 } from "../constants";
@@ -42,11 +43,11 @@ const attachmentProcessingMetaByStatus = {
     label: "Готово",
   },
   [DOCUMENT_PROCESSING_STATUS_FAILED]: {
-    badgeStatus: PROCESSING_STATUS_PROCESSING,
+    badgeStatus: PROCESSING_STATUS_ERROR,
     label: "Ошибка обработки",
   },
   [DOCUMENT_PROCESSING_STATUS_UNSUPPORTED]: {
-    badgeStatus: PROCESSING_STATUS_PROCESSING,
+    badgeStatus: PROCESSING_STATUS_ERROR,
     label: "Формат пока не поддержан",
   },
 };

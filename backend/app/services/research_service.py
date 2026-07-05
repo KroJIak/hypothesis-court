@@ -167,8 +167,24 @@ class ResearchService:
         input_requests: list[ResearchInputRequest],
         hypothesis_count: int,
     ) -> ResearchRunDetailResponse:
+        run = self.create_run_record(
+            user=user,
+            chat_session_id=chat_session_id,
+            input_requests=input_requests,
+            hypothesis_count=hypothesis_count,
+        )
+        return self.execute_run_pipeline(user=user, chat_session_id=chat_session_id, run_id=run.id)
+
+    def create_run_record(
+        self,
+        *,
+        user: User,
+        chat_session_id: uuid.UUID,
+        input_requests: list[ResearchInputRequest],
+        hypothesis_count: int,
+    ) -> ResearchRunDetailResponse:
         normalized_inputs = self._normalize_inputs(input_requests)
-        return self._create_run_from_inputs(
+        run = self._create_run_record_from_inputs(
             user=user,
             chat_session_id=chat_session_id,
             normalized_inputs=normalized_inputs,
@@ -176,6 +192,7 @@ class ResearchService:
             trigger=ResearchRunTrigger.INITIAL,
             parent_run_id=None,
         )
+        return self._build_detail_response(run)
 
     def regenerate_run(
         self,
@@ -193,7 +210,7 @@ class ResearchService:
             NormalizedInput(kind=item.kind, label=item.label, text=item.text, position=item.position)
             for item in source_inputs
         ]
-        return self._create_run_from_inputs(
+        run = self._create_run_record_from_inputs(
             user=user,
             chat_session_id=chat_session_id,
             normalized_inputs=normalized_inputs,
@@ -201,6 +218,33 @@ class ResearchService:
             trigger=ResearchRunTrigger.REGENERATE,
             parent_run_id=source_run.id,
         )
+        return self.execute_run_pipeline(user=user, chat_session_id=chat_session_id, run_id=run.id)
+
+    def regenerate_run_record(
+        self,
+        *,
+        user: User,
+        chat_session_id: uuid.UUID,
+        run_id: uuid.UUID,
+        hypothesis_count: int | None,
+    ) -> ResearchRunDetailResponse:
+        source_run = self._get_run(user=user, chat_session_id=chat_session_id, run_id=run_id)
+        if source_run.status == ResearchRunStatus.RUNNING:
+            raise ConflictError("Нельзя перегенерировать версию, пока она выполняется.")
+        source_inputs = self._repository.list_input_items(self._session, run_id=source_run.id)
+        normalized_inputs = [
+            NormalizedInput(kind=item.kind, label=item.label, text=item.text, position=item.position)
+            for item in source_inputs
+        ]
+        run = self._create_run_record_from_inputs(
+            user=user,
+            chat_session_id=chat_session_id,
+            normalized_inputs=normalized_inputs,
+            hypothesis_count=hypothesis_count or source_run.hypothesis_count,
+            trigger=ResearchRunTrigger.REGENERATE,
+            parent_run_id=source_run.id,
+        )
+        return self._build_detail_response(run)
 
     def edit_run(
         self,
@@ -214,7 +258,7 @@ class ResearchService:
         source_run = self._get_run(user=user, chat_session_id=chat_session_id, run_id=run_id)
         if source_run.status == ResearchRunStatus.RUNNING:
             raise ConflictError("Нельзя редактировать версию, пока она выполняется.")
-        return self._create_run_from_inputs(
+        run = self._create_run_record_from_inputs(
             user=user,
             chat_session_id=chat_session_id,
             normalized_inputs=self._normalize_inputs(input_requests),
@@ -222,6 +266,29 @@ class ResearchService:
             trigger=ResearchRunTrigger.EDIT,
             parent_run_id=source_run.id,
         )
+        return self.execute_run_pipeline(user=user, chat_session_id=chat_session_id, run_id=run.id)
+
+    def edit_run_record(
+        self,
+        *,
+        user: User,
+        chat_session_id: uuid.UUID,
+        run_id: uuid.UUID,
+        input_requests: list[ResearchInputRequest],
+        hypothesis_count: int | None,
+    ) -> ResearchRunDetailResponse:
+        source_run = self._get_run(user=user, chat_session_id=chat_session_id, run_id=run_id)
+        if source_run.status == ResearchRunStatus.RUNNING:
+            raise ConflictError("Нельзя редактировать версию, пока она выполняется.")
+        run = self._create_run_record_from_inputs(
+            user=user,
+            chat_session_id=chat_session_id,
+            normalized_inputs=self._normalize_inputs(input_requests),
+            hypothesis_count=hypothesis_count or source_run.hypothesis_count,
+            trigger=ResearchRunTrigger.EDIT,
+            parent_run_id=source_run.id,
+        )
+        return self._build_detail_response(run)
 
     def cancel_run(self, *, user: User, chat_session_id: uuid.UUID, run_id: uuid.UUID) -> ResearchRunSummaryResponse:
         try:
@@ -547,7 +614,7 @@ class ResearchService:
 
         return ResearchGraphResponse(run_id=run.id, nodes=nodes, edges=edges)
 
-    def _create_run_from_inputs(
+    def _create_run_record_from_inputs(
         self,
         *,
         user: User,
@@ -556,8 +623,7 @@ class ResearchService:
         hypothesis_count: int,
         trigger: ResearchRunTrigger,
         parent_run_id: uuid.UUID | None,
-    ) -> ResearchRunDetailResponse:
-        run: ResearchRun | None = None
+    ) -> ResearchRun:
         try:
             chat_session = self._get_chat_session(user=user, chat_session_id=chat_session_id, for_update=True)
             if self._repository.has_running_run(self._session, chat_session_id=chat_session_id):
@@ -600,22 +666,36 @@ class ResearchService:
                 message="Исследовательский запуск создан.",
             )
             self._session.commit()
+            return run
         except Exception:
             self._session.rollback()
             raise
 
+    def execute_run_pipeline(
+        self,
+        *,
+        user: User,
+        chat_session_id: uuid.UUID,
+        run_id: uuid.UUID,
+    ) -> ResearchRunDetailResponse:
+        run: ResearchRun | None = None
         try:
             chat_session = self._get_chat_session(user=user, chat_session_id=chat_session_id, for_update=True)
-            run = self._get_run(user=user, chat_session_id=chat_session_id, run_id=run.id)
+            run = self._get_run(user=user, chat_session_id=chat_session_id, run_id=run_id)
+            input_items = self._repository.list_input_items(self._session, run_id=run.id)
+            normalized_inputs = [
+                NormalizedInput(kind=item.kind, label=item.label, text=item.text, position=item.position)
+                for item in input_items
+            ]
             pipeline_settings = self._repository.get_pipeline_settings(self._session)
             self._check_cancelled(run)
-            self._append_event(run=run, stage=ResearchRunStage.INGESTION, progress_percent=10, message="Обработка источников началась.")
+            self._append_event_and_commit(run=run, stage=ResearchRunStage.INGESTION, progress_percent=10, message="Обработка источников началась.")
             files = self._repository.list_active_files(self._session, user_id=user.id, chat_session_id=chat_session.id)
             chunks = self._prepare_document_chunks(files=files)
             research_brief = self._research_brief(normalized_inputs)
             research_brief = self._apply_pipeline_settings_to_brief(research_brief, pipeline_settings)
             self._check_cancelled(run)
-            self._append_event(run=run, stage=ResearchRunStage.RETRIEVAL, progress_percent=25, message="Поиск релевантных фрагментов начался.")
+            self._append_event_and_commit(run=run, stage=ResearchRunStage.RETRIEVAL, progress_percent=25, message="Поиск релевантных фрагментов начался.")
             evidence_drafts, evidence_source_chunks = self._extract_evidence_drafts(
                 run=run,
                 research_brief=research_brief,
@@ -624,14 +704,14 @@ class ResearchService:
                 retrieval_limit=pipeline_settings.retrieval_limit,
             )
             self._check_cancelled(run)
-            self._append_event(run=run, stage=ResearchRunStage.EVIDENCE, progress_percent=40, message="Evidence pack сформирован.")
+            self._append_event_and_commit(run=run, stage=ResearchRunStage.EVIDENCE, progress_percent=40, message="Evidence pack сформирован.")
             evidence = self._persist_evidence(
                 run=run,
                 evidence_drafts=evidence_drafts,
                 source_chunks=evidence_source_chunks,
             )
             self._check_cancelled(run)
-            self._append_event(run=run, stage=ResearchRunStage.HYPOTHESIS_GENERATION, progress_percent=55, message="Генерация стартовых гипотез началась.")
+            self._append_event_and_commit(run=run, stage=ResearchRunStage.HYPOTHESIS_GENERATION, progress_percent=55, message="Генерация стартовых гипотез началась.")
             hypothesis_drafts = self._generate_hypothesis_drafts(
                 research_brief=research_brief,
                 evidence_drafts=evidence_drafts,
@@ -643,7 +723,7 @@ class ResearchService:
                 evidence=evidence,
             )
             self._check_cancelled(run)
-            self._append_event(run=run, stage=ResearchRunStage.DEBATE, progress_percent=70, message="Debate loop начался.")
+            self._append_event_and_commit(run=run, stage=ResearchRunStage.DEBATE, progress_percent=70, message="Debate loop начался.")
             refined_statements = self._create_debate_artifacts(
                 hypothesis_drafts=hypothesis_drafts,
                 hypotheses=hypotheses,
@@ -651,7 +731,7 @@ class ResearchService:
                 round_limit=pipeline_settings.debate_round_limit,
             )
             self._check_cancelled(run)
-            self._append_event(run=run, stage=ResearchRunStage.EVALUATION, progress_percent=82, message="Независимая оценка гипотез началась.")
+            self._append_event_and_commit(run=run, stage=ResearchRunStage.EVALUATION, progress_percent=82, message="Независимая оценка гипотез началась.")
             evaluation_payloads = self._create_evaluation_artifacts(
                 run=run,
                 chat_session_id=chat_session.id,
@@ -662,7 +742,7 @@ class ResearchService:
                 evidence_drafts=evidence_drafts,
             )
             self._check_cancelled(run)
-            self._append_event(run=run, stage=ResearchRunStage.JUDGE, progress_percent=93, message="Финальный судья формирует вердикт.")
+            self._append_event_and_commit(run=run, stage=ResearchRunStage.JUDGE, progress_percent=93, message="Финальный судья формирует вердикт.")
             self._create_judge_verdict(
                 run=run,
                 research_brief=research_brief,
@@ -675,7 +755,7 @@ class ResearchService:
             run.status = ResearchRunStatus.COMPLETED
             run.completed_at = datetime.now(UTC)
             chat_session.is_started = True
-            if trigger != ResearchRunTrigger.REGENERATE:
+            if run.trigger != ResearchRunTrigger.REGENERATE:
                 chat_session.title = run.title
             chat_session.active_research_run_id = run.id
             self._append_event(run=run, stage=ResearchRunStage.COMPLETED, progress_percent=100, message="Исследовательский запуск завершён.")
@@ -1223,6 +1303,9 @@ class ResearchService:
             if run is None:
                 self._session.rollback()
                 return
+            if run.status == ResearchRunStatus.CANCELLED:
+                self._session.rollback()
+                return
             run.status = ResearchRunStatus.CANCELLED
             run.completed_at = datetime.now(UTC)
             self._append_event(
@@ -1295,17 +1378,42 @@ class ResearchService:
                 progress_percent=progress_percent,
                 message=self._short_text(message, 500),
                 event_metadata=metadata or {},
+                created_at=datetime.now(UTC),
             ),
         )
 
-    def _check_cancelled(self, run: ResearchRun) -> None:
-        refreshed_run = self._repository.get_run(
-            self._session,
-            user_id=run.user_id,
-            chat_session_id=run.chat_session_id,
-            run_id=run.id,
+    def _append_event_and_commit(
+        self,
+        *,
+        run: ResearchRun,
+        stage: ResearchRunStage,
+        progress_percent: int,
+        message: str,
+        metadata: dict[str, object] | None = None,
+    ) -> ResearchRunEvent:
+        event = self._append_event(
+            run=run,
+            stage=stage,
+            progress_percent=progress_percent,
+            message=message,
+            metadata=metadata,
         )
-        if refreshed_run is not None and refreshed_run.status == ResearchRunStatus.CANCELLED:
+        self._session.commit()
+        return event
+
+    def _check_cancelled(self, run: ResearchRun) -> None:
+        if hasattr(self._session, "expire"):
+            self._session.expire(run, ["status"])
+            current_status = run.status
+        else:
+            refreshed_run = self._repository.get_run(
+                self._session,
+                user_id=run.user_id,
+                chat_session_id=run.chat_session_id,
+                run_id=run.id,
+            )
+            current_status = refreshed_run.status if refreshed_run is not None else run.status
+        if current_status == ResearchRunStatus.CANCELLED:
             raise ConflictError("Исследовательский запуск отменён.")
 
     @staticmethod

@@ -14,6 +14,79 @@ const initialVerdictScroll = {
   spacerHeight: 0,
 };
 
+const progressStageStatusByRole = {
+  queued: {
+    debate: {
+      defender: "ожидает",
+      attacker: "ожидает",
+      manufacturer: "ожидает",
+    },
+    judge: "ожидает",
+  },
+  ingestion: {
+    debate: {
+      manufacturer: "обрабатывает источники",
+    },
+    judge: "ожидает",
+  },
+  retrieval: {
+    debate: {
+      manufacturer: "ищет фрагменты",
+    },
+    judge: "ожидает",
+  },
+  evidence: {
+    debate: {
+      manufacturer: "собирает evidence",
+    },
+    judge: "ожидает",
+  },
+  hypothesis_generation: {
+    debate: {
+      defender: "формирует гипотезы",
+      attacker: "проверяет риски",
+      manufacturer: "проверяет реализуемость",
+    },
+    judge: "ожидает",
+  },
+  debate: {
+    debate: {
+      defender: "защищает",
+      attacker: "критикует",
+      manufacturer: "проверяет реализацию",
+    },
+    judge: "ожидает",
+  },
+  evaluation: {
+    debate: {
+      manufacturer: "передаёт оценщикам",
+    },
+    evaluation: "оценивает",
+    judge: "ожидает",
+  },
+  judge: {
+    debate: {
+      manufacturer: "ожидает",
+    },
+    evaluation: "ожидает",
+    judge: "формирует вердикт",
+  },
+  failed: {
+    judge: "ошибка",
+  },
+  cancelled: {
+    judge: "остановлено",
+  },
+};
+
+function createEvaluationStatusMap(agentIds, status) {
+  if (!status) {
+    return {};
+  }
+
+  return Object.fromEntries(agentIds.map((agentId) => [agentId, status]));
+}
+
 function clampNumber(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
@@ -52,6 +125,17 @@ export function WorkspaceScene({
   const isHypothesesLoading = session.isStarted
     && (session.launchedRequests ?? []).length > 0
     && !hasHypotheses;
+  const progressStageStatus = progressStageStatusByRole[session.researchProgress?.currentStage] ?? null;
+  const progressDebateRoleStatuses = progressStageStatus?.debate ?? {};
+  const progressEvaluationAgentStatuses = createEvaluationStatusMap(
+    session.evaluation.agents.map((agent) => agent.id),
+    progressStageStatus?.evaluation,
+  );
+  const hasProgressAgentStatus = Boolean(
+    progressStageStatus?.judge
+    || Object.keys(progressDebateRoleStatuses).length > 0
+    || Object.keys(progressEvaluationAgentStatuses).length > 0,
+  );
   const answerRevealScrollKey = `${session.id}:${session.answer ?? ""}`;
   const isVerdictTypewriterReady = !isAnswerVisible
     || (verdictScroll.key === answerRevealScrollKey && verdictScroll.phase === "ready");
@@ -59,20 +143,20 @@ export function WorkspaceScene({
     ...session.debate,
     roles: session.debate.roles.map((role) => ({
       ...role,
-      status: debateRoleStatuses[role.id] ?? "",
+      status: debateRoleStatuses[role.id] ?? progressDebateRoleStatuses[role.id] ?? "",
     })),
-  }), [debateRoleStatuses, session.debate]);
+  }), [debateRoleStatuses, progressDebateRoleStatuses, session.debate]);
   const evaluation = useMemo(() => ({
     ...session.evaluation,
     agents: session.evaluation.agents.map((agent) => ({
       ...agent,
-      status: evaluationAgentStatuses[agent.id] ?? "",
+      status: evaluationAgentStatuses[agent.id] ?? progressEvaluationAgentStatuses[agent.id] ?? "",
     })),
     judge: {
       ...session.evaluation.judge,
-      status: judgeStatus,
+      status: judgeStatus || progressStageStatus?.judge || "",
     },
-  }), [evaluationAgentStatuses, judgeStatus, session.evaluation]);
+  }), [evaluationAgentStatuses, judgeStatus, progressEvaluationAgentStatuses, progressStageStatus?.judge, session.evaluation]);
 
   const setEvaluationAvatarRef = useCallback((agentId, node) => {
     if (node) {
@@ -431,7 +515,7 @@ export function WorkspaceScene({
         manufacturerAvatarRef={manufacturerAvatarRef}
         activeConnectionDirections={activeDebateConnectionDirections}
         debateCycleNumber={debateCycleNumber}
-        hideAgentStatus={!hasHypotheses}
+        hideAgentStatus={!hasHypotheses && !hasProgressAgentStatus}
         onOpenAgentHistory={onOpenAgentHistory}
       />
       <EvaluationStage
@@ -441,7 +525,7 @@ export function WorkspaceScene({
         consultationMessages={session.consultationMessages ?? []}
         isAnswerVisible={isAnswerVisible}
         isVerdictTypewriterReady={isVerdictTypewriterReady}
-        hideAgentStatus={!hasHypotheses}
+        hideAgentStatus={!hasHypotheses && !hasProgressAgentStatus}
         onVerdictComplete={onVerdictComplete}
         onAgentAvatarRef={setEvaluationAvatarRef}
         judgeAvatarRef={judgeAvatarRef}

@@ -12,6 +12,7 @@ export const ATTACHMENT_TOOLTIP_EDGE_OFFSET = 32;
 export const PROCESSING_STATUS_PROCESSING = "processing";
 export const PROCESSING_STATUS_PROCESSED = "processed";
 export const PROCESSING_STATUS_QUEUED = "queued";
+export const PROCESSING_STATUS_ERROR = "error";
 export const DOCUMENT_PROCESSING_STATUS_UPLOADED = "uploaded";
 export const DOCUMENT_PROCESSING_STATUS_PROCESSING = "processing";
 export const DOCUMENT_PROCESSING_STATUS_PROCESSED = "processed";

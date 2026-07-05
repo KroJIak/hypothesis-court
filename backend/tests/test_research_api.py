@@ -74,7 +74,13 @@ def test_research_api_contracts(monkeypatch, tmp_path):
             llm_orchestrator=FakeLlmOrchestrator(),
         )
 
+    def execute_background_override(*, user_id, chat_session_id, run_id, settings):
+        del user_id
+        service = get_service_override(DummySession(), settings)
+        service.execute_run_pipeline(user=user, chat_session_id=chat_session_id, run_id=run_id)
+
     monkeypatch.setattr(research_routes, "_get_research_service", get_service_override)
+    monkeypatch.setattr(research_routes, "_execute_research_run_in_background", execute_background_override)
 
     app = create_app()
     app.dependency_overrides[get_current_user] = lambda: user
@@ -95,7 +101,7 @@ def test_research_api_contracts(monkeypatch, tmp_path):
     )
     assert create_response.status_code == 201
     run = create_response.json()
-    assert run["status"] == "completed"
+    assert run["status"] == "running"
 
     progress_response = client.get(f"/chat-sessions/{chat_session.id}/research-runs/{run['id']}/progress")
     assert progress_response.status_code == 200

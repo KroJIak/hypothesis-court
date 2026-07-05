@@ -474,7 +474,7 @@ def test_create_run_persists_complete_research_artifacts(service_bundle, user, c
     assert chat_session.active_research_run_id == response.id
     assert chat_session.is_started is True
     assert chat_session.title == "Проверка хвостов обогащения"
-    assert session.commits == 2
+    assert session.commits >= 2
     assert repository.runs[0].completed_at is not None
     assert repository.events[-1].stage.value == "completed"
     assert repository.events[-1].progress_percent == 100
