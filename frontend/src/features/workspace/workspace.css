@@ -1421,14 +1421,31 @@
   position: fixed;
   z-index: 3000;
   height: auto;
-  max-height: calc(100vh - 28px);
+  max-height: min(320px, calc(100vh - 28px));
   border-radius: 15px;
   background: #1b1b1b;
   color: rgba(244, 244, 244, 0.88);
   padding: 10px 30px 11px 10px;
-  overflow: visible;
+  overflow: hidden;
   pointer-events: auto;
   animation: hypothesis-preview-in 130ms ease both;
+}
+
+.hypothesis-card-preview__content {
+  max-height: calc(min(320px, 100vh - 28px) - 21px);
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
+}
+
+.hypothesis-card-preview__content::-webkit-scrollbar {
+  width: 4px;
+}
+
+.hypothesis-card-preview__content::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.28);
 }
 
 .hypothesis-card-preview__title {

@@ -270,8 +270,10 @@ export function HypothesisCandidates({
               onMouseLeave={hidePreview}
             >
               <ProcessingStatusBadge status={activeHypothesis.processingStatus} />
-              <h2 className="hypothesis-card-preview__title">{activeHypothesis.title}</h2>
-              <p className="hypothesis-card-preview__description">{activeHypothesis.description}</p>
+              <div className="hypothesis-card-preview__content">
+                <h2 className="hypothesis-card-preview__title">{activeHypothesis.title}</h2>
+                <p className="hypothesis-card-preview__description">{activeHypothesis.description}</p>
+              </div>
             </article>,
             document.body,
           )
