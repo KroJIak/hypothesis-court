@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, String, func, text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -43,6 +43,12 @@ class ChatSession(Base):
         nullable=True,
     )
     title: Mapped[str] = mapped_column(String(200), nullable=False)
+    draft_inputs: Mapped[list[dict[str, object]]] = mapped_column(
+        JSONB,
+        nullable=False,
+        default=list,
+        server_default=text("'[]'::jsonb"),
+    )
     is_started: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
     is_pinned: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
     pinned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

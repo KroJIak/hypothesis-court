@@ -714,6 +714,8 @@ class ResearchService:
                         position=item.position,
                     ),
                 )
+            chat_session.draft_inputs = []
+            chat_session.is_started = True
             self._append_event(
                 run=run,
                 stage=ResearchRunStage.QUEUED,

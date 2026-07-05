@@ -97,6 +97,7 @@ export function applyChatSessionMetadata(session, chatSession) {
     ...session,
     id: chatSession.id,
     title: chatSession.title,
+    draftInputs: chatSession.draftInputs ?? [],
     isStarted: chatSession.isStarted,
     isPinned: chatSession.isPinned,
     pinnedAt: chatSession.pinnedAt,
@@ -106,6 +107,8 @@ export function applyChatSessionMetadata(session, chatSession) {
 }
 
 export function createWorkspaceSessionFromChatSession(chatSession, paletteAgents) {
+  const composerRequests = createComposerRequestsFromResearchInputs(chatSession.draftInputs ?? []);
+
   return createWorkspaceSession({
     id: chatSession.id,
     title: chatSession.title,
@@ -117,7 +120,7 @@ export function createWorkspaceSessionFromChatSession(chatSession, paletteAgents
     query: "Новая гипотеза появится здесь после отправки запроса.",
     answer: "",
     attachments: [],
-    composerRequests: [],
+    composerRequests,
     launchedRequests: [],
     hypotheses: [],
     activeResearchRunId: null,

@@ -5,11 +5,26 @@ function mapChatSession(dto) {
   return {
     id: dto.id,
     title: dto.title,
+    draftInputs: (dto.draft_inputs ?? []).map((input, position) => ({
+      id: input.id ?? `draft-input-${position}`,
+      kind: input.kind,
+      label: input.label,
+      text: input.text,
+      position,
+    })),
     isStarted: Boolean(dto.is_started),
     isPinned: Boolean(dto.is_pinned),
     pinnedAt: dto.pinned_at ?? null,
     createdAt: dto.created_at,
     updatedAt: dto.updated_at,
+  };
+}
+
+function mapComposerRequestToDraftInput(request) {
+  return {
+    kind: request.context?.value ?? "custom",
+    label: request.context?.label ?? "Дополнительно",
+    text: request.text,
   };
 }
 
@@ -59,6 +74,27 @@ export async function createChatSession({ accessToken, title }) {
 
   if (!response.ok) {
     const detail = await readWorkspaceApiError(response, "Не удалось создать чат");
+    throw new Error(detail);
+  }
+
+  return mapChatSession(await response.json());
+}
+
+export async function updateChatSessionDraftInputs({ accessToken, chatSessionId, requests }) {
+  const response = await fetch(`${getApiBaseUrl()}/chat-sessions/${chatSessionId}/draft-inputs`, {
+    method: "PUT",
+    headers: {
+      Accept: "application/json",
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      inputs: requests.map(mapComposerRequestToDraftInput),
+    }),
+  });
+
+  if (!response.ok) {
+    const detail = await readWorkspaceApiError(response, "Не удалось сохранить входные данные");
     throw new Error(detail);
   }
 

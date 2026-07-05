@@ -18,6 +18,7 @@ from app.schemas.agent import (
 from app.repositories.session_file_repository import SessionFileRepository
 from app.schemas.chat_session import (
     ChatSessionCreateRequest,
+    ChatSessionDraftInputsUpdateRequest,
     ChatSessionRenameRequest,
     ChatSessionResponse,
     ChatSessionsListResponse,
@@ -125,6 +126,25 @@ def rename_chat_session(
             user=current_user,
             chat_session_id=chat_session_id,
             title=payload.title,
+        )
+    except ServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    return ChatSessionResponse.model_validate(chat_session)
+
+
+@router.put("/{chat_session_id}/draft-inputs", response_model=ChatSessionResponse)
+def update_chat_session_draft_inputs(
+    chat_session_id: uuid.UUID,
+    payload: ChatSessionDraftInputsUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+) -> ChatSessionResponse:
+    service = _get_chat_session_service(session)
+    try:
+        chat_session = service.update_draft_inputs(
+            user=current_user,
+            chat_session_id=chat_session_id,
+            inputs=payload.inputs,
         )
     except ServiceError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc

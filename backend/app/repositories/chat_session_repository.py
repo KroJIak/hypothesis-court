@@ -42,6 +42,7 @@ class ChatSessionRepository:
                 ChatSession.user_id == user_id,
                 ChatSession.deleted_at.is_(None),
                 ChatSession.is_started.is_(False),
+                ChatSession.draft_inputs == [],
                 ~selected_agent_exists,
                 ~session_file_exists,
             )

@@ -6,7 +6,8 @@ from sqlalchemy.orm import Session
 from app.models.chat_session import ChatSession
 from app.models.user import User
 from app.repositories.chat_session_repository import ChatSessionRepository
-from app.services.exceptions import NotFoundError, ValidationError
+from app.schemas.chat_session import ChatSessionDraftInput
+from app.services.exceptions import ConflictError, NotFoundError, ValidationError
 
 
 class ChatSessionService:
@@ -46,6 +47,7 @@ class ChatSessionService:
                 ChatSession(
                     user_id=user.id,
                     title=self._normalize_title(title),
+                    draft_inputs=[],
                 ),
             )
             self._session.commit()
@@ -103,6 +105,26 @@ class ChatSessionService:
         try:
             chat_session = self._get_owned_session(user=user, chat_session_id=chat_session_id)
             chat_session.is_started = True
+            chat_session.draft_inputs = []
+            self._session.commit()
+            return chat_session
+        except Exception:
+            self._session.rollback()
+            raise
+
+    def update_draft_inputs(
+        self,
+        *,
+        user: User,
+        chat_session_id: uuid.UUID,
+        inputs: list[ChatSessionDraftInput],
+    ) -> ChatSession:
+        try:
+            chat_session = self._get_owned_session(user=user, chat_session_id=chat_session_id)
+            normalized_inputs = self._normalize_draft_inputs(inputs)
+            if chat_session.is_started and normalized_inputs:
+                raise ConflictError("Нельзя сохранять черновик входных данных после старта чата.")
+            chat_session.draft_inputs = normalized_inputs
             self._session.commit()
             return chat_session
         except Exception:
@@ -138,3 +160,30 @@ class ChatSessionService:
         if len(normalized) > 200:
             raise ValidationError("Chat title must contain at most 200 characters.")
         return normalized
+
+    @staticmethod
+    def _normalize_draft_inputs(inputs: list[ChatSessionDraftInput]) -> list[dict[str, str]]:
+        if len(inputs) > 20:
+            raise ValidationError("Можно сохранить не больше 20 входных полей.")
+
+        normalized_inputs: list[dict[str, str]] = []
+        for item in inputs:
+            label = item.label.strip()
+            text = item.text.strip()
+            if not label:
+                raise ValidationError("Название поля ввода не может быть пустым.")
+            if len(label) > 64:
+                raise ValidationError("Название поля ввода должно быть не длиннее 64 символов.")
+            if not text:
+                raise ValidationError("Текст поля ввода не может быть пустым.")
+            if len(text) > 4000:
+                raise ValidationError("Текст одного поля ввода должен быть не длиннее 4000 символов.")
+            normalized_inputs.append(
+                {
+                    "kind": item.kind.value,
+                    "label": label,
+                    "text": text,
+                }
+            )
+
+        return normalized_inputs

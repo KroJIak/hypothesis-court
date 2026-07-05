@@ -27,6 +27,7 @@ import {
   pinChatSession,
   renameChatSession,
   unpinChatSession,
+  updateChatSessionDraftInputs,
 } from "../api/chatSessions";
 import {
   deleteSessionFile,
@@ -1562,6 +1563,26 @@ export function WorkspacePage({
     handleMoveAgentToPalette(payload.agentId);
   }
 
+  function persistChatDraftInputs(chatSessionId, requests) {
+    return updateChatSessionDraftInputs({
+      accessToken,
+      chatSessionId,
+      requests,
+    })
+      .then((chatSession) => {
+        setSessions((currentSessions) =>
+          currentSessions.map((session) =>
+            session.id === chatSessionId
+              ? applyChatSessionMetadata(session, chatSession)
+              : session,
+          ),
+        );
+      })
+      .catch((error) => {
+        showWorkspaceError(error, "Не удалось сохранить входные данные");
+      });
+  }
+
   function handleSend({ context, text }) {
     const nextText = text.trim();
     const composerRequests = selectedSession.composerRequests ?? [];
@@ -1581,10 +1602,16 @@ export function WorkspacePage({
     }
 
     if (nextText) {
+      const nextRequest = createComposerRequest(context, nextText);
+      const nextRequests = [...composerRequests, nextRequest];
       updateSelectedSession((session) => ({
         ...session,
-        composerRequests: [...(session.composerRequests ?? []), createComposerRequest(context, nextText)],
+        composerRequests: nextRequests,
       }));
+
+      if (!selectedSession.isEditingRunVersion) {
+        void persistChatDraftInputs(selectedSession.id, nextRequests);
+      }
 
       setDraftMessage("");
       return;
@@ -1961,10 +1988,15 @@ export function WorkspacePage({
   }
 
   function handleRemoveComposerRequest(requestId) {
+    const nextRequests = (selectedSession.composerRequests ?? []).filter((request) => request.id !== requestId);
     updateSelectedSession((session) => ({
       ...session,
-      composerRequests: (session.composerRequests ?? []).filter((request) => request.id !== requestId),
+      composerRequests: nextRequests,
     }));
+
+    if (!selectedSession.isEditingRunVersion) {
+      void persistChatDraftInputs(selectedSession.id, nextRequests);
+    }
   }
 
   const sidebar = (
