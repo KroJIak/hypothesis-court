@@ -57,7 +57,9 @@ def _parse_positive_int(raw_value: str, name: str) -> int:
 
 
 def _get_env(name: str, default: str | None = None) -> str:
-    value = os.getenv(name, default)
+    value = os.getenv(name)
+    if value is None or value == "":
+        value = default
     if value is None:
         raise ValueError(f"Missing required environment variable: {name}")
     return value
@@ -141,9 +143,9 @@ def get_settings() -> Settings:
             _get_env("USER_MAX_AGENTS", "50"),
             "USER_MAX_AGENTS",
         ),
-        model_provider_base_url=_get_env("MODEL_PROVIDER_BASE_URL"),
+        model_provider_base_url=_get_env("MODEL_PROVIDER_BASE_URL", "https://api.openai.com/v1"),
         model_provider_api_key=os.getenv("MODEL_PROVIDER_API_KEY") or None,
-        model_provider_model=_get_env("MODEL_PROVIDER_MODEL"),
+        model_provider_model=_get_env("MODEL_PROVIDER_MODEL", "gpt-4o-mini"),
         model_provider_folder_id=os.getenv("MODEL_PROVIDER_FOLDER_ID") or None,
         model_provider_api_mode=_get_env("MODEL_PROVIDER_API_MODE", "chat_completions"),
         embedding_base_url=_get_env("EMBEDDING_BASE_URL", "https://api.openai.com/v1"),

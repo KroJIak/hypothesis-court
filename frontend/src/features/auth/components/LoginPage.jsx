@@ -3,8 +3,8 @@ import { ArrowRight, KeyRound, LoaderCircle, Scale, UserRound } from "lucide-rea
 
 import "../auth.css";
 
-const organizerSuperadminUsername = import.meta.env.VITE_ORGANIZER_SUPERADMIN_USERNAME || "не настроен";
-const organizerSuperadminPassword = import.meta.env.VITE_ORGANIZER_SUPERADMIN_PASSWORD || "не настроен";
+const organizerSuperadminUsername = import.meta.env.VITE_ORGANIZER_SUPERADMIN_USERNAME || "superadmin";
+const organizerSuperadminPassword = import.meta.env.VITE_ORGANIZER_SUPERADMIN_PASSWORD || "change-me";
 
 export function LoginPage({ errorMessage, isSubmitting, onLogin }) {
   const [username, setUsername] = useState("");
