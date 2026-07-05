@@ -210,6 +210,11 @@ function createPlaybackSignature(session) {
 }
 
 function getOrCreatePlaybackTimeline(session) {
+  if (session.researchProgress?.run?.status === "running") {
+    playbackTimelines.delete(session.id);
+    return null;
+  }
+
   if (!session.hypotheses || session.hypotheses.length === 0) {
     playbackTimelines.delete(session.id);
     return null;
@@ -329,6 +334,7 @@ function getHypothesesWithPlaybackStatus(hypotheses, playbackState, currentStep)
 }
 
 export function useScenePlayback(session) {
+  const isBackendRunLive = session.researchProgress?.run?.status === "running";
   const steps = useMemo(() => createScenePlaybackSteps(session), [session]);
   const playbackTimeline = useMemo(() => getOrCreatePlaybackTimeline(session), [session]);
   const [playbackNow, setPlaybackNow] = useState(() => Date.now());
@@ -365,15 +371,17 @@ export function useScenePlayback(session) {
   }, [session]);
 
   return {
-    activeDebateConnectionDirections: createActiveConnectionMap(currentStep?.activeDebateConnections),
-    activeEvaluationConnectionDirections: createActiveConnectionMap(currentStep?.activeEvaluationConnections),
-    debateCycleNumber: getDebateCycleNumber(currentStep),
-    debateRoleStatuses: getDebateRoleStatuses(currentStep),
-    evaluationAgentStatuses: getEvaluationAgentStatuses(session, currentStep),
-    hypotheses: getHypothesesWithPlaybackStatus(session.hypotheses ?? [], playbackState, currentStep),
-    isAnswerVisible: playbackState.isAnswerVisible,
+    activeDebateConnectionDirections: isBackendRunLive ? new Map() : createActiveConnectionMap(currentStep?.activeDebateConnections),
+    activeEvaluationConnectionDirections: isBackendRunLive ? new Map() : createActiveConnectionMap(currentStep?.activeEvaluationConnections),
+    debateCycleNumber: isBackendRunLive ? null : getDebateCycleNumber(currentStep),
+    debateRoleStatuses: isBackendRunLive ? {} : getDebateRoleStatuses(currentStep),
+    evaluationAgentStatuses: isBackendRunLive ? {} : getEvaluationAgentStatuses(session, currentStep),
+    hypotheses: isBackendRunLive
+      ? session.hypotheses ?? []
+      : getHypothesesWithPlaybackStatus(session.hypotheses ?? [], playbackState, currentStep),
+    isAnswerVisible: isBackendRunLive ? Boolean(session.answer) : playbackState.isAnswerVisible,
     isRunning,
-    judgeStatus: getJudgeStatus(session, currentStep),
+    judgeStatus: isBackendRunLive ? "" : getJudgeStatus(session, currentStep),
     startPlayback,
   };
 }

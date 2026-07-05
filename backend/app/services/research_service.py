@@ -434,6 +434,61 @@ class ResearchService:
                 )
             )
 
+        source_files = self._repository.list_active_files(
+            self._session,
+            user_id=run.user_id,
+            chat_session_id=run.chat_session_id,
+        )
+        for source_file in source_files:
+            file_node_id = f"file:{source_file.id}"
+            nodes.append(
+                ResearchGraphNodeResponse(
+                    id=file_node_id,
+                    type="file",
+                    label=source_file.original_filename,
+                    description=source_file.processing_status.value,
+                    metadata={
+                        "session_file_id": str(source_file.id),
+                        "processing_status": source_file.processing_status.value,
+                        "processing_error": source_file.processing_error,
+                    },
+                )
+            )
+            edges.append(
+                ResearchGraphEdgeResponse(
+                    id=f"run:{run.id}->file:{source_file.id}",
+                    source=f"run:{run.id}",
+                    target=file_node_id,
+                    type="uses_source",
+                    label="использует источник",
+                )
+            )
+            for chunk in self._repository.list_chunks_for_file(self._session, session_file_id=source_file.id):
+                chunk_node_id = f"chunk:{chunk.id}"
+                if all(node.id != chunk_node_id for node in nodes):
+                    nodes.append(
+                        ResearchGraphNodeResponse(
+                            id=chunk_node_id,
+                            type="chunk",
+                            label=f"Фрагмент {chunk.position + 1}",
+                            description=chunk.content,
+                            metadata={
+                                "session_file_id": str(source_file.id),
+                                "chunk_id": str(chunk.id),
+                                "chunk_position": chunk.position,
+                            },
+                        )
+                    )
+                edges.append(
+                    ResearchGraphEdgeResponse(
+                        id=f"file:{source_file.id}->chunk:{chunk.id}",
+                        source=file_node_id,
+                        target=chunk_node_id,
+                        type="has_chunk",
+                        label="разбит на фрагмент",
+                    )
+                )
+
         for evidence in detail.evidence:
             chunk_node_id = f"chunk:{evidence.chunk_id}" if evidence.chunk_id else None
             if chunk_node_id is not None and all(node.id != chunk_node_id for node in nodes):
@@ -691,7 +746,7 @@ class ResearchService:
             self._check_cancelled(run)
             self._append_event_and_commit(run=run, stage=ResearchRunStage.INGESTION, progress_percent=10, message="Обработка источников началась.")
             files = self._repository.list_active_files(self._session, user_id=user.id, chat_session_id=chat_session.id)
-            chunks = self._prepare_document_chunks(files=files)
+            chunks = self._prepare_document_chunks(run=run, files=files)
             research_brief = self._research_brief(normalized_inputs)
             research_brief = self._apply_pipeline_settings_to_brief(research_brief, pipeline_settings)
             self._check_cancelled(run)
@@ -710,6 +765,13 @@ class ResearchService:
                 evidence_drafts=evidence_drafts,
                 source_chunks=evidence_source_chunks,
             )
+            self._append_event_and_commit(
+                run=run,
+                stage=ResearchRunStage.EVIDENCE,
+                progress_percent=48,
+                message=f"Evidence сохранены: {len(evidence)} шт.",
+                metadata={"evidence_count": len(evidence)},
+            )
             self._check_cancelled(run)
             self._append_event_and_commit(run=run, stage=ResearchRunStage.HYPOTHESIS_GENERATION, progress_percent=55, message="Генерация стартовых гипотез началась.")
             hypothesis_drafts = self._generate_hypothesis_drafts(
@@ -722,9 +784,17 @@ class ResearchService:
                 hypothesis_drafts=hypothesis_drafts,
                 evidence=evidence,
             )
+            self._append_event_and_commit(
+                run=run,
+                stage=ResearchRunStage.HYPOTHESIS_GENERATION,
+                progress_percent=62,
+                message=f"Стартовые гипотезы сохранены: {len(hypotheses)} шт.",
+                metadata={"hypothesis_count": len(hypotheses)},
+            )
             self._check_cancelled(run)
             self._append_event_and_commit(run=run, stage=ResearchRunStage.DEBATE, progress_percent=70, message="Debate loop начался.")
             refined_statements = self._create_debate_artifacts(
+                run=run,
                 hypothesis_drafts=hypothesis_drafts,
                 hypotheses=hypotheses,
                 evidence_drafts=evidence_drafts,
@@ -741,15 +811,64 @@ class ResearchService:
                 refined_statements=refined_statements,
                 evidence_drafts=evidence_drafts,
             )
+            self._append_event_and_commit(
+                run=run,
+                stage=ResearchRunStage.EVALUATION,
+                progress_percent=90,
+                message=f"Оценки агентов сохранены: {len(evaluation_payloads)} шт.",
+                metadata={"evaluation_count": len(evaluation_payloads)},
+            )
             self._check_cancelled(run)
             self._append_event_and_commit(run=run, stage=ResearchRunStage.JUDGE, progress_percent=93, message="Финальный судья формирует вердикт.")
-            self._create_judge_verdict(
+            self._append_event_and_commit(
+                run=run,
+                stage=ResearchRunStage.JUDGE,
+                progress_percent=94,
+                message="Судья сравнивает гипотезы между собой.",
+                metadata={"judge_step": "compare_hypotheses"},
+            )
+            self._append_event_and_commit(
+                run=run,
+                stage=ResearchRunStage.JUDGE,
+                progress_percent=95,
+                message="Судья проверяет доказательную базу и связи с evidence.",
+                metadata={"judge_step": "check_evidence"},
+            )
+            self._append_event_and_commit(
+                run=run,
+                stage=ResearchRunStage.JUDGE,
+                progress_percent=96,
+                message="Судья учитывает критику Защитника, Атакующего и Производственника.",
+                metadata={"judge_step": "review_debate"},
+            )
+            self._append_event_and_commit(
+                run=run,
+                stage=ResearchRunStage.JUDGE,
+                progress_percent=97,
+                message="Судья учитывает оценки дополнительных агентов.",
+                metadata={"judge_step": "review_evaluations"},
+            )
+            self._append_event_and_commit(
+                run=run,
+                stage=ResearchRunStage.JUDGE,
+                progress_percent=98,
+                message="Судья готовит итоговый приоритет и первые проверки.",
+                metadata={"judge_step": "prepare_ranking"},
+            )
+            verdict = self._create_judge_verdict(
                 run=run,
                 research_brief=research_brief,
                 hypothesis_drafts=hypothesis_drafts,
                 refined_statements=refined_statements,
                 evidence_drafts=evidence_drafts,
                 evaluation_payloads=evaluation_payloads,
+            )
+            self._append_event_and_commit(
+                run=run,
+                stage=ResearchRunStage.JUDGE,
+                progress_percent=99,
+                message="Вердикт судьи сохранён.",
+                metadata={"judge_verdict_id": str(verdict.id)},
             )
 
             run.status = ResearchRunStatus.COMPLETED
@@ -772,7 +891,7 @@ class ResearchService:
                 self._mark_run_failed(user=user, chat_session_id=chat_session_id, run_id=run.id, error=exc)
             raise
 
-    def _prepare_document_chunks(self, *, files: list[SessionFile]) -> list[DocumentChunk]:
+    def _prepare_document_chunks(self, *, run: ResearchRun, files: list[SessionFile]) -> list[DocumentChunk]:
         chunks: list[DocumentChunk] = []
         for session_file in files:
             try:
@@ -781,9 +900,23 @@ class ResearchService:
                     chunks.extend(existing_chunks)
                     if session_file.processing_status != DocumentProcessingStatus.PROCESSED:
                         self._set_file_processing_status(session_file, DocumentProcessingStatus.PROCESSED)
+                        self._append_event_and_commit(
+                            run=run,
+                            stage=ResearchRunStage.INGESTION,
+                            progress_percent=18,
+                            message=f"Файл уже подготовлен: {session_file.original_filename}.",
+                            metadata={"file_id": str(session_file.id), "filename": session_file.original_filename},
+                        )
                     continue
 
                 self._set_file_processing_status(session_file, DocumentProcessingStatus.PARSING)
+                self._append_event_and_commit(
+                    run=run,
+                    stage=ResearchRunStage.INGESTION,
+                    progress_percent=12,
+                    message=f"Парсинг файла: {session_file.original_filename}.",
+                    metadata={"file_id": str(session_file.id), "filename": session_file.original_filename},
+                )
                 extracted = self._text_extractor.extract(
                     path=self._settings.uploads_dir / session_file.object_key,
                     kind=session_file.kind,
@@ -794,6 +927,13 @@ class ResearchService:
                         session_file,
                         DocumentProcessingStatus.UNSUPPORTED,
                         error="Для этого формата пока нет текстового парсера.",
+                    )
+                    self._append_event_and_commit(
+                        run=run,
+                        stage=ResearchRunStage.INGESTION,
+                        progress_percent=16,
+                        message=f"Формат файла пока не поддержан: {session_file.original_filename}.",
+                        metadata={"file_id": str(session_file.id), "filename": session_file.original_filename},
                     )
                     continue
 
@@ -817,11 +957,29 @@ class ResearchService:
                     DocumentProcessingStatus.CHUNKED,
                     text_extracted_at=datetime.now(UTC),
                 )
+                self._append_event_and_commit(
+                    run=run,
+                    stage=ResearchRunStage.INGESTION,
+                    progress_percent=20,
+                    message=f"Файл разбит на фрагменты: {session_file.original_filename}.",
+                    metadata={
+                        "file_id": str(session_file.id),
+                        "filename": session_file.original_filename,
+                        "chunk_count": len([chunk for chunk in chunks if chunk.session_file_id == session_file.id]),
+                    },
+                )
             except (OSError, UnicodeDecodeError, ValidationError) as exc:
                 self._set_file_processing_status(
                     session_file,
                     DocumentProcessingStatus.FAILED,
                     error=str(exc)[:500],
+                )
+                self._append_event_and_commit(
+                    run=run,
+                    stage=ResearchRunStage.INGESTION,
+                    progress_percent=16,
+                    message=f"Ошибка обработки файла: {session_file.original_filename}.",
+                    metadata={"file_id": str(session_file.id), "filename": session_file.original_filename},
                 )
         return chunks
 
@@ -857,6 +1015,13 @@ class ResearchService:
         retrieval_service = self._require_retrieval_service()
         files_with_chunks = self._files_for_chunks(files=files or [], chunks=chunks)
         self._set_files_processing_status(files_with_chunks, DocumentProcessingStatus.INDEXED)
+        self._append_event_and_commit(
+            run=run,
+            stage=ResearchRunStage.RETRIEVAL,
+            progress_percent=28,
+            message="Фрагменты источников переданы на индексацию.",
+            metadata={"file_count": len(files_with_chunks), "chunk_count": len(chunks)},
+        )
         try:
             retrieval_service.ensure_chunk_embeddings(chunks)
         except Exception as exc:
@@ -868,6 +1033,13 @@ class ResearchService:
             raise
         self._session.flush()
         self._set_files_processing_status(files_with_chunks, DocumentProcessingStatus.PROCESSED)
+        self._append_event_and_commit(
+            run=run,
+            stage=ResearchRunStage.RETRIEVAL,
+            progress_percent=32,
+            message="Индексация фрагментов завершена.",
+            metadata={"file_count": len(files_with_chunks), "chunk_count": len(chunks)},
+        )
         query_vector = retrieval_service.embed_query(research_brief)
         if len(query_vector) == 3072 and any(chunk.embedding_vector is not None for chunk in chunks):
             retrieval_results = [
@@ -967,6 +1139,18 @@ class ResearchService:
                     ),
                 )
             )
+            self._append_event_and_commit(
+                run=run,
+                stage=ResearchRunStage.EVIDENCE,
+                progress_percent=44,
+                message=f"Evidence сохранён: {draft.title}.",
+                metadata={
+                    "evidence_index": len(evidence_items) - 1,
+                    "evidence_title": draft.title,
+                    "chunk_id": str(chunk.id) if chunk is not None else None,
+                    "session_file_id": str(chunk.session_file_id) if chunk is not None else None,
+                },
+            )
         return evidence_items
 
     def _generate_hypothesis_drafts(
@@ -1027,11 +1211,23 @@ class ResearchService:
                     created_by_role=None,
                 ),
             )
+            self._append_event_and_commit(
+                run=run,
+                stage=ResearchRunStage.HYPOTHESIS_GENERATION,
+                progress_percent=58,
+                message=f"Гипотеза создана: {draft.title}.",
+                metadata={
+                    "hypothesis_id": str(hypothesis.id),
+                    "hypothesis_title": draft.title,
+                    "hypothesis_position": index,
+                },
+            )
         return hypotheses
 
     def _create_debate_artifacts(
         self,
         *,
+        run: ResearchRun,
         hypothesis_drafts: list[HypothesisDraft],
         hypotheses: list[HypothesisCandidate],
         evidence_drafts: list[EvidenceDraft],
@@ -1042,6 +1238,13 @@ class ResearchService:
         for hypothesis, draft in zip(hypotheses, hypothesis_drafts, strict=True):
             current_draft = draft
             current_statement = draft.statement
+            self._append_event_and_commit(
+                run=run,
+                stage=ResearchRunStage.DEBATE,
+                progress_percent=70,
+                message=f"Началось обсуждение гипотезы: {hypothesis.title}.",
+                metadata={"hypothesis_id": str(hypothesis.id), "hypothesis_title": hypothesis.title},
+            )
             for round_number in range(1, round_limit + 1):
                 debate = orchestrator.debate_hypothesis(
                     hypothesis=current_draft,
@@ -1058,6 +1261,18 @@ class ResearchService:
                             content=content,
                         ),
                     )
+                    self._append_event_and_commit(
+                        run=run,
+                        stage=ResearchRunStage.DEBATE,
+                        progress_percent=72,
+                        message=f"{self._debate_role_label(role)} ответил по гипотезе: {hypothesis.title}.",
+                        metadata={
+                            "hypothesis_id": str(hypothesis.id),
+                            "hypothesis_title": hypothesis.title,
+                            "round_number": round_number,
+                            "actor_role": role.value,
+                        },
+                    )
                 self._repository.create_hypothesis_version(
                     self._session,
                     HypothesisVersion(
@@ -1067,6 +1282,17 @@ class ResearchService:
                         change_summary=debate.change_summary,
                         created_by_role=DebateRole.MANUFACTURER,
                     ),
+                )
+                self._append_event_and_commit(
+                    run=run,
+                    stage=ResearchRunStage.DEBATE,
+                    progress_percent=76,
+                    message=f"Гипотеза доработана после {round_number} цикла: {hypothesis.title}.",
+                    metadata={
+                        "hypothesis_id": str(hypothesis.id),
+                        "hypothesis_title": hypothesis.title,
+                        "round_number": round_number,
+                    },
                 )
                 current_statement = debate.refined_statement
                 current_draft = HypothesisDraft(
@@ -1103,6 +1329,19 @@ class ResearchService:
         evaluation_payloads: list[dict[str, object]] = []
         for index, hypothesis in enumerate(hypotheses):
             for evaluator_key, evaluator_name, user_agent_id, evaluator_prompt in evaluators:
+                self._append_event_and_commit(
+                    run=run,
+                    stage=ResearchRunStage.EVALUATION,
+                    progress_percent=84,
+                    message=f"{evaluator_name} оценивает гипотезу: {hypothesis.title}.",
+                    metadata={
+                        "hypothesis_id": str(hypothesis.id),
+                        "hypothesis_title": hypothesis.title,
+                        "evaluator_key": evaluator_key,
+                        "evaluator_name": evaluator_name,
+                        "user_agent_id": str(user_agent_id) if user_agent_id else None,
+                    },
+                )
                 draft = orchestrator.evaluate_hypothesis(
                     evaluator_key=evaluator_key,
                     evaluator_name=evaluator_name,
@@ -1124,6 +1363,19 @@ class ResearchService:
                         rationale=draft.rationale,
                         risk_notes=draft.risk_notes,
                     ),
+                )
+                self._append_event_and_commit(
+                    run=run,
+                    stage=ResearchRunStage.EVALUATION,
+                    progress_percent=88,
+                    message=f"{evaluator_name} сохранил оценку гипотезы: {hypothesis.title}.",
+                    metadata={
+                        "hypothesis_id": str(hypothesis.id),
+                        "hypothesis_title": hypothesis.title,
+                        "evaluator_key": evaluator_key,
+                        "evaluator_name": evaluator_name,
+                        "user_agent_id": str(user_agent_id) if user_agent_id else None,
+                    },
                 )
                 evaluation_payloads.append(
                     {
@@ -1421,6 +1673,14 @@ class ResearchService:
         if isinstance(error, ServiceError):
             return ResearchService._short_text(error.detail, 2000)
         return "Внутренняя ошибка исследовательского пайплайна"
+
+    @staticmethod
+    def _debate_role_label(role: DebateRole) -> str:
+        return {
+            DebateRole.DEFENDER: "Защитник",
+            DebateRole.ATTACKER: "Атакующий",
+            DebateRole.MANUFACTURER: "Производственник",
+        }.get(role, role.value)
 
     @staticmethod
     def _apply_pipeline_settings_to_brief(research_brief: str, pipeline_settings) -> str:

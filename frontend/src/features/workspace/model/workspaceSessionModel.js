@@ -263,7 +263,7 @@ export function applyResearchRunProgressToSession(session, progress) {
     activeRunVersionId: run.id,
     activeResearchRunId: run.id,
     researchProgress: progress,
-    isStarted: run.status === "running" || session.isStarted,
+    isStarted: run.status === "running" || run.status === "completed",
     isVerdictComplete: run.status === "completed" ? session.isVerdictComplete : false,
     isPendingDraft: false,
     isEditingRunVersion: false,

@@ -136,6 +136,7 @@ function mapGraphNodeType(type) {
   switch (type) {
     case "input":
       return "brief";
+    case "file":
     case "chunk":
       return "source";
     case "debate_message":
@@ -155,6 +156,7 @@ function mapGraphNodeZone(type) {
     case "input":
     case "run":
       return "brief";
+    case "file":
     case "chunk":
       return "sources";
     case "evidence":

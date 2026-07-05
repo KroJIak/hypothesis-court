@@ -76,8 +76,16 @@ const WORKSPACE_NOTIFICATION_TTL_MS = 4200;
 const WORKSPACE_NOTIFICATION_LIMIT = 5;
 const SESSION_FILE_STATUS_POLL_INTERVAL_MS = 1600;
 const RESEARCH_RUN_PROGRESS_POLL_INTERVAL_MS = 1400;
+const RESEARCH_GRAPH_POLL_INTERVAL_MS = 2200;
 const LOCAL_PENDING_AGENT_ID_PREFIX = "pending-agent-";
 const TERMINAL_RESEARCH_RUN_STATUSES = new Set(["completed", "failed", "cancelled"]);
+const RESEARCH_RUN_DETAIL_POLL_STAGES = new Set([
+  "evidence",
+  "hypothesis_generation",
+  "debate",
+  "evaluation",
+  "judge",
+]);
 
 function createLocalPendingAgent() {
   const id =
@@ -585,8 +593,14 @@ export function WorkspacePage({
     const controller = new AbortController();
     let intervalId = null;
     let didReportTerminalError = false;
+    let isPollingResearchRun = false;
 
     async function pollResearchRunProgress() {
+      if (isPollingResearchRun) {
+        return;
+      }
+
+      isPollingResearchRun = true;
       try {
         const progress = await getResearchRunProgress({
           accessToken,
@@ -596,6 +610,26 @@ export function WorkspacePage({
         });
 
         if (!TERMINAL_RESEARCH_RUN_STATUSES.has(progress.run.status)) {
+          if (RESEARCH_RUN_DETAIL_POLL_STAGES.has(progress.currentStage)) {
+            const loadedRun = await getResearchRun({
+              accessToken,
+              chatSessionId: selectedChatId,
+              runId,
+              signal: controller.signal,
+            });
+            setSessions((currentSessions) =>
+              currentSessions.map((session) =>
+                session.id === selectedChatId
+                  ? {
+                      ...applyResearchRunToSession(session, loadedRun),
+                      researchProgress: progress,
+                    }
+                  : session,
+              ),
+            );
+            return;
+          }
+
           setSessions((currentSessions) =>
             currentSessions.map((session) =>
               session.id === selectedChatId
@@ -650,6 +684,8 @@ export function WorkspacePage({
         }
 
         showWorkspaceError(error, "Не удалось обновить состояние запуска");
+      } finally {
+        isPollingResearchRun = false;
       }
     }
 
@@ -669,6 +705,67 @@ export function WorkspacePage({
     shouldPollResearchRun,
     showWorkspaceError,
     showWorkspaceNotification,
+    status,
+  ]);
+
+  useEffect(() => {
+    const runId = selectedSession?.activeResearchRunId;
+
+    if (status !== "success" || !selectedChatId || !runId || !activeKnowledgeGraphTarget || !isProcessRunning) {
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    let isPollingGraph = false;
+
+    async function pollResearchGraph() {
+      if (isPollingGraph) {
+        return;
+      }
+
+      isPollingGraph = true;
+      try {
+        const knowledgeGraph = await getResearchGraph({
+          accessToken,
+          chatSessionId: selectedChatId,
+          runId,
+          signal: controller.signal,
+        });
+
+        setSessions((currentSessions) =>
+          currentSessions.map((session) =>
+            session.id === selectedChatId
+              ? {
+                  ...session,
+                  knowledgeGraph,
+                  knowledgeGraphRunId: runId,
+                }
+              : session,
+          ),
+        );
+      } catch (error) {
+        if (error?.name !== "AbortError") {
+          showWorkspaceError(error, "Не удалось обновить граф знаний");
+        }
+      } finally {
+        isPollingGraph = false;
+      }
+    }
+
+    void pollResearchGraph();
+    const intervalId = window.setInterval(pollResearchGraph, RESEARCH_GRAPH_POLL_INTERVAL_MS);
+
+    return () => {
+      controller.abort();
+      window.clearInterval(intervalId);
+    };
+  }, [
+    accessToken,
+    activeKnowledgeGraphTarget,
+    isProcessRunning,
+    selectedChatId,
+    selectedSession?.activeResearchRunId,
+    showWorkspaceError,
     status,
   ]);
 
@@ -1536,10 +1633,7 @@ export function WorkspacePage({
       isPendingDraft: true,
       launchedRequests: [],
       composerRequests: restoredRequests,
-      hypotheses: [],
-      answer: "",
       isVerdictComplete: false,
-      consultationMessages: [],
     }));
 
     if (selectedSession.activeResearchRunId) {
@@ -1553,11 +1647,16 @@ export function WorkspacePage({
           chatSessionId: selectedSession.id,
           runId: selectedSession.activeResearchRunId,
         }))
-        .then((progress) => {
+        .then(async (progress) => {
+          const loadedRun = await getResearchRun({
+            accessToken,
+            chatSessionId: selectedSession.id,
+            runId: selectedSession.activeResearchRunId,
+          });
           setSessions((currentSessions) =>
             currentSessions.map((session) =>
               session.id === selectedSession.id
-                ? applyResearchRunProgressToSession(session, progress)
+                ? applyResearchRunProgressToSession(applyResearchRunToSession(session, loadedRun), progress)
                 : session,
             ),
           );
