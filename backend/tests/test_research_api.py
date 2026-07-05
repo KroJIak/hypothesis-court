@@ -142,3 +142,28 @@ def test_research_api_contracts(monkeypatch, tmp_path):
     assert pdf_export_response.status_code == 200
     assert pdf_export_response.json()["content_encoding"] == "base64"
     assert base64.b64decode(pdf_export_response.json()["content"]).startswith(b"%PDF")
+
+
+def test_current_user_can_download_own_avatar(tmp_path):
+    avatar_object_key = "avatars/avatar.png"
+    user = User(
+        id=uuid.uuid4(),
+        username="researcher",
+        password_hash="hash",
+        token_version=1,
+        avatar_object_key=avatar_object_key,
+    )
+    settings = make_settings(tmp_path)
+    avatar_path = tmp_path / avatar_object_key
+    avatar_path.parent.mkdir(parents=True)
+    avatar_path.write_bytes(b"\x89PNG\r\n\x1a\navatar")
+
+    app = create_app()
+    app.dependency_overrides[get_current_user] = lambda: user
+    app.dependency_overrides[get_settings] = lambda: settings
+    client = TestClient(app)
+
+    response = client.get(f"/uploads/{avatar_object_key}")
+
+    assert response.status_code == 200
+    assert response.content == b"\x89PNG\r\n\x1a\navatar"

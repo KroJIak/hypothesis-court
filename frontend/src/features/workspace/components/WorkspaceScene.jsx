@@ -3,7 +3,6 @@ import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { DebateStage } from "./DebateStage";
 import { EvaluationStage } from "./EvaluationStage";
 import { HypothesisCandidates } from "./HypothesisCandidates";
-import { ResearchProcessChats } from "./ResearchProcessChats";
 import { createResearchProgressView } from "../model/researchProgressViewModel";
 import { getElementCenter, createStraightPath } from "../utils/geometry";
 
@@ -450,10 +449,6 @@ export function WorkspaceScene({
         isAgentEditingLocked={isAgentEditingLocked}
         onOpenAgentHistory={onOpenAgentHistory}
         verdictActions={verdictActions}
-      />
-      <ResearchProcessChats
-        session={session}
-        isVisible={session.isStarted || Boolean(session.activeResearchRunId)}
       />
       {isAnswerVisible ? (
         <div

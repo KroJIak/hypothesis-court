@@ -61,14 +61,37 @@ function getDebateAgent(session, roleId) {
   };
 }
 
-function createDebateMessages(session, targetAgent, hypothesis) {
+function getManufacturerAgent(session) {
+  return getDebateAgent(session, "manufacturer");
+}
+
+function getDebateMessageSide(role) {
+  if (role === "attacker") {
+    return "right";
+  }
+
+  if (role === "manufacturer") {
+    return "center";
+  }
+
+  return "left";
+}
+
+function getLatestManufacturerMessage(hypothesis) {
+  return (hypothesis.debateMessages ?? [])
+    .filter((message) => message.role === "manufacturer")
+    .sort((firstMessage, secondMessage) =>
+      secondMessage.roundNumber - firstMessage.roundNumber
+      || new Date(secondMessage.createdAt).getTime() - new Date(firstMessage.createdAt).getTime(),
+    )[0] ?? null;
+}
+
+function createDebateMessages(session, hypothesis) {
   const source = getPrimarySource(session, hypothesis);
-  const visibleRoleId = targetAgent?.id;
   const messages = [];
   let currentRound = null;
 
   (hypothesis.debateMessages ?? [])
-    .filter((message) => !visibleRoleId || message.role === visibleRoleId)
     .sort((firstMessage, secondMessage) =>
       firstMessage.roundNumber - secondMessage.roundNumber
       || new Date(firstMessage.createdAt).getTime() - new Date(secondMessage.createdAt).getTime(),
@@ -85,7 +108,7 @@ function createDebateMessages(session, targetAgent, hypothesis) {
       messages.push({
         id: message.id,
         type: "message",
-        side: "left",
+        side: getDebateMessageSide(message.role),
         agent: getDebateAgent(session, message.role),
         text: message.content,
         source,
@@ -97,8 +120,9 @@ function createDebateMessages(session, targetAgent, hypothesis) {
 
 function createEvaluationMessages(session, targetAgent, hypothesis) {
   const source = getPrimarySource(session, hypothesis);
-
-  return (hypothesis.evaluations ?? [])
+  const manufacturerMessage = getLatestManufacturerMessage(hypothesis);
+  const messages = [];
+  const evaluationMessages = (hypothesis.evaluations ?? [])
     .filter((evaluation) =>
       evaluation.userAgentId === targetAgent?.id
       || evaluation.evaluatorKey === targetAgent?.id,
@@ -119,24 +143,62 @@ function createEvaluationMessages(session, targetAgent, hypothesis) {
       ].filter(Boolean).join(" "),
       source,
     }));
+
+  if (manufacturerMessage) {
+    messages.push({
+      id: `${manufacturerMessage.id}-for-evaluation-${targetAgent?.id ?? "agent"}`,
+      type: "message",
+      side: "right",
+      agent: getManufacturerAgent(session),
+      text: manufacturerMessage.content,
+      source,
+    });
+  }
+
+  return [...messages, ...evaluationMessages];
 }
 
 function createJudgeMessages(session, hypothesis) {
-  if (!session.verdict) {
-    return [];
+  const source = getPrimarySource(session, hypothesis);
+  const manufacturerMessage = getLatestManufacturerMessage(hypothesis);
+  const messages = [];
+
+  if (manufacturerMessage) {
+    messages.push({
+      id: `${manufacturerMessage.id}-for-judge`,
+      type: "message",
+      side: "left",
+      agent: getManufacturerAgent(session),
+      text: manufacturerMessage.content,
+      source,
+    });
   }
 
-  return [{
-    id: `${hypothesis.id}-judge-verdict`,
-    type: "message",
-    side: "left",
-    agent: session.evaluation?.judge,
-    text: [
-      session.verdict.summary,
-      session.verdict.recommendation,
-    ].filter(Boolean).join(" "),
-    source: getPrimarySource(session, hypothesis),
-  }];
+  for (const evaluation of hypothesis.evaluations ?? []) {
+    const agent = (session.evaluation?.agents ?? []).find((candidate) =>
+      candidate.id === evaluation.userAgentId
+      || candidate.id === evaluation.evaluatorKey,
+    ) ?? {
+      id: evaluation.evaluatorKey,
+      name: evaluation.evaluatorName,
+      variant: evaluation.evaluatorKey,
+    };
+
+    messages.push({
+      id: `${evaluation.id}-for-judge`,
+      type: "message",
+      side: "left",
+      agent,
+      text: [
+        evaluation.verdict,
+        evaluation.rationale,
+        evaluation.riskNotes ? `Риски: ${evaluation.riskNotes}` : "",
+      ].filter(Boolean).join(" "),
+      source,
+    });
+  }
+
+  return messages;
 }
 
 function createHistoryTabs(session, target) {
@@ -144,6 +206,7 @@ function createHistoryTabs(session, target) {
 
   return hypotheses.map((hypothesis, index) => ({
     id: hypothesis.id,
+    buttonLabel: `Гипотеза ${index + 1}`,
     title: hypothesis.title || `Гипотеза ${index + 1}`,
     messages: createHistoryMessages(session, target, hypothesis),
   }));
@@ -151,7 +214,7 @@ function createHistoryTabs(session, target) {
 
 function createHistoryMessages(session, target, hypothesis) {
   if (target.type === "debate") {
-    return createDebateMessages(session, target.agent, hypothesis);
+    return createDebateMessages(session, hypothesis);
   }
 
   if (target.type === "judge") {
@@ -159,6 +222,18 @@ function createHistoryMessages(session, target, hypothesis) {
   }
 
   return createEvaluationMessages(session, target.agent, hypothesis);
+}
+
+function getHistoryTitle(target) {
+  if (target.type === "debate") {
+    return "Общий чат троицы";
+  }
+
+  if (target.type === "judge") {
+    return "Материалы для судьи";
+  }
+
+  return getAgentDisplayName(target.agent);
 }
 
 export function AgentMessageHistoryModal({
@@ -256,7 +331,7 @@ export function AgentMessageHistoryModal({
 
         <header className="agent-history-modal__header">
           <span className="agent-history-modal__eyebrow">История сообщений</span>
-          <h2 className="agent-history-modal__title">{getAgentDisplayName(target.agent)}</h2>
+          <h2 className="agent-history-modal__title">{getHistoryTitle(target)}</h2>
         </header>
 
         {historyTabs.length > 0 ? (
@@ -274,10 +349,14 @@ export function AgentMessageHistoryModal({
                 aria-selected={activeTab?.id === tab.id}
                 onClick={() => setActiveHypothesisId(tab.id)}
               >
-                {tab.title}
+                {tab.buttonLabel}
               </button>
             ))}
           </div>
+        ) : null}
+
+        {activeTab ? (
+          <h3 className="agent-history-modal__hypothesis-title">{activeTab.title}</h3>
         ) : null}
 
         <div className="agent-history-modal__body">
@@ -318,6 +397,9 @@ export function AgentMessageHistoryModal({
                         ) : null}
                       </p>
                     </div>
+                    {message.side === "center" ? (
+                      <AgentAvatar variant={message.agent?.variant} size="compact" />
+                    ) : null}
                   </article>
                 )
               ))}
