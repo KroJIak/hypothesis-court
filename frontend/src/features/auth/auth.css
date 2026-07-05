@@ -122,6 +122,26 @@
   padding: 32px;
 }
 
+.auth-organizer-notice {
+  display: grid;
+  gap: 7px;
+  width: min(100%, 384px);
+  margin-bottom: 18px;
+  padding: 14px 16px;
+  border: 1px solid rgba(245, 196, 74, 0.55);
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(245, 196, 74, 0.94), rgba(228, 166, 45, 0.88));
+  color: #171207;
+  box-shadow: 0 18px 52px rgba(0, 0, 0, 0.26);
+  font-size: 0.86rem;
+  line-height: 1.32;
+}
+
+.auth-organizer-notice strong {
+  font-weight: 850;
+  letter-spacing: 0.035em;
+}
+
 .auth-panel__header,
 .auth-form {
   width: min(100%, 384px);

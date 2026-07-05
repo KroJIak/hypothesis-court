@@ -132,6 +132,7 @@ export function SidebarAccountControl({
           aria-label="Меню профиля"
         >
           <AccountMenuView
+            accessToken={accessToken}
             canOpenAdminPanel={Boolean(user?.is_admin)}
             displayName={displayName}
             profile={profile}
@@ -146,6 +147,7 @@ export function SidebarAccountControl({
 
       {activeView === SETTINGS_VIEW ? (
         <AccountSettingsView
+          accessToken={accessToken}
           errorMessage={errorMessage}
           onClose={handleCloseModal}
           onLogout={onLogout}
@@ -171,6 +173,7 @@ export function SidebarAccountControl({
         onClick={handleOpenMenu}
       >
         <AccountAvatar
+          accessToken={accessToken}
           user={user}
           avatarUrl={profile?.avatarUrl ?? null}
           className="account-button__avatar"

@@ -362,6 +362,7 @@ export function WorkspacePage({
   const lastRunDetailPollKeyRef = useRef(new Map());
   const graphRequestsRef = useRef(new Map());
   const newAgentBaselineByIdRef = useRef(new Map());
+  const sessionsRef = useRef([]);
   const deferredChatSearchQuery = useDeferredValue(chatSearchQuery);
   const selectedSession = sessions.find((session) => session.id === selectedChatId) ?? sessions[0] ?? null;
   const selectedSessionAvailableAgents = selectedSession && data
@@ -389,6 +390,10 @@ export function WorkspacePage({
   const agentEditingLockedReason = selectedSession?.isVerdictComplete
     ? "Агентов нельзя выставлять в завершенном чате."
     : "Агентов можно выставлять только до старта процесса.";
+
+  useEffect(() => {
+    sessionsRef.current = sessions;
+  }, [sessions]);
 
   const showWorkspaceNotification = useCallback((message, type = "info") => {
     if (!message) {
@@ -1095,18 +1100,34 @@ export function WorkspacePage({
       return;
     }
 
+    const chatSessionId = selectedSession.id;
+    const uploadStartedInBranchDraft = Boolean(selectedSession.isEditingRunVersion);
+
     setIsUploadingSessionFile(true);
     try {
       for (const file of files) {
         const uploadedFile = await uploadSessionFile({
           accessToken,
-          chatSessionId: selectedSession.id,
+          chatSessionId,
           file,
         });
+        const latestSession = sessionsRef.current.find((session) => session.id === chatSessionId);
+
+        if (
+          uploadStartedInBranchDraft
+          && (!latestSession?.isEditingRunVersion || !Array.isArray(latestSession.branchDraftBaseAttachmentIds))
+        ) {
+          await deleteSessionFile({
+            accessToken,
+            chatSessionId,
+            sessionFileId: uploadedFile.id,
+          });
+          continue;
+        }
 
         setSessions((currentSessions) =>
           currentSessions.map((session) =>
-            session.id === selectedSession.id
+            session.id === chatSessionId
               ? {
                   ...session,
                   attachments: [

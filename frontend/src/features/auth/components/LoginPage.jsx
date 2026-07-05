@@ -3,6 +3,9 @@ import { ArrowRight, KeyRound, LoaderCircle, Scale, UserRound } from "lucide-rea
 
 import "../auth.css";
 
+const organizerSuperadminUsername = import.meta.env.VITE_ORGANIZER_SUPERADMIN_USERNAME || "не настроен";
+const organizerSuperadminPassword = import.meta.env.VITE_ORGANIZER_SUPERADMIN_PASSWORD || "не настроен";
+
 export function LoginPage({ errorMessage, isSubmitting, onLogin }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -41,6 +44,12 @@ export function LoginPage({ errorMessage, isSubmitting, onLogin }) {
       </section>
 
       <section className="auth-panel" aria-label="Форма входа">
+        <div className="auth-organizer-notice" aria-label="Данные доступа для организаторов">
+          <strong>ДЛЯ ОРГАНИЗАТОРОВ ХАКАТОНА:</strong>
+          <span>ЛОГИН СУПЕРАДМИНА: {organizerSuperadminUsername}</span>
+          <span>ПАРОЛЬ СУПЕРАДМИНА: {organizerSuperadminPassword}</span>
+        </div>
+
         <div className="auth-panel__header">
           <h2 className="auth-panel__title">Вход</h2>
         </div>
