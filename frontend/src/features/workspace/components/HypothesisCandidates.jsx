@@ -138,8 +138,13 @@ export function HypothesisCandidates({
 
     const updateCardWidth = () => {
       const sectionStyle = window.getComputedStyle(sectionElement);
+      const agentSize = Number.parseFloat(sectionStyle.getPropertyValue("--hypothesis-agent-size")) || 44;
       const gap = Number.parseFloat(sectionStyle.getPropertyValue("--hypothesis-card-gap")) || 8;
-      const nextCardWidth = (sectionElement.clientWidth - gap * (HYPOTHESIS_VISIBLE_COUNT - 1)) / HYPOTHESIS_VISIBLE_COUNT;
+      const sideGap = Number.parseFloat(sectionStyle.getPropertyValue("--hypothesis-gap")) || gap;
+      const graphButtonWidth = 42;
+      const reservedInlineSpace = (agentSize + graphButtonWidth + sideGap * 2);
+      const availableListWidth = Math.max(1, sectionElement.clientWidth - reservedInlineSpace);
+      const nextCardWidth = (availableListWidth - gap * (HYPOTHESIS_VISIBLE_COUNT - 1)) / HYPOTHESIS_VISIBLE_COUNT;
 
       setCardWidth(Math.max(1, nextCardWidth));
     };

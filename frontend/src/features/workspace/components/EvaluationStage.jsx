@@ -19,6 +19,7 @@ export function EvaluationStage({
   consultationMessages = [],
   isAnswerVisible,
   isVerdictTypewriterReady,
+  shouldAnimateVerdict,
   hideAgentStatus,
   onVerdictComplete,
   onAgentAvatarRef,
@@ -266,6 +267,7 @@ export function EvaluationStage({
             sessionId={sessionId}
             onComplete={onVerdictComplete}
             isReadyToType={isVerdictTypewriterReady}
+            shouldAnimate={shouldAnimateVerdict}
           />
           {verdictActions ? <JudgeVerdictActions {...verdictActions} /> : null}
           {consultationMessages.length > 0 ? (

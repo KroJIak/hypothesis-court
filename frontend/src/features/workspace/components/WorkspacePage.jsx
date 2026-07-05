@@ -336,6 +336,7 @@ export function WorkspacePage({
   const [activeAgentHistoryTarget, setActiveAgentHistoryTarget] = useState(null);
   const [activeKnowledgeGraphTarget, setActiveKnowledgeGraphTarget] = useState(null);
   const [pendingRunChatIds, setPendingRunChatIds] = useState(() => new Set());
+  const [animatedVerdictRunIds, setAnimatedVerdictRunIds] = useState(() => new Set());
   const sceneScrollRef = useRef(null);
   const addAgentFrameRef = useRef(null);
   const notificationTimeoutsRef = useRef(new Map());
@@ -362,6 +363,10 @@ export function WorkspacePage({
   const isProcessRunning = selectedSession
     ? activeRunStatus === "running" || pendingRunChatIds.has(selectedSession.id)
     : false;
+  const shouldAnimateVerdict = Boolean(
+    selectedSession?.activeRunVersionId
+    && animatedVerdictRunIds.has(selectedSession.activeRunVersionId),
+  );
   const shouldPollSessionFiles = isProcessRunning && (selectedSession?.attachments ?? []).length > 0;
   const shouldPollResearchRun = Boolean(selectedSession?.activeResearchRunId) && activeRunStatus === "running";
   const agentEditingLockedReason = selectedSession?.isVerdictComplete
@@ -395,6 +400,14 @@ export function WorkspacePage({
   const showWorkspaceError = useCallback((error, fallbackMessage) => {
     showWorkspaceNotification(error instanceof Error ? error.message : fallbackMessage, "error");
   }, [showWorkspaceNotification]);
+
+  function markVerdictAnimationRun(runId) {
+    if (!runId) {
+      return;
+    }
+
+    setAnimatedVerdictRunIds((currentRunIds) => new Set(currentRunIds).add(runId));
+  }
 
   useEffect(() => () => {
     for (const timeoutId of notificationTimeoutsRef.current.values()) {
@@ -656,6 +669,7 @@ export function WorkspacePage({
             signal: controller.signal,
           });
           resetJudgeVerdict(selectedChatId);
+          markVerdictAnimationRun(runId);
           setSessions((currentSessions) =>
             currentSessions.map((session) =>
               session.id === selectedChatId
@@ -1590,6 +1604,9 @@ export function WorkspacePage({
     runRequest
       .then((run) => {
         resetJudgeVerdict(selectedSession.id);
+        if (run.status === "completed") {
+          markVerdictAnimationRun(run.id);
+        }
         setSessions((currentSessions) =>
           currentSessions.map((session) =>
             session.id === selectedSession.id
@@ -1853,6 +1870,9 @@ export function WorkspacePage({
     })
       .then((run) => {
         resetJudgeVerdict(selectedSession.id);
+        if (run.status === "completed") {
+          markVerdictAnimationRun(run.id);
+        }
         setSessions((currentSessions) =>
           currentSessions.map((session) =>
             session.id === selectedSession.id
@@ -1949,6 +1969,7 @@ export function WorkspacePage({
             onOpenAgentHistory={handleOpenAgentHistory}
             onOpenKnowledgeGraph={handleOpenKnowledgeGraph}
             isProcessRunning={isProcessRunning}
+            shouldAnimateVerdict={shouldAnimateVerdict}
             verdictActions={verdictActions}
           />
         </div>

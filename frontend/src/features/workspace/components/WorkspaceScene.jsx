@@ -30,6 +30,7 @@ export function WorkspaceScene({
   onOpenAgentHistory,
   onOpenKnowledgeGraph,
   isProcessRunning,
+  shouldAnimateVerdict,
   verdictActions,
 }) {
   const sceneRef = useRef(null);
@@ -437,6 +438,7 @@ export function WorkspaceScene({
         consultationMessages={session.consultationMessages ?? []}
         isAnswerVisible={isAnswerVisible}
         isVerdictTypewriterReady={isVerdictTypewriterReady}
+        shouldAnimateVerdict={shouldAnimateVerdict}
         hideAgentStatus={!hasHypotheses && !progressView.hasAgentStatus}
         onVerdictComplete={onVerdictComplete}
         onAgentAvatarRef={setEvaluationAvatarRef}

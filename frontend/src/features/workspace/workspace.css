@@ -1119,7 +1119,7 @@
   flex: 0 0 var(--hypothesis-card-width);
   height: 74px;
   min-width: 0;
-  overflow: visible;
+  overflow: hidden;
   border-radius: 15px;
   background: rgba(255, 255, 255, 0.045);
   color: rgba(244, 244, 244, 0.88);
@@ -1169,6 +1169,7 @@
 }
 
 .hypothesis-card__title {
+  display: block;
   position: relative;
   z-index: 1;
   margin: 0 0 5px;
@@ -1176,6 +1177,9 @@
   font-size: 0.78rem;
   font-weight: 600;
   line-height: 1.1;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -1436,12 +1440,15 @@
 }
 
 .hypothesis-card-preview__title {
+  display: -webkit-box;
   margin: 0 0 6px;
   color: #f4f4f4;
   font-size: 0.78rem;
   font-weight: 600;
   line-height: 1.1;
-  white-space: nowrap;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .hypothesis-card-preview__description {
