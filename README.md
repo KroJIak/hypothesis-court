@@ -261,3 +261,9 @@ docs/      продуктовая и архитектурная документ
 docker compose down
 docker compose up --build
 ```
+
+## Контекст разработки
+
+Проект был сделан в рамках хакатона [НОРНИКЕЛЬ AI SCIENCE HACK 2026](https://nornickel-ai-hackathon.ru/).
+
+Команда работала над задачей `Фабрика гипотез`.
