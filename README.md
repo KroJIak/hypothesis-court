@@ -1,28 +1,28 @@
 # Hypothesis Court
 
 <p align="center">
-  <strong>Explainable R&amp;D workspace</strong> for turning KPI, constraints, and source materials into ranked hypotheses, internal debate, and a final recommendation.
+  Платформа для исследовательских сессий, в которой KPI, ограничения и исходные материалы превращаются в набор гипотез, обсуждение, оценку и итоговую рекомендацию.
 </p>
 
 <p align="center">
   <img alt="FastAPI" src="https://img.shields.io/badge/backend-FastAPI-111111?style=flat-square">
   <img alt="React" src="https://img.shields.io/badge/frontend-React-111111?style=flat-square">
   <img alt="PostgreSQL" src="https://img.shields.io/badge/database-PostgreSQL%20%2B%20pgvector-111111?style=flat-square">
-  <img alt="Docker Compose" src="https://img.shields.io/badge/runtime-Docker%20Compose-111111?style=flat-square">
+  <img alt="Docker Compose" src="https://img.shields.io/badge/запуск-Docker%20Compose-111111?style=flat-square">
 </p>
 
 <p align="center">
-  <img src="./docs/readme-assets/readme-workspace-overview.png" alt="Hypothesis Court workspace overview" width="100%">
+  <img src="./docs/readme-assets/readme-workspace-overview.png" alt="Общий вид рабочей среды Hypothesis Court" width="100%">
 </p>
 
 <p align="center">
-  Session-based research pipeline • Evidence-first reasoning • Debate loop • Knowledge graph • Verdict and ranking
+  Исследовательская сессия • Работа с фактами и ограничениями • Цикл обсуждения гипотез • Граф знаний • Итоговая оценка
 </p>
 
 <p align="center">
   <a href="#что-это">Что это</a> •
   <a href="#галерея">Галерея</a> •
-  <a href="#как-работает-продукт">Flow</a> •
+  <a href="#как-работает-проект">Как это работает</a> •
   <a href="#архитектура">Архитектура</a> •
   <a href="#быстрый-запуск">Запуск</a> •
   <a href="#как-проект-развивался">История</a>
@@ -33,46 +33,48 @@
     <td align="center"><strong>3-5</strong><br>стартовых гипотез</td>
     <td align="center"><strong>5</strong><br>слоев исследовательского контура</td>
     <td align="center"><strong>10+</strong><br>поддерживаемых форматов источников</td>
-    <td align="center"><strong>1</strong><br>workspace для evidence, debate и verdict</td>
+    <td align="center"><strong>1</strong><br>рабочая среда для фактов, обсуждения и вывода</td>
   </tr>
 </table>
 
 ## Что это
 
-**Hypothesis Court** не пытается быть обычным чатом с LLM. Это исследовательская рабочая среда, в которой:
+**Hypothesis Court** — система для исследовательских и инженерных команд, которым нужно работать с задачей, источниками, гипотезами и итоговой оценкой в рамках одной сессии.
+
+В проекте:
 
 - пользователь формулирует `KPI`, ограничения и контекст;
 - загружает документы, таблицы, PDF и изображения;
-- получает `evidence pack`, а не просто текстовый ответ;
+- получает набор фактов и ограничений, привязанный к источникам;
 - видит стартовый набор из `3-5` гипотез;
-- наблюдает `debate loop` по каждой гипотезе;
-- получает независимую оценку, ranking и verdict judge;
-- может открыть knowledge graph и пройти весь путь от исходников до рекомендации.
+- наблюдает цикл обсуждения по каждой гипотезе;
+- получает независимую оценку, ранжирование и итоговый вывод;
+- может открыть граф знаний и проследить путь от исходников до рекомендации.
 
 Результат одной исследовательской сессии:
 
-- `research brief`
-- `source bundle`
-- `evidence pack`
-- `initial hypothesis set`
-- `hypothesis versions`
-- `debate transcript`
-- `evaluation sheet`
-- `ranking sheet`
-- `final recommendation`
+- постановка задачи;
+- набор загруженных источников;
+- набор фактов, рисков и ограничений;
+- стартовый набор гипотез;
+- версии гипотез после обсуждения;
+- история обсуждения;
+- результаты оценки;
+- ранжирование вариантов;
+- итоговая рекомендация.
 
 ## Чем проект силен
 
 <table>
   <tr>
-    <td width="33%"><strong>Evidence-first workflow</strong><br>Гипотезы не висят в воздухе, а опираются на конкретные фрагменты документов.</td>
-    <td width="33%"><strong>Agent debate</strong><br>Каждая гипотеза проходит Defender, Attacker и Manufacturer вместо одного прямого ответа.</td>
-    <td width="33%"><strong>Explainability by design</strong><br>Пользователь видит не только verdict, но и весь маршрут от brief до ranking.</td>
+    <td width="33%"><strong>Опора на источники</strong><br>Гипотезы связаны с конкретными фрагментами документов, а не только с итоговым текстом модели.</td>
+    <td width="33%"><strong>Ролевое обсуждение</strong><br>Каждая гипотеза проходит через защиту, критику и проверку реализуемости.</td>
+    <td width="33%"><strong>Прозрачность хода работы</strong><br>Пользователь видит не только итог, но и путь от вводных данных до ранжирования.</td>
   </tr>
   <tr>
-    <td width="33%"><strong>Knowledge graph</strong><br>Связывает вводные, файлы, evidence, гипотезы, оценки и следующий шаг.</td>
-    <td width="33%"><strong>Versioned research runs</strong><br>Позволяет хранить и переключать версии исследования внутри одной сессии.</td>
-    <td width="33%"><strong>Admin and provider control</strong><br>Настраивает пользователей, текстовый провайдер и embedding-провайдер без правки кода.</td>
+    <td width="33%"><strong>Граф знаний</strong><br>Связывает вводные, файлы, факты, гипотезы, оценки и следующий шаг.</td>
+    <td width="33%"><strong>Версии исследований</strong><br>Позволяет хранить и переключать версии исследования внутри одной сессии.</td>
+    <td width="33%"><strong>Управление настройками</strong><br>Позволяет настраивать пользователей, текстовый провайдер и провайдер эмбеддингов через интерфейс.</td>
   </tr>
 </table>
 
@@ -81,28 +83,28 @@
 <table>
   <tr>
     <td colspan="2">
-      <img src="./docs/readme-assets/readme-workspace-overview.png" alt="Workspace overview" width="100%">
+      <img src="./docs/readme-assets/readme-workspace-overview.png" alt="Общий вид рабочей среды" width="100%">
     </td>
   </tr>
   <tr>
-    <td align="center">Общий вид workspace: hypothesis cards, scene, verdict, ranking и processed attachments</td>
-    <td align="center">Реальный demo-run по кейсу хвостов КГМК</td>
+    <td align="center">Общий вид рабочей среды: карточки гипотез, сцена, итоговый вывод, ранжирование и обработанные вложения</td>
+    <td align="center">Локальный запуск проекта на кейсе хвостов КГМК</td>
   </tr>
   <tr>
     <td>
-      <img src="./docs/readme-assets/readme-hypothesis-preview.png" alt="Hypothesis preview" width="100%">
+      <img src="./docs/readme-assets/readme-hypothesis-preview.png" alt="Предпросмотр гипотезы" width="100%">
     </td>
     <td>
-      <img src="./docs/readme-assets/readme-knowledge-graph.png" alt="Knowledge graph" width="100%">
+      <img src="./docs/readme-assets/readme-knowledge-graph.png" alt="Граф знаний" width="100%">
     </td>
   </tr>
   <tr>
-    <td align="center">Hover-preview гипотезы с кратким механизмом, KPI alignment и feasibility</td>
-    <td align="center">Knowledge graph: вводные, источники, evidence, гипотезы и verdict в одной карте</td>
+    <td align="center">Предпросмотр гипотезы с кратким механизмом, связью с KPI и оценкой реализуемости</td>
+    <td align="center">Граф знаний: вводные, источники, факты, гипотезы и итоговый вывод в одной схеме</td>
   </tr>
   <tr>
     <td colspan="2">
-      <img src="./docs/readme-assets/readme-login.png" alt="Login page" width="100%">
+      <img src="./docs/readme-assets/readme-login.png" alt="Экран входа" width="100%">
     </td>
   </tr>
   <tr>
@@ -110,29 +112,29 @@
   </tr>
 </table>
 
-## Как работает продукт
+## Как работает проект
 
 ```mermaid
 flowchart LR
-    A[KPI и ограничения] --> B[Upload sources]
-    B --> C[Parse and chunk]
-    C --> D[Retrieval and evidence]
-    D --> E[Generate 3-5 hypotheses]
-    E --> F[Debate loops]
-    F --> G[Evaluation and ranking]
-    G --> H[Judge verdict]
-    H --> I[Recommended next checks]
+    A[KPI и ограничения] --> B[Загрузка источников]
+    B --> C[Разбор и нарезка]
+    C --> D[Поиск и факты]
+    D --> E[Построение 3-5 гипотез]
+    E --> F[Циклы обсуждения]
+    F --> G[Оценка и ранжирование]
+    G --> H[Итоговый вывод]
+    H --> I[Следующие проверки]
 ```
 
-### Screen Tour
+### Основной сценарий
 
 1. Формулирует задачу через `KPI`, ограничения и контекст.
 2. Загружает документы и вспомогательные материалы.
 3. Дожидается обработки и индексации файлов.
-4. Получает evidence с привязкой к исходникам.
+4. Получает факты, риски и ограничения с привязкой к исходным материалам.
 5. Смотрит стартовый набор гипотез.
 6. Наблюдает внутреннюю критику и доработку гипотез.
-7. Изучает evaluator outputs и рейтинг.
+7. Изучает результаты оценки и рейтинг.
 8. Получает финальную рекомендацию и список первых проверок.
 
 ## Что можно загружать
@@ -159,29 +161,29 @@ flowchart LR
 
 Для изображений проект умеет:
 
-- использовать vision description, если выбранный провайдер поддерживает картинки;
-- падать обратно в `Tesseract OCR (rus+eng)`, если vision-модель недоступна.
+- использовать описание изображения, если выбранный провайдер поддерживает работу с картинками;
+- переходить на `Tesseract OCR (rus+eng)`, если модель не поддерживает изображения.
 
 ## Архитектура
 
 ```mermaid
 flowchart TD
-    U[Browser] --> N[nginx]
-    N --> FE[React workspace]
+    U[Браузер] --> N[nginx]
+    N --> FE[React-интерфейс]
     N --> API[FastAPI backend]
     API --> DB[(PostgreSQL + pgvector)]
-    API --> STORE[(Uploads storage)]
+    API --> STORE[(Хранилище файлов)]
     DBI[db-init] --> DB
-    API --> ORCH[Research orchestrator]
-    ORCH --> DOC[Document pipeline]
-    ORCH --> RET[Retrieval and evidence]
-    ORCH --> HYP[Hypothesis engine]
-    ORCH --> DEB[Debate layer]
-    ORCH --> EVA[Evaluation layer]
-    ORCH --> J[Judge]
+    API --> ORCH[Исследовательский оркестратор]
+    ORCH --> DOC[Обработка документов]
+    ORCH --> RET[Поиск и факты]
+    ORCH --> HYP[Построение гипотез]
+    ORCH --> DEB[Обсуждение]
+    ORCH --> EVA[Оценка]
+    ORCH --> J[Судья]
 ```
 
-Runtime включает:
+В состав локального контура входят:
 
 - `frontend`
 - `backend`
@@ -191,10 +193,10 @@ Runtime включает:
 
 Архитектурный принцип:
 
-- `frontend` отвечает за research workspace, scene и graph UX;
-- `backend` держит API, orchestration, state и export logic;
-- `research orchestrator` явно проводит ingestion, retrieval, hypothesis generation, debate, evaluation и judge;
-- `postgres + pgvector` хранят identity, session state, chunks, evidence и версии research runs.
+- `frontend` отвечает за интерфейс исследовательской среды, сцену и граф знаний;
+- `backend` держит API, оркестрацию, состояние сессий и экспорт результатов;
+- `исследовательский оркестратор` явно проводит этапы обработки документов, поиска, построения гипотез, обсуждения, оценки и итогового вывода;
+- `postgres + pgvector` хранят пользователей, состояние сессий, фрагменты документов, факты и версии исследований.
 
 ## Быстрый запуск
 
@@ -214,7 +216,7 @@ docker compose up --build
 После старта:
 
 - приложение: `http://localhost:8080`
-- backend docs: `http://localhost:8080/api/docs`
+- документация backend API: `http://localhost:8080/api/docs`
 
 Если вы изменили `NGINX_EXTERNAL_PORT`, открывайте свой порт из `.env`.
 
@@ -223,7 +225,7 @@ docker compose up --build
 1. Заполнить `.env`.
 2. Поднять `docker compose up --build`.
 3. Войти под `SUPERADMIN_USERNAME` / `SUPERADMIN_PASSWORD`.
-4. Загрузить материалы и запустить research session.
+4. Загрузить материалы и запустить исследовательскую сессию.
 
 ## Минимальная конфигурация `.env`
 
@@ -253,10 +255,10 @@ EMBEDDING_FOLDER_ID=
 
 Важно:
 
-- `MODEL_PROVIDER_*` нужны для hypothesis generation, debate, evaluation и judge verdict.
-- `EMBEDDING_*` нужны для document retrieval и evidence layer.
-- для OpenAI-compatible провайдеров `*_FOLDER_ID` обычно можно оставить пустым.
-- настройки провайдеров можно поправить и после входа через admin panel.
+- `MODEL_PROVIDER_*` нужны для построения гипотез, обсуждения, оценки и итогового вывода.
+- `EMBEDDING_*` нужны для обработки документов, поиска и слоя фактов.
+- для OpenAI-совместимых провайдеров `*_FOLDER_ID` обычно можно оставить пустым.
+- настройки провайдеров можно менять и после входа через панель администратора.
 
 ## Демо-кейс из скриншотов
 
@@ -277,30 +279,30 @@ EMBEDDING_FOLDER_ID=
 
 ## Как проект развивался
 
-По истории репозитория и внутренней документации проект развивался не как landing page, а как реальный продуктовый контур:
+По истории репозитория и внутренней документации видно, что проект развивался как рабочий исследовательский контур:
 
-1. Сначала появился базовый React workspace и позиционирование как `chat-based R&D assistant`.
-2. Затем были добавлены auth, admin-panel, суперпользователь, provider settings и runtime на `Docker Compose`.
-3. После этого проект вырос в session-based workspace: persistent chats, файлы, пользовательские агенты, verdict UI и account surface.
-4. Следующий крупный шаг: полноценный `research pipeline` с background runs, progress tracking, versioned runs, evaluation stage и judge.
-5. Последние крупные изменения усилили explainability: knowledge graph, input-to-evidence links, image support, OCR fallback и draft inputs для research sessions.
+1. Сначала появился базовый React-интерфейс и общее направление исследовательского помощника.
+2. Затем были добавлены авторизация, панель администратора, суперпользователь, настройки провайдеров и запуск через `Docker Compose`.
+3. После этого проект вырос в среду с исследовательскими сессиями: чаты, файлы, пользовательские агенты, итоговый вывод и настройки аккаунта.
+4. Следующий крупный шаг: полноценный исследовательский пайплайн с фоновыми запусками, отслеживанием прогресса, версиями исследований, этапом оценки и судейским выводом.
+5. Последние крупные изменения усилили прозрачность работы: граф знаний, связи между вводными и фактами, поддержка изображений, переход на OCR и draft inputs для исследовательских сессий.
 
-Итог: репозиторий уже содержит не прототип экрана, а законченную explainable R&D platform с product docs, architecture docs и рабочим локальным runtime.
+В текущем состоянии репозиторий содержит не только интерфейс, но и документацию по продукту, архитектуре и локальному запуску.
 
 Что особенно видно по истории:
 
-- сначала проект был ближе к research chat;
-- затем превратился в session-based workspace;
-- потом получил полноценный orchestrated pipeline;
-- на последних итерациях усилил explainability через graph, versioned runs, OCR и richer evidence mapping.
+- сначала проект был ближе к исследовательскому чату;
+- затем превратился в среду с исследовательскими сессиями;
+- потом получил полноценный оркестрируемый пайплайн;
+- на последних итерациях усилил прозрачность через граф знаний, версии исследований, OCR и более подробные связи между источниками и фактами.
 
 ## Структура репозитория
 
 ```text
 backend/   FastAPI API, orchestration, models, services, Alembic
-frontend/  React workspace, auth, scene, graph, UI logic
-nginx/     reverse proxy and external entrypoint
-docs/      product, architecture, internal examples, source materials
+frontend/  React-интерфейс, авторизация, сцена, граф, логика UI
+nginx/     внешний вход и маршрутизация трафика
+docs/      продуктовая и архитектурная документация, внутренние примеры, исходные материалы
 ```
 
 ## Карта документации
@@ -332,13 +334,13 @@ docker compose down -v
 - проверьте `docker compose ps`
 - проверьте, какой `NGINX_EXTERNAL_PORT` стоит в `.env`
 
-### Research pipeline не стартует
+### Исследовательский пайплайн не стартует
 
 - проверьте `MODEL_PROVIDER_BASE_URL`
 - проверьте `MODEL_PROVIDER_API_KEY`
 - проверьте `MODEL_PROVIDER_MODEL`
 
-### Файлы загружаются, но evidence не строится
+### Файлы загружаются, но факты не строятся
 
 - проверьте `EMBEDDING_BASE_URL`
 - проверьте `EMBEDDING_API_KEY`
@@ -351,6 +353,6 @@ docker compose down
 docker compose up --build
 ```
 
-## Support
+## Поддержка
 
 Если сервис не поднимается или ошибка непонятна, напишите в Telegram: `@krojiak`.
